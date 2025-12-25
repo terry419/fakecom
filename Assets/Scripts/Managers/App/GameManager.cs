@@ -2,11 +2,16 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
+    private void Awake()
+    {
+        ServiceLocator.Register(this);
+    }
+
     public bool IsPaused { get; private set; } = false;
 
     public void Initialize()
     {
-        // °ÔÀÓ »óÅÂ ¼³Á¤ ÃÊ±âÈ­
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
     }
 
     public void StartGame()

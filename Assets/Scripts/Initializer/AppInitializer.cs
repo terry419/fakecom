@@ -3,55 +3,68 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using System;
 using System.Linq;
-using System.Diagnostics; // [복구] Stopwatch용 네임스페이스
+using System.Diagnostics;
+using System.Text;
 
 public static class AppInitializer
 {
     private static bool _isInitialized = false;
+    private static StringBuilder _sbLog = new StringBuilder();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void InitializeGame()
     {
-        // 1. 중복 실행 방지
         if (_isInitialized) return;
         _isInitialized = true;
 
-        // [복구] 성능 측정 시작
         var sw = Stopwatch.StartNew();
-        UnityEngine.Debug.Log("[AppInitializer] System Initialization Started...");
+        _sbLog.Clear();
+        _sbLog.AppendLine("[AppInitializer] System Initialization Started...");
 
         try
         {
-            // -----------------------------------------------------------------
-            // 2. 초기화 로직 수행
-            // -----------------------------------------------------------------
+            // 1. AppConfig 로드
             var config = LoadAppConfig();
+            _sbLog.AppendLine($" - [Load] AppConfig Loaded. (Global: {config.GlobalSettingsRef.AssetGUID})");
 
-            // 어드레서블 초기화
+            // 2. Addressables 초기화
             var initHandle = Addressables.InitializeAsync();
             initHandle.WaitForCompletion();
 
-            if (initHandle.IsValid() && initHandle.Status != AsyncOperationStatus.Succeeded)
+            if (initHandle.IsValid() && initHandle.Status == AsyncOperationStatus.Succeeded)
             {
-                throw new Exception($"[FATAL] Addressables Initialization Failed. Status: {initHandle.Status}");
+                _sbLog.AppendLine(" - [System] Addressables Initialized.");
             }
+            else if (!initHandle.IsValid())
+            {
+                _sbLog.AppendLine(" - [System] Addressables Initialized (Handle Released).");
+            }
+            else
+            {
+                throw new Exception($"Addressables Failed: {initHandle.Status}");
+            }
+
             GameObject globalRoot = GetOrCreateGlobalRoot();
 
-            // 데이터 및 객체 로드
+            // 3. 매니저 로드 및 생성
             LoadGlobalSettings(config);
-            SpawnInputManager(config, globalRoot.transform);
+            // ▼ [수정됨] 자가 등록 패턴 적용으로 name 인자 제거
+            SpawnManager(config.InputManagerRef, globalRoot.transform);
+            SpawnManager(config.DataManagerRef, globalRoot.transform);
+            SpawnManager(config.GameManagerRef, globalRoot.transform);
 
-            // -----------------------------------------------------------------
-            // 3. 완료 및 결과 리포트
-            // -----------------------------------------------------------------
             sw.Stop();
-            UnityEngine.Debug.Log($"[AppInitializer] Initialization Complete. (Time: {sw.ElapsedMilliseconds}ms)");
+            _sbLog.AppendLine($"[AppInitializer] Initialization Complete. (Total Time: {sw.ElapsedMilliseconds}ms)");
+
+            UnityEngine.Debug.Log(_sbLog.ToString());
         }
         catch (Exception ex)
         {
-            // [복구] 실패 시에도 시간 측정 종료 및 로그 출력
             sw.Stop();
-            UnityEngine.Debug.LogError($"[AppInitializer] CRITICAL ERROR! (Time: {sw.ElapsedMilliseconds}ms)\nReason: {ex}");
+            _sbLog.AppendLine($"[AppInitializer] CRITICAL FAILURE (Time: {sw.ElapsedMilliseconds}ms)");
+            _sbLog.AppendLine($"Reason: {ex}");
+
+            UnityEngine.Debug.LogError(_sbLog.ToString());
 
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
@@ -61,15 +74,34 @@ public static class AppInitializer
         }
     }
 
-    // --- (헬퍼 함수들은 이전과 동일하여 생략, 그대로 쓰시면 됩니다) ---
-    // LoadAppConfig(), GetOrCreateGlobalRoot(), LoadGlobalSettings(), SpawnInputManager() 
-    // ... 위 함수들은 아까 확정한 버전 그대로 아래에 붙여넣으시면 됩니다.
+    // --- Helper Methods ---
+
+    // ▼ [수정됨] 매니저 등록 로직 제거 및 name 인자 제거
+    private static void SpawnManager(AssetReferenceT<GameObject> refObj, Transform parent)
+    {
+        if (!refObj.RuntimeKeyIsValid())
+            throw new Exception($"A manager reference ({refObj.RuntimeKey}) is invalid in AppConfig.");
+
+        var op = refObj.InstantiateAsync(parent);
+        var obj = op.WaitForCompletion();
+
+        if (op.Status == AsyncOperationStatus.Succeeded && obj != null)
+        {
+            obj.name = op.Result.name; // 프리팹 이름으로 설정
+            _sbLog.AppendLine($"   - [Instantiated] {obj.name}");
+            // [제거됨] ServiceLocator.Register() 로직
+            // 이제 각 매니저의 Awake()에서 스스로 등록합니다.
+        }
+        else
+        {
+            throw new Exception($"Failed to spawn manager with key {refObj.RuntimeKey}.");
+        }
+    }
 
     private static AppConfig LoadAppConfig()
     {
         var config = Resources.FindObjectsOfTypeAll<AppConfig>().FirstOrDefault();
-        if (config == null)
-            throw new InvalidOperationException("AppConfig not found in Preloaded Assets.");
+        if (config == null) throw new InvalidOperationException("AppConfig not found in Resources!");
         return config;
     }
 
@@ -86,34 +118,19 @@ public static class AppInitializer
     private static void LoadGlobalSettings(AppConfig config)
     {
         if (!config.GlobalSettingsRef.RuntimeKeyIsValid())
-            throw new Exception("AppConfig: GlobalSettings reference is missing.");
+            throw new Exception("GlobalSettings Reference is invalid.");
 
         var op = config.GlobalSettingsRef.LoadAssetAsync();
         var settings = op.WaitForCompletion();
 
-        if (op.Status != AsyncOperationStatus.Succeeded || settings == null)
-            throw new Exception($"Failed to load GlobalSettingsSO from key '{config.GlobalSettingsRef.AssetGUID}'. Check Addressable Groups.");
-
-        ServiceLocator.Register(settings);
-    }
-
-    private static void SpawnInputManager(AppConfig config, Transform parent)
-    {
-        if (!config.InputManagerRef.RuntimeKeyIsValid())
-            throw new Exception("AppConfig: InputManager reference is missing.");
-
-        var op = config.InputManagerRef.InstantiateAsync(parent);
-        var inputObj = op.WaitForCompletion();
-
-        if (op.Status != AsyncOperationStatus.Succeeded || inputObj == null)
-            throw new Exception($"Failed to instantiate InputManager from key '{config.InputManagerRef.AssetGUID}'.");
-
-        inputObj.name = "InputManager";
-
-        var inputMgr = inputObj.GetComponent<InputManager>();
-        if (inputMgr == null)
-            throw new MissingComponentException("Prefab loaded but missing 'InputManager' component.");
-
-        ServiceLocator.Register(inputMgr);
+        if (op.Status == AsyncOperationStatus.Succeeded && settings != null)
+        {
+            ServiceLocator.Register(settings);
+            _sbLog.AppendLine($"   - [Register] GlobalSettingsSO (Ver: {settings.GameVersion})");
+        }
+        else
+        {
+            throw new Exception("Failed to load GlobalSettingsSO.");
+        }
     }
 }

@@ -11,14 +11,13 @@ public class AppConfig : ScriptableObject
     [Header("2. Global Managers (Addressable)")]
     [SerializeField] private AssetReferenceT<GameObject> _inputManagerRef;
 
+    [SerializeField] private AssetReferenceT<GameObject> _dataManagerRef;
+    [SerializeField] private AssetReferenceT<GameObject> _gameManagerRef;
+
 #if UNITY_EDITOR
     [Header("Editor Debug Info")]
     [SerializeField] public GlobalSettingsSO _editorGlobalSettingsDebug;
 
-
-    [Header("3. Seesion Managers")]
-    [SerializeField] private AssetReferenceT<GameObject> _dataManagerRef; // 세이브/로드, 인벤토리 등
-    [SerializeField] private AssetReferenceT<GameObject> _gameManagerRef; // 게임 상태(FSM), 레벨 관리
 #endif
 
     // -----------------------------------------------------------------------
@@ -27,5 +26,5 @@ public class AppConfig : ScriptableObject
     public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef => _globalSettingsRef;
     public AssetReferenceT<GameObject> InputManagerRef => _inputManagerRef;
     public AssetReferenceT<GameObject> DataManagerRef => _dataManagerRef;
-    public AssetReferenceT<GameObject> GameManagerRef => _gameManagerRef;
+   public AssetReferenceT<GameObject> GameManagerRef => _gameManagerRef;
 }

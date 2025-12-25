@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class TargetUIManager : MonoBehaviour, IInitializable
+public class TurnManager : MonoBehaviour, IInitializable
 {
     private void Awake()
     {
@@ -13,14 +13,14 @@ public class TargetUIManager : MonoBehaviour, IInitializable
     private void OnDestroy()
     {
         // 2. 파괴될 때 스스로를 등록 해제 (매우 중요!)
-        ServiceLocator.Unregister(this);
+        ServiceLocator.Unregister<TurnManager>(this);
         Debug.Log("[Self-Unregister] TurnManager Unregistered.");
     }
 
     public void Initialize() { }
-    // 타겟 정보 UI 표시 및 풀링을 담당합니다.
-    public void ShowTargetInfo()
+    // 나중에 턴 순서, 제한 시간 등을 여기서 관리하겠죠?
+    public void StartBattle()
     {
-        Debug.Log("[TargetUIManager] 타겟 UI 표시.");
+        Debug.Log("전투 시작! 턴 시스템 가동.");
     }
 }

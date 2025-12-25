@@ -163,7 +163,7 @@ public class SceneInitializer : MonoBehaviour
         // 해제 예약
         _unregisterStack.Push(() =>
         {
-            ServiceLocator.Unregister<T>();
+            ServiceLocator.Unregister(instance);
             sbLog.AppendLine($"   - [Unregister] {typeName}");
         });
     }

@@ -1,20 +1,34 @@
-// 파일명: SessionManager.cs
-using Cysharp.Threading.Tasks; // GDD 6.1 UniTask 사용
+using UnityEngine;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using Cysharp.Threading.Tasks;
 
 public class SessionManager : MonoBehaviour, IInitializable
 {
     public event Action<SessionState, SessionState> OnStateChanged;
     public SessionState CurrentState { get; private set; } = SessionState.None;
 
-    // GDD 6.3: 전투 중 획득한 아이템 임시 저장고
     private List<object> _pendingLoot = new List<object>();
+
+    private void Awake()
+    {
+        // 1. 깨어날 때 스스로를 등록
+        ServiceLocator.Register(this);
+        Debug.Log("[Self-Register] TurnManager Registered.");
+    }
+
+
+    private void OnDestroy()
+    {
+        // 2. 파괴될 때 스스로를 등록 해제 (매우 중요!)
+        ServiceLocator.Unregister(this);
+        Debug.Log("[Self-Unregister] TurnManager Unregistered.");
+    }
+
 
     public void Initialize()
     {
-        // 씬 로드 시 SceneInitializer에 의해 호출됨
+        // 로그 제거됨 (SceneInitializer가 보고함)
         _pendingLoot.Clear();
         ChangeState(SessionState.Boot);
     }
@@ -23,11 +37,17 @@ public class SessionManager : MonoBehaviour, IInitializable
     {
         if (CurrentState == newState) return;
 
-        // [안전장치] 저장 중에는 상태 변경을 제한함
-        if (CurrentState == SessionState.Saving && newState != SessionState.Error) return;
+        if (CurrentState == SessionState.Saving && newState != SessionState.Error)
+        {
+            Debug.LogWarning($"[SessionManager] Cannot change state to {newState} while SAVING.");
+            return;
+        }
 
         SessionState oldState = CurrentState;
         CurrentState = newState;
+
+        // 상태 변경 로그 (이모티콘 제거, 표준 포맷)
+        Debug.Log($"[SessionManager] State Change: {oldState} -> {newState}");
 
         HandleStateEntry(newState).Forget();
         OnStateChanged?.Invoke(oldState, newState);
@@ -38,47 +58,62 @@ public class SessionManager : MonoBehaviour, IInitializable
         switch (state)
         {
             case SessionState.Boot:
-                await ProcessBooting(); // 자동 전환 로직
+                await ProcessBooting();
                 break;
 
             case SessionState.Setup:
-                ResumeGameTime(); // 시간 복구
-                // MapManager.Generate() 호출 로직 위치
+                ResumeGameTime();
+                // MapManager.Generate() 호출 로직
+                // Setup 완료 로그는 필요할 수 있음 (흐름 파악용)
+                Debug.Log("[SessionManager] Setup Complete. Auto-transition to TurnWaiting.");
                 ChangeState(SessionState.TurnWaiting);
                 break;
 
             case SessionState.TurnWaiting:
-                ResumeGameTime(); // 시간 복구
-                // TurnManager.DetermineNextUnit() 호출 (GDD 11.3)
+                ResumeGameTime();
+                // TurnManager.DetermineNextUnit()
                 break;
 
             case SessionState.SystemOption:
-                PauseGameTime(); // 시간 정지
+                PauseGameTime();
                 break;
 
             case SessionState.Resolution:
                 PauseGameTime();
-                // GDD 6.3: Pending Loot를 세이브 데이터로 전송
+                Debug.Log($"[SessionManager] Battle Result. Pending Loot Count: {_pendingLoot.Count}");
                 break;
 
             case SessionState.Retry:
-                // 재귀 호출을 피하기 위해 다음 프레임에 Setup으로 전환
                 await UniTask.Yield();
                 ChangeState(SessionState.Setup);
+                break;
+
+            case SessionState.Error:
+                PauseGameTime();
+                Debug.LogError("[SessionManager] Critical Session Error Occurred.");
                 break;
         }
     }
 
-    // [개선] 시간 제어 로직 통합
-    private void PauseGameTime() => Time.timeScale = 0f;
-    private void ResumeGameTime() => Time.timeScale = 1f;
+    private void PauseGameTime()
+    {
+        Time.timeScale = 0f;
+    }
+
+    private void ResumeGameTime()
+    {
+        Time.timeScale = 1f;
+    }
 
     private async UniTask ProcessBooting()
     {
-        // GDD 8.0: 데이터 매니저를 통한 SO 로드 확인
+        // 데이터 로드 시뮬레이션
         await UniTask.Delay(TimeSpan.FromSeconds(0.5f));
         ChangeState(SessionState.Setup);
     }
 
-    public void AddLoot(object item) => _pendingLoot.Add(item);
+    public void AddLoot(object item)
+    {
+        _pendingLoot.Add(item);
+    }
 }

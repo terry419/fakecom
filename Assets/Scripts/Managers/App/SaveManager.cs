@@ -3,6 +3,10 @@ using UnityEngine;
 //  나중에 전역(Global)에서 파일의 저장/불러오기를 담당할 클래스
 public class SaveManager : MonoBehaviour
 {
+    private void Awake()
+    {
+        ServiceLocator.Register(this);
+    }
     /*
      * [미래의 작업 내역]
      * 1. Application.persistentDataPath에서 세이브 파일 리스트 스캔
