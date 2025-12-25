@@ -1,0 +1,3667 @@
+==================== UnitPositionAnchor.cs (경로: ./fakecom/Assets/Scripts/Enemy/UnitPositionAnchor.cs) ====================
+using UnityEngine;
+
+public class UnitPositionAnchor : MonoBehaviour
+{
+    public Vector3Int GridPosition { get; private set; }
+
+    [Header("Height Adjustment")]
+    [Tooltip("타일 표면으로부터의 미세 높이 오프셋")]
+    [SerializeField] private float anchorOffset = 0.01f;
+
+    private void Start()
+    {
+        var mapManager = MapManager.Instance;
+        if (mapManager == null || !mapManager.IsInitialized)
+        {
+            enabled = false;
+            return;
+        }
+
+        Vector3Int gridPos = GridUtils.WorldToGrid(transform.position);
+        GridPosition = gridPos;
+
+        Tile myTile = mapManager.GetTileAt(gridPos);
+        if (myTile != null)
+        {
+            myTile.OccupyingObject = this;
+
+            // Bounds 기반 정밀 배치
+            float targetY = GridUtils.GetSurfaceY(myTile, this.gameObject, anchorOffset);
+
+            Vector3 tilePos = myTile.transform.position;
+            transform.position = new Vector3(tilePos.x, targetY, tilePos.z);
+
+            Debug.Log($"[UnitPositionAnchor] {name} anchored to {gridPos} at Y:{targetY}");
+        }
+    }
+
+    public void SetGridPosition(Vector3Int newPos)
+    {
+        GridPosition = newPos;
+    }
+}
+
+==================== Tile.cs (경로: ./fakecom/Assets/Scripts/Core/Tile.cs) ====================
+using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class Tile : MonoBehaviour
+{
+    [field: SerializeField]
+    public Vector3Int Coordinate { get; private set; }
+
+    public Vector3Int GridPosition => Coordinate;
+
+    [SerializeField]
+    private BlockType blockType = BlockType.Floor;
+    public BlockType Type => blockType;
+
+    [SerializeField]
+    private EdgeInfo[] edges;
+    [SerializeField, HideInInspector]
+    private GameObject[] edgeObjects = new GameObject[4];
+
+    [SerializeField, HideInInspector]
+    private GameObject pillarObject;
+
+    public Component OccupyingObject { get; set; }
+    public int Cost { get; set; } = 1;
+
+    // 물리적 높이 계산용 콜라이더 캐싱
+    private Collider _tileCollider;
+    // 시각적 높이 계산용 렌더러/메쉬필터 캐싱
+    private Renderer _visualRenderer;
+    private MeshFilter _visualMeshFilter;
+
+    private void Awake()
+    {
+        InitializeArrays();
+        _tileCollider = GetComponent<Collider>();
+
+        Transform visualTransform = transform.Find("Visual");
+        if (visualTransform != null)
+        {
+            _visualRenderer = visualTransform.GetComponent<Renderer>();
+            _visualMeshFilter = visualTransform.GetComponent<MeshFilter>();
+        }
+    }
+
+    /// <summary>
+    /// 타일의 물리적 상단(bounds.max.y) 좌표를 반환합니다.
+    /// </summary>
+    public float GetTopY()
+    {
+        if (_tileCollider == null) _tileCollider = GetComponent<Collider>();
+        return _tileCollider != null ? _tileCollider.bounds.max.y : transform.position.y;
+    }
+
+    /// <summary>
+    /// 타일의 시각적 표면(bounds.max.y) 좌표를 반환합니다. Awake()에서도 안전하게 호출할 수 있습니다.
+    /// </summary>
+    public float GetSurfaceY()
+    {
+        if (_visualMeshFilter != null && _visualMeshFilter.sharedMesh != null)
+        {
+            // renderer.bounds는 Awake()에서 값이 부정확할 수 있으므로, 수동으로 계산합니다.
+            var mesh = _visualMeshFilter.sharedMesh;
+            var visualTransform = _visualMeshFilter.transform;
+
+            // 메쉬의 로컬 y최대값(bounds.max.y)에 월드 스케일을 곱하고, 실제 월드 위치를 더해줍니다.
+            return visualTransform.position.y + (mesh.bounds.max.y * visualTransform.lossyScale.y);
+        }
+
+        // fallback: Awake() 이후에 호출될 경우를 위한 원래 로직
+        if (_visualRenderer != null)
+        {
+            return _visualRenderer.bounds.max.y;
+        }
+        
+        // 최종 fallback
+        return transform.position.y;
+    }
+
+    private void InitializeArrays()
+    {
+        if (edges == null || edges.Length != 4)
+        {
+            edges = new EdgeInfo[4];
+            for (int i = 0; i < 4; i++) edges[i] = EdgeInfo.Default;
+        }
+
+        if (edgeObjects == null || edgeObjects.Length != 4)
+            edgeObjects = new GameObject[4];
+    }
+
+    public void Initialize(Vector3Int coord, BlockType type = BlockType.Floor)
+    {
+        Coordinate = coord;
+        blockType = type;
+        InitializeArrays();
+        for (int i = 0; i < 4; i++) edgeObjects[i] = null;
+    }
+
+    public void UpdateCoordinate(Vector3Int newCoord)
+    {
+        Coordinate = newCoord;
+        gameObject.name = $"Tile_{newCoord.x}_{newCoord.y}_{newCoord.z}";
+    }
+
+    public void SetEdgeObject(Direction dir, GameObject obj)
+    {
+        int index = (int)dir;
+        if (index < 0 || index >= 4) return;
+        if (edgeObjects[index] != null && edgeObjects[index] != obj)
+        {
+            if (Application.isPlaying) Destroy(edgeObjects[index]);
+            else DestroyImmediate(edgeObjects[index]);
+        }
+        edgeObjects[index] = obj;
+    }
+
+    public GameObject GetEdgeObject(Direction dir)
+    {
+        if (edgeObjects == null || edgeObjects.Length < 4) return null;
+        return edgeObjects[(int)dir];
+    }
+
+    public void SetEdge(Direction direction, EdgeInfo info)
+    {
+        if (direction == Direction.None) return;
+        int index = (int)direction;
+        if (index < 0 || index >= 4) return;
+        edges[index] = info;
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(this);
+#endif
+    }
+
+    public EdgeInfo GetEdge(Direction direction)
+    {
+        if (direction == Direction.None) return EdgeInfo.Default;
+        int index = (int)direction;
+        if (index < 0 || index >= 4) return EdgeInfo.Default;
+        return edges[index];
+    }
+
+    public float GetWorldHeight() => Coordinate.y * GridUtils.LEVEL_HEIGHT;
+    public bool CanMove(Direction direction) => GetEdge(direction).IsTraversable;
+    public float GetBlocksSight(Direction direction) => GetEdge(direction).BlocksSight;
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(0, 1, 1, 0.3f);
+        Gizmos.DrawWireCube(transform.position, new Vector3(2.5f, 0.1f, 2.5f));
+    }
+}
+
+==================== PaletteIDAttribute.cs (경로: ./fakecom/Assets/Scripts/Core/PaletteIDAttribute.cs) ====================
+using UnityEngine;
+
+//   ־ [PaletteID]   ֽϴ.
+public class PaletteIDAttribute : PropertyAttribute { }
+
+==================== AppInitializer.cs (경로: ./fakecom/Assets/Scripts/Core/AppInitializer.cs) ====================
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class AppInitializer : MonoBehaviour
+{
+    [Header("Config")]
+    [SerializeField] private GlobalSettingsSO globalSettings;
+
+    private static AppInitializer instance;
+
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void Start()
+    {
+        InitializeGlobalScope();
+        InitializeSessionScope();
+
+        // [핵심] 데이터 로드 및 실패 처리
+        var dataManager = ServiceLocator.Get<DataManager>();
+        if (dataManager != null)
+        {
+            bool success = dataManager.InitializeData();
+            if (!success)
+            {
+                GLog.Error("데이터 초기화 실패! 새 게임으로 복구를 시도합니다.");
+                dataManager.NewGame();
+            }
+        }
+        else
+        {
+            GLog.Error("[FATAL] DataManager를 찾을 수 없습니다!");
+        }
+
+        // 검증 로그
+        ServiceLocator.PrintAllRegisteredServices();
+        GLog.Info("[AppInitializer] 전체 초기화 완료");
+
+        // 씬 로드 (중복 방지)
+        if (SceneManager.GetActiveScene().name != "SampleScene")
+        {
+            SceneManager.LoadScene("SampleScene");
+        }
+        else
+        {
+            GLog.Info("[AppInitializer] 이미 SampleScene입니다. 씬 로드를 건너뜁니다.");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this) instance = null;
+    }
+
+    private void InitializeGlobalScope()
+    {
+        var existingGlobalRoot = GameObject.Find("GlobalManagers");
+        if (existingGlobalRoot != null) return;
+
+        GameObject globalRoot = new GameObject("GlobalManagers");
+        DontDestroyOnLoad(globalRoot);
+        GLog.Info("[AppInitializer] 새 GlobalManagers 생성");
+
+        if (globalSettings != null)
+        {
+            ServiceLocator.Register(globalSettings, ManagerScope.Global);
+            GLog.Info("[AppInitializer] GlobalSettingsSO 등록 완료");
+        }
+        else
+        {
+            GLog.Error("[FATAL] AppInitializer에 GlobalSettingsSO가 연결되지 않았습니다!");
+        }
+
+        OrganizeGlobalManagers(globalRoot);
+        GLog.Info("[AppInitializer] Global Scope 초기화 완료");
+    }
+
+    private void OrganizeGlobalManagers(GameObject root)
+    {
+        // 1. InputManager 처리
+        var existingInputs = FindObjectsOfType<InputManager>();
+        if (existingInputs.Length > 1)
+        {
+            for (int i = 1; i < existingInputs.Length; i++) Destroy(existingInputs[i].gameObject);
+        }
+
+        var input = FindObjectOfType<InputManager>();
+        if (input == null) root.AddComponent<InputManager>();
+        else if (input.transform.parent != root.transform) input.transform.SetParent(root.transform);
+
+        // 2. [추가] DataManager 생성 보장 (없으면 만들어서 붙임)
+        var dataManager = FindObjectOfType<DataManager>();
+        if (dataManager == null)
+        {
+            GameObject dmObj = new GameObject("DataManager");
+            dmObj.transform.SetParent(root.transform);
+            dmObj.AddComponent<DataManager>();
+            GLog.Info("[AppInitializer] 새 DataManager 생성 및 등록");
+        }
+        else if (dataManager.transform.parent != root.transform)
+        {
+            dataManager.transform.SetParent(root.transform);
+        }
+    }
+
+    private void InitializeSessionScope()
+    {
+        var existingSessionRoot = GameObject.Find("SessionManagers");
+        if (existingSessionRoot != null) return;
+
+        GameObject sessionRoot = new GameObject("SessionManagers");
+        DontDestroyOnLoad(sessionRoot);
+        GLog.Info("[AppInitializer] 새 SessionManagers 생성");
+    }
+}
+
+==================== UnitDataSO.cs (경로: ./fakecom/Assets/Scripts/Core/UnitDataSO.cs) ====================
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "UnitDataSO", menuName = "ScriptableObjects/Unit Data", order = 1)]
+public class UnitDataSO : ScriptableObject
+{
+    public string UnitID;
+    public string UnitName;
+    public Team UnitTeam;
+    public ClassType ClassType;
+
+    [Header("Base Stats")]
+    public BaseStatsStruct BaseStats;
+
+    [Header("Animations")]
+    public string deathAnimationTrigger = "Die"; // 애니메이션을 실행할 트리거 이름
+    public string deathStateName = "DeathState"; // 애니메이션이 끝났는지 확인할 상태 이름
+
+
+    [System.Serializable]
+    public struct BaseStatsStruct
+    {
+        public int MaxHP;
+        public int Mobility; // 이동 거리 (타일 수)
+        public int Range; // 기본 사거리 (타일 수)
+        public int Agility; // 민첩성 (TS 계산용)
+        public int Aim; // 기본 명중률
+        public int Evasion; // 기본 회피율
+        public float CritChance; // 기본 치명타 확률
+    }
+
+
+
+    public enum Team
+    {
+        Player, // 아군
+        Enemy,  // 적군
+        Neutral // 중립
+    }
+
+    // DefaultLoadout과 같은 필드는 현재 공격 기능 구현에 직접적으로 필요하지 않으므로,
+    // SO 시스템 2단계에서 추가 구현 예정 (GDD 8.1 참조)
+    // public DefaultLoadoutStruct DefaultLoadout;
+    // [System.Serializable]
+    // public struct DefaultLoadoutStruct { /* ... */ }
+
+    // AI_Behavior도 현재 스코프 밖이므로 2단계에서 추가 구현 예정
+    // public AIBehaviorSO AI_Behavior;
+}
+
+==================== SceneInitializer.cs (경로: ./fakecom/Assets/Scripts/Core/SceneInitializer.cs) ====================
+using UnityEngine;
+using System.Linq; // [ʼ] Linq ߰
+
+/// <summary>
+///  ġ Ŵ ʱȭϰ,   ȭ մϴ.
+/// </summary>
+public class SceneInitializer : MonoBehaviour
+{
+    private void Awake()
+    {
+        // ߺ  
+        var existingInitializers = FindObjectsOfType<SceneInitializer>();
+        if (existingInitializers.Length > 1)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        // Scene Scope Ŵ   
+        GameObject sceneRoot = new GameObject("SceneManagers");
+        sceneRoot.transform.SetParent(this.transform);
+
+        RegisterOrSpawn<TurnManager>(sceneRoot);
+        RegisterOrSpawn<CombatManager>(sceneRoot);
+        RegisterOrSpawn<PlayerInputCoordinator>(sceneRoot);
+        // ʿ ٸ Ŵ(MapManager )  Awake ϰų ⼭ ߰
+        RegisterOrSpawn<MapManager>(sceneRoot);
+        RegisterOrSpawn<TargetUIManager>(sceneRoot);
+        RegisterOrSpawn<DamageTextManager>(sceneRoot);
+
+        GLog.Info("[SceneInitializer] Awake Ϸ (Ŵ  )");
+    }
+
+    private void RegisterOrSpawn<T>(GameObject root) where T : MonoBehaviour
+    {
+        if (ServiceLocator.IsRegistered<T>()) return;
+
+        T existing = FindObjectOfType<T>();
+        if (existing != null) return;
+
+        GameObject go = new GameObject(typeof(T).Name);
+        go.transform.SetParent(root.transform);
+        go.AddComponent<T>();
+        GLog.Info($"[SceneInitializer] {typeof(T).Name} ڵ  Ϸ");
+    }
+
+    private void Start()
+    {
+
+        GLog.Info("[SceneInitializer] Scene Scope ʱȭ Ϸ");
+
+        // [߰]   ȭ 
+        SyncUnitsWithData();
+    }
+
+    private void SyncUnitsWithData()
+    {
+        var dataManager = ServiceLocator.Get<DataManager>();
+
+        //  Ŵ ̺ Ͱ   Ұ
+        if (dataManager == null || dataManager.CurrentData == null) return;
+
+        var units = FindObjectsOfType<UnitStatus>();
+        bool hasChanges = false;
+
+        foreach (var unit in units)
+        {
+            // [] UnitDataSO  Ȯ
+            if (unit.unitData == null)
+            {
+                GLog.Warning($"[SceneInitializer] {unit.gameObject.name} UnitDataSO ־ ȭ ǳʶݴϴ.");
+                continue;
+            }
+
+            // Ʊ ָ /ε  (   Ϳ )
+            if (unit.unitData.UnitTeam == UnitDataSO.Team.Player)
+            {
+                // Roster  ID ġϴ  ã
+                var saveData = dataManager.CurrentData.Roster.FirstOrDefault(x => x.UnitID == unit.unitData.UnitID);
+
+                if (saveData != null)
+                {
+                    // Case A: ̹ Ͱ  -> ε  ĳ
+                    unit.InitializeFromSaveData(saveData);
+                }
+                else
+                {
+                    // Case B: Ͱ  (ű ) ->    
+                    GLog.Info($"[SceneInitializer] ű  ߰  : {unit.unitData.UnitID}");
+
+                    var newData = new UnitSaveData
+                    {
+                        UnitID = unit.unitData.UnitID,
+                        CurrentHP = unit.CurrentHP, // (⺻) ü 
+                        Experience = 0
+                    };
+
+                    dataManager.CurrentData.Roster.Add(newData);
+
+                    // [߿]   ͵ ֿ Ͽ ĳ !
+                    unit.InitializeFromSaveData(newData);
+
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // ű ϵ  ִٸ Ͽ  
+        if (hasChanges)
+        {
+            dataManager.SaveGame();
+            GLog.Info("[SceneInitializer] ű    Ϸ");
+        }
+        else
+        {
+            GLog.Info("[SceneInitializer]  ȭ Ϸ ( )");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.UnloadScene();
+        GLog.Info("[SceneInitializer] Scene Scope  Ϸ");
+    }
+}
+
+==================== EdgeInfo.cs (경로: ./fakecom/Assets/Scripts/Core/EdgeInfo.cs) ====================
+using UnityEngine;
+
+[System.Serializable]
+public struct EdgeInfo
+{
+    // [ٽ ] CoverType ʵ .  Type (isOpen) .
+    public EdgeType type;
+    public bool isOpen;
+
+    //  ܼȭ:  Ǽ CoverType ߸   ϴ.
+    public EdgeInfo(EdgeType type, bool isOpen = false)
+    {
+        this.type = type;
+        this.isOpen = isOpen;
+    }
+
+    // =========================================================
+    // 1.   (ڵ  Ƽ)
+    // =========================================================
+
+    /// <summary>
+    ///   (EdgeType  ڵ )
+    /// </summary>
+    public CoverType CoverProvided
+    {
+        get
+        {
+            switch (type)
+            {
+                case EdgeType.Window:
+                case EdgeType.BrokenWall:
+                    return CoverType.Half; // [Ģ ] â, μ  -> ݾ
+
+                case EdgeType.SolidWall:
+                    return CoverType.Full; // [Ģ ]  ->  
+
+                case EdgeType.Door:        //   󹰷δ ϴٰ  (Ȥ Full  )
+                case EdgeType.Open:
+                default:
+                    return CoverType.None;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ̵  
+    /// </summary>
+    public bool IsTraversable
+    {
+        get
+        {
+            return type switch
+            {
+                EdgeType.Open => true,
+                EdgeType.BrokenWall => true,    // μ    
+                EdgeType.Door => isOpen,        //  ߸ 
+                _ => false                      // Wall, Window  Ұ
+            };
+        }
+    }
+
+    /// <summary>
+    /// þ ܷ ( ջ float)
+    /// 0.0f: 
+    /// 0.5f:  (Window) -   ġ 1.0Ǿ þ 
+    /// 1.0f:  (SolidWall, Closed Door)
+    /// </summary>
+    public float BlocksSight
+    {
+        get
+        {
+            return type switch
+            {
+                EdgeType.SolidWall => 1.0f,
+                EdgeType.Door => isOpen ? 0.0f : 1.0f, //   þ 
+                EdgeType.Window => 0.5f,               // [ٽ] â 0.5
+                _ => 0.0f
+            };
+        }
+    }
+
+    // =========================================================
+    // 2. Ǽ  丮 (δ  2)
+    // ڵ  new EdgeInfo(...)  EdgeInfo.Window ó 
+    // =========================================================
+
+    public static EdgeInfo Open => new EdgeInfo(EdgeType.Open);
+    public static EdgeInfo SolidWall => new EdgeInfo(EdgeType.SolidWall);
+    public static EdgeInfo Window => new EdgeInfo(EdgeType.Window);
+    public static EdgeInfo BrokenWall => new EdgeInfo(EdgeType.BrokenWall);
+    public static EdgeInfo Door(bool isOpen) => new EdgeInfo(EdgeType.Door, isOpen);
+
+    // ⺻
+    public static EdgeInfo Default => Open;
+}
+
+==================== TilemapGenerator.cs (경로: ./fakecom/Assets/Scripts/Core/TilemapGenerator.cs) ====================
+using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class TilemapGenerator : MonoBehaviour
+{
+    [Header("Settings")]
+    public Tile tilePrefab;
+    public Transform tileParent;
+
+    [Header("Generation Settings")]
+    public Vector3Int centerPosition = Vector3Int.zero; // [문제 1 해결] 중심점 입력 필드
+    public Vector2Int mapSize = new Vector2Int(10, 10);
+
+    private void Awake()
+    {
+        // 서비스 로케이터에 나 자신을 등록 (Scene 스코프)
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+
+    private void OnDestroy()
+    {
+        // 씬이 파괴될 때 등록 해제
+        if (ServiceLocator.IsRegistered<TilemapGenerator>())
+        {
+            ServiceLocator.Unregister<TilemapGenerator>(this);
+        }
+    }
+
+    // [버튼용] 인스펙터 설정값으로 생성
+    [ContextMenu("Generate Map (Use Settings)")]
+    public void GenerateMapFromSettings()
+    {
+        GenerateMap(centerPosition, mapSize);
+    }
+
+    public void GenerateMap(Vector3Int center, Vector2Int size)
+    {
+        ClearMapEditor();
+
+        // [중요] 부모가 없으면 나 자신을 부모로, 단 내 위치는 0,0,0이어야 안전함
+        if (tileParent == null) tileParent = transform;
+
+        // 중심 보정 계산
+        int startX = center.x - (size.x / 2);
+        int startZ = center.z - (size.y / 2);
+
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int z = 0; z < size.y; z++)
+            {
+                // Y값(층수)은 center.y를 그대로 따름
+                Vector3Int coord = new Vector3Int(startX + x, center.y, startZ + z);
+                SpawnTile(coord);
+            }
+        }
+        Debug.Log($"Map Generated around {center}, Size: {size}");
+    }
+
+    private void SpawnTile(Vector3Int coord)
+    {
+        Vector3 worldPos = GridUtils.GridToWorld(coord);
+        Tile newTile = (Tile)PrefabUtility.InstantiatePrefab(tilePrefab, tileParent);
+        newTile.transform.position = worldPos;
+        newTile.Initialize(coord, BlockType.Floor);
+        newTile.UpdateCoordinate(coord);
+
+#if UNITY_EDITOR
+        Undo.RegisterCreatedObjectUndo(newTile.gameObject, "Generate Tile");
+        if (MapManager.Instance != null)
+            MapManager.Instance.RegisterTile(coord, newTile);
+#endif
+    }
+
+    [ContextMenu("Clear Map")]
+    public void ClearMapEditor()
+    {
+        if (tileParent != null)
+        {
+            for (int i = tileParent.childCount - 1; i >= 0; i--)
+                Undo.DestroyObjectImmediate(tileParent.GetChild(i).gameObject);
+        }
+        if (MapManager.Instance != null) MapManager.Instance.ClearMap();
+    }
+}
+
+==================== ServiceLocator.cs (경로: ./fakecom/Assets/Scripts/Core/ServiceLocator.cs) ====================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+/// <summary>
+/// 매니저 수명 주기 관리 (Global, Session, Scene)
+/// </summary>
+public enum ManagerScope { Global, Session, Scene }
+
+/// <summary>
+/// 로깅 레벨 정의
+/// </summary>
+public enum LogLevel { Debug, Info, Warning, Error }
+
+/// <summary>
+/// 로거 인터페이스 (나중에 커스텀 로거로 교체 가능)
+/// </summary>
+public interface ILogger
+{
+    void Log(string message, LogLevel level);
+}
+
+public static class ServiceLocator
+{
+    private static readonly Dictionary<Type, (object instance, ManagerScope scope)> services =
+        new Dictionary<Type, (object, ManagerScope)>();
+
+    private static ILogger logger = new DefaultLogger();
+
+    static ServiceLocator()
+    {
+        Application.quitting += Clear;
+    }
+
+    public static void SetLogger(ILogger customLogger)
+    {
+        logger = customLogger ?? new DefaultLogger();
+    }
+
+    public static void Register<T>(T service, ManagerScope scope)
+    {
+        Type type = typeof(T);
+        if (services.ContainsKey(type))
+        {
+            logger.Log($"'{type.Name}' 서비스가 이미 등록되어 있습니다. 덮어씁니다. (Scope: {scope})", LogLevel.Warning);
+            services[type] = (service, scope);
+        }
+        else
+        {
+            services.Add(type, (service, scope));
+            logger.Log($"'{type.Name}' 서비스 등록 완료 (Scope: {scope})", LogLevel.Info);
+        }
+    }
+
+    public static T Get<T>()
+    {
+        Type type = typeof(T);
+        if (!services.TryGetValue(type, out var tuple))
+        {
+            logger.Log($"'{type.Name}' 타입의 서비스를 찾을 수 없습니다!", LogLevel.Error);
+            return default;
+        }
+        return (T)tuple.instance;
+    }
+
+    public static void Unregister<T>(T service)
+    {
+        Type type = typeof(T);
+        if (services.ContainsKey(type) && services[type].instance.Equals(service))
+        {
+            services.Remove(type);
+            logger.Log($"'{type.Name}' 서비스 등록 해제", LogLevel.Info);
+        }
+    }
+
+    public static void UnloadScene()
+    {
+        var sceneServices = services
+            .Where(x => x.Value.scope == ManagerScope.Scene)
+            .Select(x => x.Key)
+            .ToList();
+
+        foreach (var type in sceneServices)
+        {
+            services.Remove(type);
+        }
+
+        if (sceneServices.Count > 0)
+            logger.Log($"Scene 스코프 매니저 {sceneServices.Count}개 해제 완료", LogLevel.Info);
+    }
+
+    public static void PrintAllRegisteredServices()
+    {
+        logger.Log("=== Registered Services ===", LogLevel.Info);
+        foreach (var kvp in services)
+        {
+            logger.Log($" - {kvp.Key.Name} ({kvp.Value.scope})", LogLevel.Info);
+        }
+        logger.Log($"Total: {services.Count}", LogLevel.Info);
+    }
+
+    public static bool IsRegistered<T>()
+    {
+        return services.ContainsKey(typeof(T));
+    }
+
+    public static void Clear()
+    {
+        services.Clear();
+    }
+    public static void Log(string message, LogLevel level)
+    {
+        // 기존 private logger를 외부(GLog)에서 호출할 수 있게 연결
+        logger.Log(message, level);
+    }
+}
+
+public class DefaultLogger : ILogger
+{
+    public void Log(string message, LogLevel level)
+    {
+        string timestamp = $"[{System.DateTime.Now:HH:mm:ss}]";
+        switch (level)
+        {
+            case LogLevel.Error:
+                Debug.LogError($"{timestamp} [ServiceLocator] {message}");
+                break;
+            case LogLevel.Warning:
+                Debug.LogWarning($"{timestamp} [ServiceLocator] {message}");
+                break;
+            case LogLevel.Info:
+                Debug.Log($"{timestamp} [ServiceLocator] {message}");
+                break;
+            default:
+                Debug.Log($"{timestamp} [ServiceLocator] {message}");
+                break;
+        }
+    }
+}
+
+==================== CombatCalculator.cs (경로: ./fakecom/Assets/Scripts/Combat/CombatCalculator.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 모든 전투 관련 계산을 전담하는 정적 클래스
+/// </summary>
+public static class CombatCalculator
+{
+    /// <summary>
+    /// 공격의 최종 결과를 담는 구조체
+    /// </summary>
+    public struct AttackResult
+    {
+        public bool IsHit;
+        public bool IsCrit;
+        public int Damage;
+    }
+
+    /// <summary>
+    /// 공격 한 번에 대한 모든 판정을 처리하고 최종 결과를 반환합니다.
+    /// </summary>
+    /// <param name="attacker">공격자</param>
+    /// <param name="target">피격자</param>
+    /// <returns>명중, 크리, 데미지가 포함된 결과 구조체</returns>
+    public static AttackResult ResolveAttack(UnitStatus attacker, UnitStatus target)
+    {
+        // 1. 명중률 계산
+        int hitChance = CalculateHitChance(attacker, target, CoverType.None); // TODO: 엄폐 계산
+        
+        // 2. 명중 판정
+        bool isHit = Random.Range(0, 100) < hitChance;
+        if (!isHit)
+        {
+            return new AttackResult { IsHit = false }; // 빗나가면 바로 반환
+        }
+
+        // 3. 크리티컬 확률 계산
+        float critChance = CalculateCritChance(attacker, target);
+
+        // 4. 크리티컬 판정
+        // [수정] 0~1 사이의 값으로 비교하여, 주인님의 설계 의도를 반영합니다.
+        bool isCrit = Random.Range(0, 100) < (critChance * 100);
+
+        // 5. 데미지 계산
+        // TODO: 무기 데미지, 방어력 등 다양한 요소를 반영해야 함
+        int damage = 3; // 기본 데미지
+        if (isCrit)
+        {
+            damage = 5; // 크리티컬 데미지
+        }
+
+        // 최종 결과 반환
+        return new AttackResult
+        {
+            IsHit = true,
+            IsCrit = isCrit,
+            Damage = damage
+        };
+    }
+
+    /// <summary>
+    /// 기본 명중률을 계산합니다. (GDD 9.1)
+    /// </summary>
+    public static int CalculateHitChance(UnitStatus attacker, UnitStatus target, CoverType cover)
+    {
+        // TODO: GDD의 복잡한 공식 (거리, 엄폐, 고저차 등) 적용 필요
+        int baseHitChance = attacker.Aim - target.Evasion;
+        return Mathf.Clamp(baseHitChance, 5, 99);
+    }
+
+    /// <summary>
+    /// 기본 크리티컬 확률을 계산합니다.
+    /// </summary>
+    public static float CalculateCritChance(UnitStatus attacker, UnitStatus target)
+    {
+        // TODO: 스킬, 장비 등에 따른 보너스/페널티 적용 필요
+        return attacker.CritChance;
+    }
+}
+
+
+==================== StatusEffectController.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/StatusEffectController.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 유닛에 부착되어 지속 효과(상태이상)들을 관리하는 컴포넌트입니다.
+/// </summary>
+[RequireComponent(typeof(UnitStatus))]
+public class StatusEffectController : MonoBehaviour
+{
+    private UnitStatus _owner;
+    private readonly List<IDurationEffect> _activeEffects = new List<IDurationEffect>();
+
+    private void Awake()
+    {
+        _owner = GetComponent<UnitStatus>();
+    }
+
+    /// <summary>
+    /// 이 유닛에게 새로운 지속 효과를 추가합니다.
+    /// </summary>
+    /// <param name="effect">추가할 효과의 로직</param>
+    /// <param name="user">효과를 시전한 유닛</param>
+    public void AddEffect(IDurationEffect effect, UnitStatus user)
+    {
+        // TODO: 동일한 효과에 대한 중첩/갱신 정책 구현
+        _activeEffects.Add(effect);
+        effect.OnApply(user, _owner);
+        RecalculateTotalPenalty();
+    }
+
+    /// <summary>
+    /// 턴이 시작되거나 시간이 경과할 때 호출되어 모든 활성 효과를 갱신합니다.
+    /// (TurnManager 등에 의해 호출되어야 합니다.)
+    /// </summary>
+    public void TickEffects()
+    {
+        // 리스트에서 아이템이 제거될 수 있으므로, 역순으로 순회하는 것이 안전합니다.
+        for (int i = _activeEffects.Count - 1; i >= 0; i--)
+        {
+            var effect = _activeEffects[i];
+            effect.OnTick();
+
+            if (effect.IsFinished)
+            {
+                effect.OnRemove();
+                _activeEffects.RemoveAt(i);
+
+                RecalculateTotalPenalty();
+            }
+        }
+    }
+
+    private float _currentTotalPenalty = 1.0f; // 미리 계산해서 저장해둘 변수
+
+    public void RecalculateTotalPenalty()
+    {
+        float penaltyMultiplier = 1.0f;
+
+        // 리스트를 돌며 모든 패널티를 곱합니다.
+        foreach (var effect in _activeEffects)
+        {
+            // 남은 생존율 비율을 곱해나가는 식 (1.0 - 패널티)
+            penaltyMultiplier *= (1.0f - effect.SurvivalPenalty);
+        }
+
+        _currentTotalPenalty = penaltyMultiplier;
+    }
+
+
+    /// <summary>
+    /// 현재 모든 디버프로 인한 생존 확률 패널티 합계를 계산합니다. (0.0 ~ 1.0)
+    /// </summary>
+    public float GetTotalSurvivalPenalty()
+    {
+        return _currentTotalPenalty;
+    }
+}
+
+
+==================== AbilityExecutor.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/AbilityExecutor.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// AbilityDataSO를 실제 게임 월드에 실행시키는 static '두뇌' 클래스입니다.
+/// </summary>
+public static class AbilityExecutor
+{
+    /// <summary>
+    /// 주어진 어빌리티를 실행합니다.
+    /// </summary>
+    /// <param name="ability">실행할 어빌리티 데이터</param>
+    /// <param name="user">어빌리티 시전자</param>
+    /// <param name="mainTarget">플레이어가 지정한 주 타겟</param>
+    public static void Execute(AbilityDataSO ability, UnitStatus user, UnitStatus mainTarget)
+    {
+        if (ability == null || user == null) return;
+
+        // 1. 주 타겟팅 전략을 통해 기본 대상들을 가져옵니다.
+        List<UnitStatus> initialTargets = ability.targetingStrategy.GetTargets(user, mainTarget);
+
+        // 2. 각 효과를 순차적으로 적용합니다.
+        foreach (var effectSO in ability.effects)
+        {
+            if (effectSO == null) continue;
+
+            // 3. 효과별로 실제 적용 대상을 결정합니다.
+            List<UnitStatus> targetsToApply;
+            switch (effectSO.targetType)
+            {
+                case EffectTargetType.Self:
+                    targetsToApply = new List<UnitStatus> { user }; // GC-optimization point, but acceptable for now
+                    break;
+                case EffectTargetType.FromTargeting:
+                default:
+                    targetsToApply = initialTargets;
+                    break;
+
+            }
+
+            // 4. 최종 대상 목록의 각 유닛에게 효과를 적용합니다.
+            foreach (var target in targetsToApply)
+            {
+                // 엣지 케이스: 이전 효과로 인해 타겟이 죽거나 비활성화된 경우
+                if (target == null || target.IsDead) continue; 
+
+                // 5. 이 효과가 발동하기 위한 모든 조건을 검사합니다.
+                bool allConditionsMet = true;
+                if (effectSO.conditions != null)
+                {
+                    foreach (var condition in effectSO.conditions)
+                    {
+                        if (condition != null && !condition.IsMet(user, target))
+                        {
+                            allConditionsMet = false;
+                            break;
+                        }
+                    }
+                }
+                if (!allConditionsMet) continue;
+                
+                // 6. 로직 인스턴스를 생성하고 타입에 따라 실행합니다.
+                EffectLogic logic = effectSO.CreateLogic();
+
+                // 즉시 발동 효과 처리
+                if (logic is IInstantEffect instant)
+                {
+                    instant.Execute(user, target);
+                }
+
+                // 지속 효과 처리 (Unit-Centric 방식)
+                if (logic is IDurationEffect duration)
+                {
+                    var statusController = target.GetComponent<StatusEffectController>();
+                    if (statusController != null)
+                    {
+                        statusController.AddEffect(duration, user);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"{target.name}에 지속 효과를 적용하려 했으나, StatusEffectController 컴포넌트가 없습니다.");
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+==================== ResourceCost.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/ResourceCost.cs) ====================
+/// <summary>
+/// 어빌리티 또는 행동에 필요한 비용의 종류를 정의합니다.
+/// </summary>
+public enum ResourceType { ActionPoint, Ammo, Health, Mana }
+
+/// <summary>
+/// 어빌리티 사용 비용을 정의하는 구조체입니다.
+/// </summary>
+[System.Serializable]
+public struct ResourceCost
+{
+    public ResourceType type;
+    public int amount;
+
+    /// <summary>
+    /// 새로운 비용을 생성합니다.
+    /// </summary>
+    public ResourceCost(ResourceType type, int amount)
+    {
+        this.type = type;
+        this.amount = amount;
+    }
+}
+
+
+==================== AbilityDataSO.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/AbilityDataSO.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 하나의 어빌리티를 정의하는 ScriptableObject 데이터 컨테이너입니다.
+/// </summary>
+[CreateAssetMenu(fileName = "New Ability", menuName = "Abilities/Ability Data")]
+public class AbilityDataSO : ScriptableObject
+{
+    [Header("Basic Info")]
+    [Tooltip("어빌리티의 이름")]
+    public string abilityName;
+    [Tooltip("UI에 표시될 아이콘")]
+    public Sprite icon;
+    [Tooltip("재사용 대기시간 (턴 단위)")]
+    public int cooldown;
+
+    [Header("Costs")]
+    [Tooltip("이 어빌리티를 사용하는 데 필요한 비용 목록")]
+    public List<ResourceCost> costs;
+
+    [Header("Strategy")]
+    [Tooltip("어빌리티의 타겟을 결정하는 전략")]
+    public TargetingSO targetingStrategy;
+
+    [Header("Logic")]
+    [Tooltip("이 어빌리티가 순차적으로 실행할 효과 목록")]
+    public List<EffectSO> effects;
+}
+
+
+==================== TargetingSO.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Targeting/TargetingSO.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 어빌리티의 타겟을 찾는 모든 타겟팅 전략 ScriptableObject의 기반 클래스입니다.
+/// </summary>
+public abstract class TargetingSO : ScriptableObject
+{
+    /// <summary>
+    /// 실제 타겟을 계산하여 반환하는 핵심 로직입니다.
+    /// </summary>
+    public abstract List<UnitStatus> GetTargets(UnitStatus user, UnitStatus mainTarget);
+
+    /// <summary>
+    /// UI 표시를 위해 사거리 정보를 요청하는 가상 메서드입니다.
+    /// 자식 클래스에서 필요에 따라 재정의합니다.
+    /// </summary>
+    /// <returns>사거리. 표시할 필요가 없으면 0을 반환합니다.</returns>
+    public virtual float GetRange() => 0f;
+
+    /// <summary>
+    /// UI 표시를 위해 효과 반경 정보를 요청하는 가상 메서드입니다.
+    /// 자식 클래스에서 필요에 따라 재정의합니다.
+    /// </summary>
+    /// <returns>효과 반경. 표시할 필요가 없으면 0을 반환합니다.</returns>
+    public virtual float GetRadius() => 0f;
+}
+
+==================== SingleTargetingSO.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Targeting/SingleTargetingSO.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 단일 대상을 타겟으로 하는 전략입니다.
+/// </summary>
+[CreateAssetMenu(fileName = "New Single Targeting", menuName = "Abilities/Targeting/Single")]
+public class SingleTargetingSO : TargetingSO
+{
+    [Header("Settings")]
+    public float range = 10f;
+
+    public override List<UnitStatus> GetTargets(UnitStatus user, UnitStatus mainTarget)
+    {
+        var targets = new List<UnitStatus>();
+        if (mainTarget != null && !mainTarget.IsDead)
+        {
+            // 거리 체크 로직
+            float dist = Vector3.Distance(user.transform.position, mainTarget.transform.position);
+            if (dist <= range)
+            {
+                targets.Add(mainTarget);
+            }
+        }
+        return targets;
+    }
+
+    public override float GetRange() => range;
+}
+
+
+==================== ConditionSO.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Conditions/ConditionSO.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 특정 조건이 충족되었는지 검사하는 모든 조건 ScriptableObject의 기반 클래스입니다.
+/// </summary>
+public abstract class ConditionSO : ScriptableObject
+{
+    /// <summary>
+    /// 주어진 컨텍스트에서 이 조건이 충족되었는지 확인합니다.
+    /// </summary>
+    /// <param name="user">어빌리티 시전자</param>
+    /// <param name="target">어빌리티 대상</param>
+    /// <returns>조건 충족 시 true, 그렇지 않으면 false</returns>
+    public abstract bool IsMet(UnitStatus user, UnitStatus target);
+}
+
+
+==================== IInstantEffect.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/IInstantEffect.cs) ====================
+/// <summary>
+/// 즉시 발동하는 효과를 위한 인터페이스입니다.
+/// </summary>
+public interface IInstantEffect
+{
+    void Execute(UnitStatus user, UnitStatus target);
+}
+
+
+==================== EffectTargetType.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/EffectTargetType.cs) ====================
+/// <summary>
+/// Effect가 적용될 대상을 강제로 지정하기 위한 열거형입니다.
+/// </summary>
+public enum EffectTargetType 
+{
+    /// <summary>
+    /// AbilityDataSO의 TargetingSO가 결정한 대상을 그대로 사용합니다.
+    /// </summary>
+    FromTargeting,
+
+    /// <summary>
+    /// 타겟팅 결과와 상관없이, 어빌리티 시전자 자신을 대상으로 지정합니다.
+    /// </summary>
+    Self 
+}
+
+
+==================== BurnEffect.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/BurnEffect.cs) ====================
+using UnityEngine;
+
+public class BurnEffect : IDurationEffect
+{
+    private UnitStatus _target;
+    private int _remainingTurns;
+
+    // ̽ 
+    public bool IsFinished => _remainingTurns <= 0;
+    public float SurvivalPenalty => 0.3f;
+
+    public void OnApply(UnitStatus user, UnitStatus target)
+    {
+        _target = target;
+        _remainingTurns = 3; // ÷ 3 
+    }
+
+    public void OnTick()
+    {
+        if (IsFinished) return;
+
+        // 1.    
+        _remainingTurns--;
+
+        // 2.   ( 5, TS Ƽ ) 
+        // : , Ͽ, ũƼÿ, ߰Ƽ, ̻󿩺
+        _target.TakeDamage(5, true, false, 0f, true);
+
+        Debug.Log($" {_target.gameObject.name} ȭ  5  ( : {_remainingTurns})");
+    }
+    public void OnRemove() { /*  ó */ }
+}
+
+==================== DamageEffect.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/DamageEffect.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 기획자가 데미지 수치와 연출 리소스를 설정하는 데이터 파일입니다.
+/// </summary>
+[CreateAssetMenu(fileName = "New Damage Effect", menuName = "Abilities/Effects/Damage")]
+public class DamageEffectSO : EffectSO
+{
+    [Header("Damage Settings")]
+    public int minDamage = 3;
+    public int maxDamage = 5;
+    public bool isCritical = false;
+
+    [Header("Visual Settings")]
+    [Tooltip("피격 시 생성될 이펙트 프리팹 (선택 사항)")]
+    public GameObject bloodEffectPrefab; 
+
+    public override EffectLogic CreateLogic()
+    {
+        return new DamageEffectLogic(this);
+    }
+}
+
+/// <summary>
+/// 실제 데미지를 계산하고, UI 및 이펙트 연출을 수행하는 로직입니다.
+/// </summary>
+public class DamageEffectLogic : EffectLogic, IInstantEffect
+{
+    private readonly DamageEffectSO _data;
+    private DamageTextManager _damageTextManager; // 연출 매니저 캐싱
+
+    public DamageEffectLogic(DamageEffectSO data)
+    {
+        _data = data;
+    }
+
+    public void Execute(UnitStatus user, UnitStatus target)
+    {
+        // 1. 필요한 매니저 가져오기 (없으면 ServiceLocator에서 조회)
+        if (_damageTextManager == null)
+        {
+            _damageTextManager = ServiceLocator.Get<DamageTextManager>();
+        }
+
+        // 2. 데미지 계산 (랜덤 범위)
+        int damage = Random.Range(_data.minDamage, _data.maxDamage + 1);
+        
+        // 3. 데미지 적용
+        // TODO: isCrit 여부는 추후 CombatCalculator 등을 통해 동적으로 결정해야 함
+        target.TakeDamage(damage, false, _data.isCritical, target.LastFinalPenalty);
+
+        // 4. [시각 효과 1] 데미지 텍스트 출력
+        if (_damageTextManager != null)
+        {
+            HitColorType color = _data.isCritical ? HitColorType.Red : HitColorType.Yellow;
+            _damageTextManager.ShowDamage(target.transform.position, damage.ToString(), color);
+        }
+
+        // 5. [시각 효과 2] 피격 이펙트 생성
+        if (_data.bloodEffectPrefab != null)
+        {
+            // EffectLogic은 MonoBehaviour가 아니므로 Object.Instantiate 사용
+            Object.Instantiate(_data.bloodEffectPrefab, 
+                               target.transform.position + Vector3.up, 
+                               Quaternion.LookRotation(Vector3.up));
+        }
+
+        //Debug.Log($"[Effect] {user.name} -> {target.name} : {damage} 피해 (이펙트 생성 완료)");
+    }
+}
+
+
+==================== EffectLogic.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/EffectLogic.cs) ====================
+/// <summary>
+/// 모든 Effect 로직 클래스들의 기반이 되는 추상 클래스입니다.
+/// 런타임에 필요한 데이터는 생성자를 통해 주입받습니다.
+/// </summary>
+public abstract class EffectLogic
+{
+    // 현재는 타입 마커 역할만 수행
+}
+
+
+==================== EffectSO.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/EffectSO.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 모든 Effect 데이터(SO)의 기반이 되는 추상 클래스입니다.
+/// 팩토리 메서드 패턴을 사용하여 자신과 연결된 EffectLogic 인스턴스를 생성합니다.
+/// </summary>
+public abstract class EffectSO : ScriptableObject
+{
+    [Header("Targeting Override")]
+    [Tooltip("기본 타겟팅(FromTargeting)을 무시하고 대상을 강제 지정합니다.")]
+    public EffectTargetType targetType = EffectTargetType.FromTargeting;
+
+    [Header("Conditions")]
+    [Tooltip("이 효과가 발동하기 위해 충족되어야 하는 조건 목록")]
+    public List<ConditionSO> conditions;
+
+    /// <summary>
+    /// 이 데이터에 해당하는 순수 로직(EffectLogic) 인스턴스를 생성하여 반환합니다.
+    /// </summary>
+    /// <returns>생성된 EffectLogic 인스턴스</returns>
+    public abstract EffectLogic CreateLogic();
+}
+
+
+==================== IDurationEffect.cs (경로: ./fakecom/Assets/Scripts/Combat/Abilities/Effects/IDurationEffect.cs) ====================
+/// <summary>
+/// 일정 기간 동안 지속되는 효과(상태이상)를 위한 인터페이스입니다.
+/// 구현체는 내부에 user와 target, 그리고 남은 시간 등의 상태를 저장해야 합니다.
+/// </summary>
+public interface IDurationEffect
+{
+    /// <summary>
+    /// 효과가 대상에게 처음 적용될 때 호출됩니다.
+    /// 이 메소드 내에서 시전자(user)와 대상(target)을 멤버 변수로 캐싱해야 합니다.
+    /// </summary>
+    void OnApply(UnitStatus user, UnitStatus target);
+
+    /// <summary>
+    /// 매 턴 또는 일정 시간마다 호출됩니다.
+    /// 캐싱해둔 target의 상태를 변경하는 로직을 수행합니다.
+    /// </summary>
+    void OnTick();
+
+    /// <summary>
+    /// 효과의 지속시간이 끝나 제거될 때 호출됩니다.
+    /// </summary>
+    void OnRemove();
+
+    /// <summary>
+    /// 효과의 지속시간이 끝났는지 여부를 반환합니다.
+    /// </summary>
+    bool IsFinished { get; }
+
+
+    /// <summary>
+    /// 존 확률을 깎는 비율 (0.0이면 패널티 없음, 0.2면 20% 감소)
+    /// </summary>
+    float SurvivalPenalty { get; }
+}
+
+
+==================== TurnTimelineUI.cs (경로: ./fakecom/Assets/Scripts/UI/TurnTimelineUI.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class TurnTimelineUI : MonoBehaviour
+{
+    [Header("Components")]
+    [SerializeField] private GameObject iconPrefab;
+    [SerializeField] private RectTransform barRect;
+
+    [Header("Settings")]
+    [SerializeField] private float maxVisibleTS = 100f;
+
+    private Dictionary<UnitStatus, GameObject> iconMap = new Dictionary<UnitStatus, GameObject>();
+    private TurnManager turnManager;
+    private CameraController cameraController; // [߰] ܿ Ѱ ī޶
+
+    private void Start()
+    {
+        turnManager = ServiceLocator.Get<TurnManager>();
+        cameraController = ServiceLocator.Get<CameraController>(); // [߰]
+
+        if (turnManager != null)
+        {
+            InitializeIcons();
+            turnManager.OnTimelineUpdated += UpdatePositions;
+            turnManager.OnTurnStarted += (u) => ForceUpdate();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (turnManager != null)
+        {
+            turnManager.OnTimelineUpdated -= UpdatePositions;
+        }
+    }
+
+    private void InitializeIcons()
+    {
+        var units = FindObjectsOfType<UnitStatus>();
+        foreach (var unit in units)
+        {
+            CreateIcon(unit);
+        }
+        ForceUpdate();
+    }
+
+    private void CreateIcon(UnitStatus unit)
+    {
+        if (iconMap.ContainsKey(unit)) return;
+
+        GameObject iconObj = Instantiate(iconPrefab, barRect);
+
+        // []  ũƮ ʱȭ
+        TimelineIcon iconScript = iconObj.GetComponent<TimelineIcon>();
+        if (iconScript != null)
+        {
+            iconScript.Initialize(unit, cameraController);
+        }
+
+        iconMap.Add(unit, iconObj);
+    }
+
+    private void UpdatePositions(List<UnitStatus> units)
+    {
+        float barHeight = barRect.rect.height;
+
+        foreach (var unit in units)
+        {
+            if (!iconMap.ContainsKey(unit)) CreateIcon(unit);
+
+            GameObject icon = iconMap[unit];
+            RectTransform rt = icon.GetComponent<RectTransform>();
+
+            // Y ġ  ( )
+            float ratio = 1.0f - Mathf.Clamp01(unit.CurrentTS / maxVisibleTS);
+            float posY = (ratio * barHeight) - (barHeight / 2f);
+
+            rt.anchoredPosition = new Vector2(0, posY);
+        }
+    }
+
+    private void ForceUpdate()
+    {
+        List<UnitStatus> keys = new List<UnitStatus>(iconMap.Keys);
+        UpdatePositions(keys);
+    }
+}
+
+==================== TargetInfoUI.cs (경로: ./fakecom/Assets/Scripts/UI/TargetInfoUI.cs) ====================
+using TMPro;
+using UnityEngine;
+
+/// <summary>
+/// 개별 타겟의 UI에 대한 참조를 관리하고,
+/// UI의 내용을 업데이트하는 역할을 합니다.
+/// 이 컴포넌트는 TargetUIManager에 의해 풀링될 UI 프리팹에 부착됩니다.
+/// </summary>
+public class TargetInfoUI : MonoBehaviour
+{
+    [Tooltip("명중률을 표시할 TextMeshProUGUI 컴포넌트")]
+    [SerializeField] private TextMeshProUGUI hitChanceText;
+
+    [Tooltip("예상 데미지를 표시할 TextMeshProUGUI 컴포넌트")]
+    [SerializeField] private TextMeshProUGUI damageText;
+
+    /// <summary>
+    /// UI에 표시될 명중률과 데미지 텍스트를 설정합니다.
+    /// </summary>
+    public void SetInfo(string hitChance, string damage)
+    {
+        if (hitChanceText != null)
+        {
+            hitChanceText.text = hitChance;
+        }
+
+        if (damageText != null)
+        {
+            damageText.text = damage;
+        }
+    }
+
+    /// <summary>
+    /// UI 요소의 활성 상태를 설정합니다.
+    /// </summary>
+    public void SetActive(bool isActive)
+    {
+        gameObject.SetActive(isActive);
+    }
+}
+
+
+==================== QTEController.cs (경로: ./fakecom/Assets/Scripts/UI/QTEController.cs) ====================
+using UnityEngine;
+using System; 
+using System.Collections;
+
+public class QTEController : MonoBehaviour
+{
+    /* ߿   ּ Ǯ !
+     */
+    //[Header("--- UI References (Future) ---")] 
+    // ߿ ⿡  QTE UI г̳ ̴, ư  մϴ.
+    // [SerializeField] private GameObject survivalPanel;
+    // [SerializeField] private GameObject rhythmPanel;
+
+    [Header("--- Settings Reference ---")]
+    [Tooltip("Ȯ   GlobalSettings ּ.")]
+    [SerializeField] private GlobalSettingsSO globalSettings;
+
+    /// <summary>
+    /// Ŵ ȣϴ  Դϴ.
+    /// ŸԿ    (4  ϳ) մϴ.
+    /// </summary>
+    public void StartQTE(QTEType type, Action<bool> onResult)
+    {
+        if (globalSettings == null)
+        {
+            onResult?.Invoke(false);
+            return;
+        }
+
+        // ٷ   ʰ, ڷƾ ¿ ̸ ݴϴ.
+        StartCoroutine(ProcessQTESequence(type, onResult));
+    }
+
+    private IEnumerator ProcessQTESequence(QTEType type, Action<bool> onResult)
+    {
+        // 1. [ ] QTE    ! (尨 )
+        // ߿ ⼭ Time.timeScale = 0;    ֽϴ.
+        Debug.Log($"[QTEController] {type} ߵ! {globalSettings.qtePreDelay} ...");
+
+        yield return new WaitForSeconds(globalSettings.qtePreDelay);
+
+        // 2. [ ]  ð  ùķ̼ 
+        switch (type)
+        {
+            case QTEType.Survival:
+                SimulateResult(globalSettings.probSurvival, "Survival", onResult);
+                break;
+            case QTEType.AttackCrit:
+                SimulateResult(globalSettings.probAttackCrit, "Attack", onResult);
+                break;
+            case QTEType.EnemyCrit:
+                SimulateResult(globalSettings.probEnemyCrit, "EnemyCrit", onResult);
+                break;
+            case QTEType.SynchroPulse:
+                SimulateResult(globalSettings.probSynchroPulse, "SynchroPulse", onResult);
+                break;
+        }
+    }
+
+    private void SimulateResult(float probability, string qteName, Action<bool> onResult)
+    {
+        float roll = UnityEngine.Random.value;
+        bool isSuccess = roll <= probability;
+
+        string resultText = isSuccess ? "<color=green>!</color>" : "<color=red>...</color>";
+        Debug.Log($"[QTE ] {qteName} : {resultText} (ֻ: {roll:F2} / Ȯ: {probability})");
+
+        onResult?.Invoke(isSuccess);
+    }
+
+    // ========================================================================
+    // [ ]  QTE ŸԺ   (   ȯ)
+    // ========================================================================
+
+    private void HandleSurvivalQTE(Action<bool> onResult)
+    {
+        // TODO: ȭ Ӱ , Ÿ ư UI ǥ
+        Debug.Log(">>> [Survival Mode] Ÿؼ Ƴ!");
+
+        // [ӽ] ٷ  ó
+        onResult?.Invoke(true);
+    }
+
+    private void HandleAttackCritQTE(Action<bool> onResult)
+    {
+        // TODO: Ÿ̹ (Bar) UI ǥ, Ư  ġ üũ
+        Debug.Log(">>> [Attack Mode] Ÿֿ̹  ư !");
+
+        // [ӽ] ٷ  ó
+        onResult?.Invoke(true);
+    }
+
+    private void HandleEnemyCritQTE(Action<bool> onResult)
+    {
+        // TODO: /ȸ   ,  ӵ üũ
+        Debug.Log(">>> [Counter Mode]   ĳ!");
+
+        // [ӽ] ٷ  ó
+        onResult?.Invoke(true);
+    }
+
+    private void HandleSynchroPulseQTE(Action<bool> onResult)
+    {
+        // TODO:  Ű   or ̵   UI
+        Debug.Log(">>> [Synchro-Pulse] ý !  Էϼ!");
+
+        // [ӽ] ٷ  ó (߿ 50% Ȯ  ׽Ʈ )
+        bool tempResult = UnityEngine.Random.value > 0.1f; // 90%  Ȯ (׽Ʈ)
+        onResult?.Invoke(tempResult);
+    }
+}
+
+==================== UIInputBridge.cs (경로: ./fakecom/Assets/Scripts/UI/UIInputBridge.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 런타임에 생성되는 Manager들의 기능을 
+/// 씬에 미리 배치된 UI 버튼들이 호출할 수 있도록 연결해주는 중간다리 역할의 스크립트입니다.
+/// </summary>
+public class UIInputBridge : MonoBehaviour
+{
+    private InputManager inputManager;
+    private CameraController cameraController;
+
+    void Start()
+    {
+        // ServiceLocator를 통해 런타임에 Manager 인스턴스를 찾습니다.
+        inputManager = ServiceLocator.Get<InputManager>();
+        if (inputManager == null)
+        {
+            Debug.LogError("[UIInputBridge] InputManager를 찾을 수 없습니다!");
+        }
+
+        cameraController = ServiceLocator.Get<CameraController>();
+        if (cameraController == null)
+        {
+            Debug.LogError("[UIInputBridge] CameraController를 찾을 수 없습니다!");
+        }
+    }
+
+    /// <summary>
+    /// UI 버튼의 OnClick() 이벤트에 연결하여 스킬 1번을 발동시킵니다.
+    /// </summary>
+    public void TriggerSkill1()
+    {
+        inputManager?.InvokeSkill1();
+    }
+
+    /// <summary>
+    /// UI 버튼의 OnClick() 이벤트에 연결하여 활성 유닛에게 카메라를 즉시 이동시킵니다.
+    /// </summary>
+    public void TriggerCameraRecenter()
+    {
+        inputManager?.InvokeCameraRecenter();
+    }
+
+    /// <summary>
+    /// UI 버튼의 OnClick() 이벤트에 연결하여 턴을 종료합니다.
+    /// </summary>
+    public void TriggerEndTurn()
+    {
+        inputManager?.InvokeTurnEnd();
+    }
+
+    /// <summary>
+    /// UI 버튼의 OnClick() 이벤트에 연결하여 액션캠 디버그 뷰를 토글합니다.
+    /// </summary>
+    public void TriggerActionCamDebug()
+    {
+        cameraController?.ToggleDebugActionView();
+    }
+}
+
+
+==================== TimelineIcon.cs (경로: ./fakecom/Assets/Scripts/UI/TimelineIcon.cs) ====================
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems; // Ŭ    ̺ Ʈ  
+
+public class TimelineIcon : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+{
+    [Header("UI Elements")]
+    [SerializeField] private Image portraitImage; //  ʻ ȭ  ̹    (               )
+    [SerializeField] private RectTransform contentRoot; //  ʻ ȭ Ʋ ( ¿             )
+
+    private UnitStatus linkedUnit;
+    private CameraController cameraController;
+    private float defaultXOffset; //       󸶳          ִ   
+
+    public void Initialize(UnitStatus unit, CameraController cam)
+    {
+        linkedUnit = unit;
+        cameraController = cam;
+        defaultXOffset = Mathf.Abs(contentRoot.anchoredPosition.x);
+
+        // 1.           ( Ʊ /    )
+        if (unit.unitData.UnitTeam == UnitDataSO.Team.Player)
+        {
+            portraitImage.color = Color.blue; //  Ʊ :  Ķ 
+            SetSide(isRight: false); //  Ʊ         (       )
+        }
+        else
+        {
+            portraitImage.color = Color.red; //     :     
+            SetSide(isRight: true); //              
+        }
+    }
+
+    //  ¿    ġ       Լ 
+    private void SetSide(bool isRight)
+    {
+        //   (Bar)    ߾ (0) ̶            
+        //        ̸  X +,      ̸  X -
+        float newX = isRight ? defaultXOffset : -defaultXOffset;
+
+        //   ġ     
+        contentRoot.anchoredPosition = new Vector2(newX, contentRoot.anchoredPosition.y);
+
+        // (   û   )   ǳ                       ʹٸ  Rotation Y   180           ˴ϴ .
+        // if (!isRight) transform.localRotation = Quaternion.Euler(0, 180, 0);
+    }
+
+    // ---    ͷ   :         ִ       ī ޶   ̵  ---
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (cameraController != null && linkedUnit != null)
+        {
+            // ī ޶             Ĵٺ      
+            cameraController.SetTarget(linkedUnit.transform, true);
+        }
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (cameraController != null)
+        {
+            //          ? 
+            //  ɼ  A:  ٽ             ο       ư  (TurnManager.ActiveUnit)
+            //  ɼ  B:  ׳      ڸ       (         )
+
+            //  ϴ  B  (    )      ΰڽ  ϴ . A        Ͻø  TurnManager     ActiveUnit    ޾ƿ;   մϴ .
+        }
+    }
+}
+
+==================== DamageText.cs (경로: ./fakecom/Assets/Scripts/UI/DamageText.cs) ====================
+using UnityEngine;
+using TMPro;
+using System.Collections;
+
+public class DamageText : MonoBehaviour
+{
+    [SerializeField] private TextMeshProUGUI tmpText;
+    private float moveSpeed = 1.0f;
+    private float lifeTime = 1.0f; // 1  
+
+    public void Setup(string text, Color color)
+    {
+        if (tmpText == null) tmpText = GetComponent<TextMeshProUGUI>();
+
+        tmpText.text = text;
+        tmpText.color = color;
+
+        // ڸ   
+        StartCoroutine(FloatAndFade());
+    }
+
+    private IEnumerator FloatAndFade()
+    {
+        float timer = 0f;
+        Vector3 startPos = transform.position;
+        Color startColor = tmpText.color;
+
+        while (timer < lifeTime)
+        {
+            //  ̵
+            transform.position += Vector3.up * moveSpeed * Time.deltaTime;
+
+            //   (Ĺݺ 50% )
+            if (timer > lifeTime * 0.5f)
+            {
+                float progress = (timer - (lifeTime * 0.5f)) / (lifeTime * 0.5f);
+                float alpha = Mathf.Lerp(1f, 0f, progress);
+                tmpText.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+            }
+
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        Destroy(gameObject); //  ϸ 
+    }
+}
+
+==================== MapBlock.cs (경로: ./fakecom/Assets/Scripts/Tools/MapBlock.cs) ====================
+using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class MapBlock : MonoBehaviour
+{
+    [Header("Identity")]
+    [Tooltip("ObjectPaletteSO에 등록된 ID와 일치해야 합니다.")]
+    public string id;
+
+    [Header("Positioning")]
+    [Tooltip("0: 0층(지면), 1: 1층... (2.5m 단위)")]
+    [Range(0, 10)] // [개선] 층수 제한 안전장치 추가
+    public int heightLevel = 0;
+
+    [Header("Orientation")]
+    [Tooltip("0: 0도(North), 1: 90도(East), 2: 180도(South), 3: 270도(West)")]
+    [Range(0, 3)]
+    public int rotationIndex = 0;
+
+    // [안정성] 인스펙터 값을 변경하면 즉시 회전에 반영
+    private void OnValidate()
+    {
+        transform.rotation = Quaternion.Euler(0, rotationIndex * 90f, 0);
+    }
+
+    // [복구] 씬 뷰 시각화 로직 (이게 있어야 편합니다!)
+    private void OnDrawGizmos()
+    {
+#if UNITY_EDITOR
+        // 1. 블록 윤곽선 (바닥 타일과 겹치지 않게 살짝 위로 띄움)
+        Gizmos.color = new Color(0, 1, 1, 0.5f); // Cyan 반투명
+        Gizmos.DrawWireCube(transform.position + Vector3.up * 0.5f, new Vector3(0.95f, 0.1f, 0.95f));
+
+        // 2. 텍스트 스타일 설정
+        GUIStyle style = new GUIStyle();
+        style.normal.textColor = Color.yellow; // 노란색 (잘 보임)
+        style.fontSize = 12;
+        style.fontStyle = FontStyle.Bold;
+        style.alignment = TextAnchor.MiddleCenter;
+
+        // 3. 회전 방향 화살표 텍스트 계산
+        string rotArrow = "↑(N)";
+        switch (rotationIndex)
+        {
+            case 0: rotArrow = "↑(N)"; break; // +Z
+            case 1: rotArrow = "→(E)"; break; // +X
+            case 2: rotArrow = "↓(S)"; break; // -Z
+            case 3: rotArrow = "←(W)"; break; // -X
+        }
+
+        // 4. 정보 표시 (ID, 층수, 방향)
+        // 블록 머리 위에 띄웁니다.
+        Vector3 labelPos = transform.position + Vector3.up * 1.5f;
+        string labelText = $"{id}\nLvl:{heightLevel}\n{rotArrow}";
+
+        Handles.Label(labelPos, labelText, style);
+
+        // 5. 실제 방향 화살표 그리기 (추가 보너스)
+        Handles.color = Color.yellow;
+        Handles.ArrowHandleCap(
+            0,
+            transform.position + Vector3.up * 0.5f,
+            transform.rotation,
+            1.0f,
+            EventType.Repaint
+        );
+#endif
+    }
+}
+
+==================== MapEditorTool.cs (경로: ./fakecom/Assets/Scripts/Tools/MapEditorTool.cs) ====================
+using UnityEngine;
+using UnityEditor;
+
+public class MapEditorTool : EditorWindow
+{
+    // =========================================================
+    // 1. 변수 및 설정
+    // =========================================================
+    private int currentLevel = 0; // 0=1층(지면), 1=2층(천장)
+    private MapEditorSettingsSO settings;
+
+    private EdgeType selectedEdgeType = EdgeType.SolidWall;
+    private bool doorInitialOpen = false;
+    private Vector3Int? roomStartPos = null;
+
+    // [기능] 수동 미세 높이 조절
+    private float manualHeightOffset = 0f;
+
+    [MenuItem("Window/Custom/Map Editor Tool")]
+    public static void ShowWindow() => GetWindow<MapEditorTool>("Map Editor");
+
+    private void OnEnable()
+    {
+        SceneView.duringSceneGui += OnSceneGUI;
+
+        // 설정 파일 자동 로드
+        string[] guids = AssetDatabase.FindAssets("t:MapEditorSettingsSO");
+        if (guids.Length > 0)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+            settings = AssetDatabase.LoadAssetAtPath<MapEditorSettingsSO>(path);
+        }
+
+        // 툴 켜질 때 맵 장부 최신화 (안전장치)
+        MapManager mapMgr = GetMapManager();
+        if (mapMgr != null) mapMgr.EditorScanMap();
+    }
+
+    private void OnDisable() => SceneView.duringSceneGui -= OnSceneGUI;
+
+    // =========================================================
+    // 2. GUI (창 화면)
+    // =========================================================
+    private void OnGUI()
+    {
+        GUILayout.Label("Construction Settings", EditorStyles.boldLabel);
+
+        // [편의성] 층수 조절 버튼
+        GUILayout.BeginHorizontal();
+        currentLevel = EditorGUILayout.IntField("Current Level (Y)", currentLevel);
+        if (GUILayout.Button("-", GUILayout.Width(30))) currentLevel--;
+        if (GUILayout.Button("+", GUILayout.Width(30))) currentLevel++;
+        GUILayout.EndHorizontal();
+        if (currentLevel < 0) currentLevel = 0;
+
+        EditorGUILayout.Space();
+
+        settings = (MapEditorSettingsSO)EditorGUILayout.ObjectField("Settings Profile", settings, typeof(MapEditorSettingsSO), false);
+
+        if (settings == null)
+        {
+            EditorGUILayout.HelpBox("먼저 'MapEditorSettings' 파일을 생성하고 할당해주세요!", MessageType.Warning);
+            return;
+        }
+
+        EditorGUILayout.Space();
+        GUILayout.Label("Edge Options", EditorStyles.label);
+        selectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Type", selectedEdgeType);
+
+        if (selectedEdgeType == EdgeType.Pillar)
+        {
+            EditorGUILayout.HelpBox("기둥은 Phase 3에서 'Vertex' 모드로 지원됩니다.", MessageType.Info);
+        }
+
+        if (selectedEdgeType == EdgeType.Door)
+            doorInitialOpen = EditorGUILayout.Toggle("Door Initial Open", doorInitialOpen);
+
+        // 높이 미세 조절
+        manualHeightOffset = EditorGUILayout.FloatField("Manual Height Offset", manualHeightOffset);
+
+        EditorGUILayout.Space();
+        if (GUILayout.Button("Validate Map (검증)")) ValidateMap();
+        if (GUILayout.Button("Force Re-Scan Map")) GetMapManager()?.EditorScanMap();
+
+        EditorGUILayout.HelpBox(
+            "Controls:\n" +
+            "- Click: Place Edge\n" +
+            "- Shift+Click: Remove Edge\n" +
+            "- Alt+Click: Build Room (Drag)",
+            MessageType.Info);
+    }
+
+    // =========================================================
+    // 3. Scene GUI (핵심 로직)
+    // =========================================================
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        if (settings == null) return;
+
+        Event e = Event.current;
+        Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+
+        // [핵심] 현재 레벨 높이에 '수학적 평면' 생성 -> 1층 클릭 실수 방지!
+        float yLevelWorld = currentLevel * GridUtils.LEVEL_HEIGHT;
+        Plane levelPlane = new Plane(Vector3.up, new Vector3(0, yLevelWorld, 0));
+
+        // 평면과 Ray의 충돌 지점 계산
+        if (levelPlane.Raycast(ray, out float enter))
+        {
+            Vector3 hitPoint = ray.GetPoint(enter);
+            Vector3Int gridPos = GridUtils.WorldToGrid(hitPoint);
+
+            // [강제 고정] 마우스가 어디를 뚫고 지나갔든, Y는 무조건 현재 레벨로 고정
+            gridPos.y = currentLevel;
+
+            Direction dir = CalculateClosestEdge(hitPoint, gridPos);
+
+            // [시각화] 현재 작업 중인 층을 보여주는 그리드 가이드 표시
+            DrawLevelGrid(gridPos, yLevelWorld);
+            DrawPreview(gridPos, dir);
+
+            if (e.type == EventType.MouseDown && e.button == 0)
+            {
+                if (e.alt)
+                {
+                    if (roomStartPos == null) roomStartPos = gridPos;
+                    else { BuildRoom(roomStartPos.Value, gridPos); roomStartPos = null; }
+                }
+                else
+                {
+                    if (e.shift) RemoveEdge(gridPos, dir);
+                    else PlaceEdge(gridPos, dir);
+                }
+                e.Use();
+            }
+        }
+
+        if (e.type == EventType.MouseMove) sceneView.Repaint();
+    }
+
+    // =========================================================
+    // 4. 설치 로직 (PlaceEdge)
+    // =========================================================
+    private void PlaceEdge(Vector3Int gridPos, Direction dir)
+    {
+        Tile tile = EnsureTileExists(gridPos);
+        if (tile == null) return;
+
+        MapManager mapMgr = GetMapManager();
+        Vector3Int neighborPos = gridPos + GridUtils.GetDirectionVector(dir);
+        Tile neighbor = mapMgr.GetTileAt(neighborPos);
+
+        // 기존 오브젝트 청소 (Ghost Data 방지)
+        Undo.RecordObject(tile, "Place Edge");
+        if (tile.GetEdgeObject(dir) != null) Undo.DestroyObjectImmediate(tile.GetEdgeObject(dir));
+
+        if (neighbor != null)
+        {
+            Undo.RecordObject(neighbor, "Sync Neighbor Edge");
+            Direction opposite = GridUtils.GetOpposite(dir);
+            if (neighbor.GetEdgeObject(opposite) != null) Undo.DestroyObjectImmediate(neighbor.GetEdgeObject(opposite));
+        }
+
+        // 프리팹 생성
+        GameObject prefab = GetPrefabByType(selectedEdgeType);
+        if (prefab != null)
+        {
+            Vector3 spawnPos = GridUtils.GridToWorld(gridPos) + GridUtils.GetEdgeOffset(dir);
+
+            // [자동 오프셋] + [수동 오프셋] 적용
+            float autoOffset = GetDefaultOffset(selectedEdgeType);
+            spawnPos.y += autoOffset + manualHeightOffset;
+
+            GameObject obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab, tile.transform);
+            obj.transform.position = spawnPos;
+            obj.transform.rotation = Quaternion.Euler(0, GridUtils.GetWallRotationY(dir), 0);
+
+            tile.SetEdgeObject(dir, obj);
+            Undo.RegisterCreatedObjectUndo(obj, "Create Edge Obj");
+        }
+
+        // 데이터 동기화
+        EdgeInfo info = CreateEdgeInfo(selectedEdgeType);
+        tile.SetEdge(dir, info);
+        if (neighbor != null) neighbor.SetEdge(GridUtils.GetOpposite(dir), info);
+    }
+
+    // =========================================================
+    // 5. 삭제 및 기타 로직
+    // =========================================================
+    private void RemoveEdge(Vector3Int gridPos, Direction dir)
+    {
+        MapManager mapMgr = GetMapManager();
+        if (mapMgr == null) return;
+
+        Tile tile = mapMgr.GetTileAt(gridPos);
+        if (tile == null) return;
+
+        Undo.RecordObject(tile, "Remove Edge");
+        if (tile.GetEdgeObject(dir) != null) Undo.DestroyObjectImmediate(tile.GetEdgeObject(dir));
+        tile.SetEdgeObject(dir, null);
+        tile.SetEdge(dir, EdgeInfo.Default);
+
+        Vector3Int neighborPos = gridPos + GridUtils.GetDirectionVector(dir);
+        Tile neighbor = mapMgr.GetTileAt(neighborPos);
+        if (neighbor != null)
+        {
+            Undo.RecordObject(neighbor, "Remove Edge Sync");
+            Direction opposite = GridUtils.GetOpposite(dir);
+            if (neighbor.GetEdgeObject(opposite) != null) Undo.DestroyObjectImmediate(neighbor.GetEdgeObject(opposite));
+            neighbor.SetEdgeObject(opposite, null);
+            neighbor.SetEdge(opposite, EdgeInfo.Default);
+        }
+    }
+
+    private void BuildRoom(Vector3Int start, Vector3Int end)
+    {
+        int minX = Mathf.Min(start.x, end.x); int maxX = Mathf.Max(start.x, end.x);
+        int minZ = Mathf.Min(start.z, end.z); int maxZ = Mathf.Max(start.z, end.z);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            PlaceEdge(new Vector3Int(x, currentLevel, minZ), Direction.South);
+            PlaceEdge(new Vector3Int(x, currentLevel, maxZ), Direction.North);
+        }
+        for (int z = minZ; z <= maxZ; z++)
+        {
+            PlaceEdge(new Vector3Int(minX, currentLevel, z), Direction.West);
+            PlaceEdge(new Vector3Int(maxX, currentLevel, z), Direction.East);
+        }
+    }
+
+    // =========================================================
+    // 6. 헬퍼 메서드 & 시각화
+    // =========================================================
+
+    // 안전하게 MapManager 찾기
+    private MapManager GetMapManager() => FindObjectOfType<MapManager>();
+
+    private Tile EnsureTileExists(Vector3Int coord)
+    {
+        var mapMgr = GetMapManager();
+        if (mapMgr == null) return null;
+
+        var tile = mapMgr.GetTileAt(coord);
+        if (tile == null) // 1차 실패 시 재스캔 시도
+        {
+            mapMgr.EditorScanMap();
+            tile = mapMgr.GetTileAt(coord);
+        }
+
+        if (tile == null) Debug.LogWarning($"타일이 없습니다: {coord}");
+        return tile;
+    }
+
+    private GameObject GetPrefabByType(EdgeType type)
+    {
+        if (settings == null) return null;
+        return type switch
+        {
+            EdgeType.SolidWall => settings.solidWallPrefab,
+            EdgeType.Window => settings.windowPrefab,
+            EdgeType.Door => settings.doorPrefab,
+            EdgeType.Pillar => settings.pillarPrefab,
+            _ => null
+        };
+    }
+
+    // [자동 오프셋]
+    private float GetDefaultOffset(EdgeType type)
+    {
+        return type switch
+        {
+            EdgeType.SolidWall => 2.3f,
+            EdgeType.Door => 2.3f,
+            EdgeType.Window => 1.6f,
+            _ => 0f
+        };
+    }
+
+    private EdgeInfo CreateEdgeInfo(EdgeType type) => new EdgeInfo(type, type == EdgeType.Door ? doorInitialOpen : false);
+
+    private Direction CalculateClosestEdge(Vector3 hit, Vector3Int grid)
+    {
+        Vector3 center = GridUtils.GridToWorld(grid);
+        Vector3 rel = hit - center;
+        return Mathf.Abs(rel.x) > Mathf.Abs(rel.z) ? (rel.x > 0 ? Direction.East : Direction.West) : (rel.z > 0 ? Direction.North : Direction.South);
+    }
+
+    // [시각화 1] 현재 작업 중인 층의 바닥을 격자로 표시 (안내선)
+    private void DrawLevelGrid(Vector3Int centerGrid, float yHeight)
+    {
+        Handles.color = new Color(0.5f, 0.5f, 0.5f, 0.2f);
+        Vector3 center = GridUtils.GridToWorld(centerGrid);
+        // 현재 마우스 주변 3x3 영역만 그리드 표시
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int z = -1; z <= 1; z++)
+            {
+                Vector3 pos = center + new Vector3(x, 0, z);
+                Handles.DrawWireCube(pos, new Vector3(1, 0, 1));
+            }
+        }
+    }
+
+    // [시각화 2] 설치될 벽 미리보기
+    private void DrawPreview(Vector3Int grid, Direction dir)
+    {
+        Vector3 pos = GridUtils.GridToWorld(grid);
+
+        // 타일 테두리
+        Handles.color = roomStartPos.HasValue ? Color.cyan : Color.white;
+        Handles.DrawWireCube(pos, new Vector3(1.0f, 0.1f, 1.0f));
+
+        // 엣지 위치
+        Handles.color = Color.green;
+        Vector3 edgePos = pos + GridUtils.GetEdgeOffset(dir);
+        Vector3 size = (dir == Direction.North || dir == Direction.South)
+            ? new Vector3(1.0f, 2.0f, 0.1f)
+            : new Vector3(0.1f, 2.0f, 1.0f);
+
+        // 미리보기 박스도 오프셋만큼 띄워줌
+        float offset = GetDefaultOffset(selectedEdgeType) + manualHeightOffset;
+        Handles.DrawWireCube(edgePos + Vector3.up * (1.0f + offset), size);
+    }
+
+    private void ValidateMap()
+    {
+        // (기존 ValidateMap 로직과 동일)
+        Tile[] allTiles = FindObjectsOfType<Tile>();
+        int errorCount = 0;
+        foreach (var tile in allTiles)
+        {
+            if (tile.Coordinate.y > 0)
+            {
+                Vector3Int below = tile.Coordinate + Vector3Int.down;
+                Tile belowTile = GetMapManager()?.GetTileAt(below);
+                if (belowTile == null || belowTile.Type == BlockType.Empty)
+                {
+                    Debug.LogWarning($"[Structure Error] 공중 부양: {tile.Coordinate}");
+                    errorCount++;
+                }
+            }
+        }
+        Debug.Log($"검증 완료. {errorCount}건 발견");
+    }
+}
+
+==================== MapEditorSettingSO.cs (경로: ./fakecom/Assets/Scripts/Assets/Settings/MapEditorSettingSO.cs) ====================
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "MapEditorSettings", menuName = "Custom/Map Editor Settings")]
+public class MapEditorSettingsSO : ScriptableObject
+{
+    public GameObject solidWallPrefab;
+    public GameObject windowPrefab;
+    public GameObject doorPrefab;
+    public GameObject pillarPrefab;
+}
+
+==================== EffectAutoDestroy.cs (경로: ./fakecom/Assets/Scripts/Visuals/EffectAutoDestroy.cs) ====================
+using UnityEngine;
+
+public class EffectAutoDestroy : MonoBehaviour
+{
+    [SerializeField] private float lifeTime = 2.0f;
+
+    private void Start()
+    {
+        // 2 ڿ 
+        Destroy(gameObject, lifeTime);
+    }
+}
+
+==================== PathVisualizer.cs (경로: ./fakecom/Assets/Scripts/Visuals/PathVisualizer.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PathVisualizer : MonoBehaviour
+{
+    [SerializeField] private GameObject overlayTilePrefab;
+    [SerializeField] private GameObject reachableTilePrefab;
+    [SerializeField] private GameObject unreachableTilePrefab;
+    [SerializeField] private LineRenderer rangeCirclePrefab;
+
+    // [설정] 바닥에서 얼마나 띄울 것인가? (0.15f면 충분히 보임)
+    private const float Y_OFFSET = 0.15f;
+
+    private List<GameObject> activeOverlayTiles = new List<GameObject>();
+    private List<GameObject> activeReachableTiles = new List<GameObject>();
+    private LineRenderer activeRangeCircle;
+
+    private void Awake() { ServiceLocator.Register(this, ManagerScope.Scene); }
+    private void OnDestroy() { if (ServiceLocator.IsRegistered<PathVisualizer>()) ServiceLocator.Unregister<PathVisualizer>(this); }
+
+    public void ShowPath(List<Vector3> path)
+    {
+        if (overlayTilePrefab == null) return;
+        ClearPath();
+
+
+        foreach (Vector3 pos in path)
+        {
+            float finalY = pos.y + Y_OFFSET;
+
+            // [수정] Y_OFFSET 적용
+            GameObject overlay = Instantiate(overlayTilePrefab, new Vector3(pos.x, pos.y + Y_OFFSET, pos.z), overlayTilePrefab.transform.rotation);
+            activeOverlayTiles.Add(overlay);
+        }
+    }
+
+    public void ShowUnreachablePath(List<Vector3> path)
+    {
+        if (unreachableTilePrefab == null) return;
+        foreach (Vector3 pos in path)
+        {
+            GameObject overlay = Instantiate(unreachableTilePrefab, new Vector3(pos.x, pos.y + Y_OFFSET, pos.z), unreachableTilePrefab.transform.rotation);
+            activeOverlayTiles.Add(overlay);
+        }
+    }
+
+    public void ShowReachableRange(List<Tile> tiles)
+    {
+        if (reachableTilePrefab == null) return;
+        ClearReachableRange();
+        foreach (var tile in tiles)
+        {
+            // [수정] transform.position.y 대신 실제 밟는 표면 높이(GetWorldHeight)를 사용합니다.
+            float surfaceY = tile.GetWorldHeight();
+            Vector3 pos = tile.transform.position;
+
+            GameObject overlay = Instantiate(reachableTilePrefab,
+                new Vector3(pos.x, surfaceY + Y_OFFSET, pos.z),
+                reachableTilePrefab.transform.rotation);
+
+            activeReachableTiles.Add(overlay);
+        }
+    }
+
+    public void ClearPath() { foreach (var t in activeOverlayTiles) if (t) Destroy(t); activeOverlayTiles.Clear(); }
+    public void ClearReachableRange() { foreach (var t in activeReachableTiles) if (t) Destroy(t); activeReachableTiles.Clear(); }
+    public void ShowRangeCircle(Vector3 center, float radius, int segments = 50) { /* 기존 코드 유지 */ }
+    public void ClearRangeCircle() { if (activeRangeCircle) { Destroy(activeRangeCircle.gameObject); activeRangeCircle = null; } }
+    public void ClearAll() { ClearPath(); ClearReachableRange(); ClearRangeCircle(); }
+}
+
+==================== Projectile.cs (경로: ./fakecom/Assets/Scripts/Visuals/Projectile.cs) ====================
+using UnityEngine;
+using System;
+
+public class Projectile : MonoBehaviour
+{
+    private Vector3 targetPosition;
+    private float speed = 20f; // Ѿ ӵ
+    private Action onHitCallback; // ¾   Լ ( ֱ)
+    private bool isLaunched = false;
+
+    public void Initialize(Vector3 targetPos, Action onHit)
+    {
+        this.targetPosition = targetPos;
+        this.onHitCallback = onHit;
+
+        // Ѿ Ӹ ǥ  
+        transform.LookAt(targetPos);
+        isLaunched = true;
+    }
+
+    private void Update()
+    {
+        if (!isLaunched) return;
+
+        // ǥ  ̵
+        float step = speed * Time.deltaTime;
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, step);
+
+        //  Ȯ (Ÿ  )
+        if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
+        {
+            // ǥ  !
+            Hit();
+        }
+    }
+
+    private void Hit()
+    {
+        isLaunched = false;
+
+        //  Լ !
+        onHitCallback?.Invoke();
+
+        // () ⼭  Ʈ   Instantiate ϸ ϴ.
+
+        // Ѿ 
+        Destroy(gameObject);
+    }
+}
+
+==================== Billboard.cs (경로: ./fakecom/Assets/Scripts/Visuals/Billboard.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 이 컴포넌트가 부착된 오브젝트가 항상 메인 카메라를 바라보도록 만듭니다.
+/// World Space UI 요소가 플레이어 화면을 정면으로 보도록 할 때 사용됩니다.
+/// </summary>
+public class Billboard : MonoBehaviour
+{
+    private Camera mainCamera;
+
+    private void Start()
+    {
+        // 성능을 위해 시작 시점에 메인 카메라를 캐싱합니다.
+        mainCamera = Camera.main;
+    }
+
+    private void LateUpdate()
+    {
+        // 카메라가 없으면 아무것도 하지 않습니다.
+        if (mainCamera == null) return;
+
+        // 이 오브젝트의 회전값을 카메라의 회전값과 동일하게 설정하여,
+        // 항상 카메라와 같은 방향을 바라보게 합니다.
+        transform.rotation = mainCamera.transform.rotation;
+    }
+}
+
+
+==================== GLog.cs (경로: ./fakecom/Assets/Scripts/Utils/GLog.cs) ====================
+using UnityEngine;
+
+public static class GLog
+{
+    // α׸ ƿ   ġ (  )
+    public static bool IsLoggingEnabled = true;
+
+    public static void Info(object message) => Log(message, LogLevel.Info);
+    public static void Warning(object message) => Log(message, LogLevel.Warning);
+    public static void Error(object message) => Log(message, LogLevel.Error);
+
+    private static void Log(object message, LogLevel level)
+    {
+        if (!IsLoggingEnabled && level != LogLevel.Error) return;
+
+        // ServiceLocator  
+        ServiceLocator.Log($"[{level}] {message}", level);
+    }
+}
+
+==================== GridUtils.cs (경로: ./fakecom/Assets/Scripts/Utils/GridUtils.cs) ====================
+using UnityEngine;
+
+public static class GridUtils
+{
+    public const float LEVEL_HEIGHT = 2.5f;
+    public const float CELL_SIZE = 1.0f;
+
+    // --- 1. 좌표 변환 (Coordinate Conversion) ---
+    public static Vector3Int GetGridPos(Vector3 pos) => WorldToGrid(pos);
+    public static int SnapCoordinate(float value) => Mathf.RoundToInt(value);
+
+    public static Vector3Int WorldToGrid(Vector3 worldPos)
+    {
+        int x = SnapCoordinate(worldPos.x);
+        int z = SnapCoordinate(worldPos.z);
+        int y = Mathf.RoundToInt(worldPos.y / LEVEL_HEIGHT);
+        return new Vector3Int(x, y, z);
+    }
+
+    public static Vector3 GridToWorld(Vector3Int gridPos)
+    {
+        return new Vector3(gridPos.x, gridPos.y * LEVEL_HEIGHT, gridPos.z);
+    }
+
+    // --- 2. 방향 판별 (Direction Handling) ---
+    public static Direction GetDirection(Vector3Int from, Vector3Int to)
+    {
+        if (from == to) return Direction.None;
+        if (from.y != to.y) return Direction.None;
+        Vector3Int diff = to - from;
+        if (diff.x == 0 && diff.z == 1) return Direction.North;
+        if (diff.x == 0 && diff.z == -1) return Direction.South;
+        if (diff.x == 1 && diff.z == 0) return Direction.East;
+        if (diff.x == -1 && diff.z == 0) return Direction.West;
+        return Direction.None;
+    }
+
+    public static Direction GetOpposite(Direction dir)
+    {
+        return dir switch
+        {
+            Direction.North => Direction.South,
+            Direction.South => Direction.North,
+            Direction.East => Direction.West,
+            Direction.West => Direction.East,
+            _ => Direction.None
+        };
+    }
+
+    public static Vector3Int GetDirectionVector(Direction dir)
+    {
+        return dir switch
+        {
+            Direction.North => new Vector3Int(0, 0, 1),
+            Direction.South => new Vector3Int(0, 0, -1),
+            Direction.East => new Vector3Int(1, 0, 0),
+            Direction.West => new Vector3Int(-1, 0, 0),
+            _ => Vector3Int.zero
+        };
+    }
+
+    // --- 3. 배치 데이터 (Placement Data) ---
+    public static Vector3 GetEdgeOffset(Direction dir)
+    {
+        float offset = CELL_SIZE * 0.5f;
+        return dir switch
+        {
+            Direction.North => new Vector3(0, 0, offset),
+            Direction.South => new Vector3(0, 0, -offset),
+            Direction.East => new Vector3(offset, 0, 0),
+            Direction.West => new Vector3(-offset, 0, 0),
+            _ => Vector3.zero
+        };
+    }
+
+    public static float GetWallRotationY(Direction dir)
+    {
+        return dir switch
+        {
+            Direction.North => 0f,
+            Direction.East => 90f,
+            Direction.South => 180f,
+            Direction.West => 270f,
+            _ => 0f
+        };
+    }
+
+    // --- 4. 높이 계산 (상세 로그 포함) ---
+    public static float GetSurfaceY(Tile tile, GameObject targetObj, float offset)
+    {
+        // [1] 타일 표면 높이
+        float tileTop = tile.GetSurfaceY();
+
+        // [2] 오프셋 계산
+        Collider col = targetObj.GetComponent<Collider>();
+        float pivotY = targetObj.transform.position.y; // 오브젝트 피벗 Y
+        float bottomY = pivotY; // 기본적으로 피벗이 바닥이라고 가정
+        float distDiff = 0f;
+
+        if (col != null)
+        {
+            bottomY = col.bounds.min.y; // 오브젝트 콜라이더 바닥 Y
+            distDiff = pivotY - bottomY; // 피벗이 바닥으로부터 얼마나 떨어져 있는가?
+        }
+        else
+        {
+            Renderer ren = targetObj.GetComponentInChildren<Renderer>();
+            if (ren != null)
+            {
+                bottomY = ren.bounds.min.y;
+                distDiff = pivotY - bottomY;
+            }
+        }
+
+        // [3] 최종 높이 계산
+        float finalY = tileTop + distDiff + offset;
+
+        // [상세 디버그 로그]
+        // 이 로그가 콘솔에 뜨면 버그 잡을 때 바로 캡처하거나 수치를 확인해 주세요.
+        Debug.Log($"<color=cyan>[GridUtils 계산] {targetObj.name} 위치 산출</color>\n" +
+                  $"1. 타일({tile.name}) 표면 Y: <b>{tileTop:F4}</b>\n" +
+                  $"2. 오브젝트 피벗 Y: {pivotY:F4} / 바닥 Y: {bottomY:F4} -> 차이(Diff): <b>{distDiff:F4}</b>\n" +
+                  $"3. 보정치: <b>{offset:F4}</b>\n" +
+                  $"4. 최종 결과: {tileTop:F4} (타일) + {distDiff:F4} (피벗차) + {offset:F4} (오프셋) = <b>{finalY:F4}</b>");
+
+        return finalY;
+    }
+}
+
+==================== GameManager.cs (경로: ./fakecom/Assets/Scripts/Manager/GameManager.cs) ====================
+using UnityEngine;
+
+public class GameManager : MonoBehaviour
+    {
+        void Start()
+        {
+            
+        }
+    }
+
+
+
+==================== MapManager.cs (경로: ./fakecom/Assets/Scripts/Manager/MapManager.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+
+// [기존 구조체 유지]
+public struct PathResult
+{
+    public List<Vector3> path;
+    public List<int> cumulativeCosts;
+    public int totalCost;
+}
+
+public struct TeleportNode
+{
+    public Vector3Int Destination;
+    public int Cost;
+}
+
+public class MapManager : MonoBehaviour
+{
+    public static MapManager Instance { get; private set; }
+
+    // [Phase 1.4] O(1) 조회를 위한 저장소
+    private Dictionary<Vector3Int, Tile> tileMap = new Dictionary<Vector3Int, Tile>();
+
+    // [기존 기능] 텔레포트 연결 정보
+    private Dictionary<Vector3Int, List<TeleportNode>> teleportConnections = new Dictionary<Vector3Int, List<TeleportNode>>();
+    public bool IsInitialized { get; private set; } = false;
+
+
+    private void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else { Destroy(gameObject); return; }
+
+        ServiceLocator.Register(this, ManagerScope.Scene);
+
+        try
+        {
+            ScanAndRegisterWorld();
+            IsInitialized = true; // [성공] 이제 다른 유닛들이 접근해도 안전합니다.
+            Debug.Log("[MapManager] Initialization Successful.");
+        }
+        catch (System.Exception ex)
+        {
+            IsInitialized = false;
+            Debug.LogError($"[MapManager] Initialization Failed: {ex}");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (ServiceLocator.IsRegistered<MapManager>()) ServiceLocator.Unregister<MapManager>(this);
+    }
+
+    // =========================================================
+    // 1. 데이터 관리
+    // =========================================================
+
+    public void ScanAndRegisterWorld()
+    {
+        ClearMap();
+        Tile[] tiles = FindObjectsOfType<Tile>();
+        foreach (var tile in tiles)
+        {
+            Vector3Int coord = GridUtils.WorldToGrid(tile.transform.position);
+            tile.UpdateCoordinate(coord);
+            RegisterTile(coord, tile);
+        }
+        Debug.Log($"[MapManager] World scanned. {tileMap.Count} tiles registered.");
+    }
+
+    public void RegisterTile(Vector3Int coord, Tile tile)
+    {
+        if (tileMap.ContainsKey(coord)) tileMap[coord] = tile;
+        else tileMap.Add(coord, tile);
+    }
+
+    public Tile GetTileAt(Vector3Int coord)
+    {
+        return tileMap.TryGetValue(coord, out Tile tile) ? tile : null;
+    }
+
+    public void ClearMap()
+    {
+        tileMap.Clear();
+        teleportConnections.Clear();
+    }
+
+    // =========================================================
+    // 2. 물리 판정 (IsEdgePassable 복구 완료)
+    // =========================================================
+
+    /// <summary>
+    /// [핵심 Fix] 두 타일 간의 양방향 이동 가능 여부 판정
+    /// </summary>
+    public bool IsEdgePassable(Vector3Int from, Vector3Int to)
+    {
+        // 1. 타일 가져오기
+        Tile fromTile = GetTileAt(from);
+        Tile toTile = GetTileAt(to);
+
+        if (fromTile == null || toTile == null) return false;
+
+        // 2. 층 높이 체크 (같은 층만 일반 이동 가능)
+        if (from.y != to.y) return false;
+
+        // 3. 방향 계산
+        Direction dir = GridUtils.GetDirection(from, to);
+        if (dir == Direction.None) return false; // 인접하지 않음
+
+        // 4. [양방향 엣지 검사]
+        // 나가는 쪽(Exit) 확인
+        EdgeInfo exitEdge = fromTile.GetEdge(dir);
+        // 들어오는 쪽(Entry) 확인 (반대 방향)
+        EdgeInfo entryEdge = toTile.GetEdge(GridUtils.GetOpposite(dir));
+
+        // 둘 다 뚫려 있어야 통과 가능 (AND 조건)
+        return exitEdge.IsTraversable && entryEdge.IsTraversable;
+    }
+
+    // =========================================================
+    // 3. 텔레포트 및 길 찾기 (기존 기능 유지)
+    // =========================================================
+
+    public void RegisterTeleportPath(Vector3Int start, Vector3Int end, int cost = 1)
+    {
+        if (!teleportConnections.ContainsKey(start))
+            teleportConnections[start] = new List<TeleportNode>();
+
+        if (!teleportConnections[start].Exists(x => x.Destination == end))
+        {
+            teleportConnections[start].Add(new TeleportNode { Destination = end, Cost = cost });
+        }
+    }
+
+    public PathResult FindPath(Vector3 startPos, Vector3 targetPos, int mobility)
+    {
+        Vector3Int startGridPos = GridUtils.WorldToGrid(startPos);
+        Vector3Int targetGridPos = GridUtils.WorldToGrid(targetPos);
+
+        Tile startTile = GetTileAt(startGridPos);
+        if (startTile == null) return new PathResult { path = null, totalCost = 0 };
+
+        SimplePriorityQueue<Vector3Int> openQueue = new SimplePriorityQueue<Vector3Int>();
+        openQueue.Enqueue(startGridPos, 0);
+
+        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        Dictionary<Vector3Int, int> gCost = new Dictionary<Vector3Int, int>();
+
+        gCost[startGridPos] = 0;
+
+        HashSet<Vector3Int> closed = new HashSet<Vector3Int>();
+        Vector3Int[] horizontalDirs = { new Vector3Int(0, 0, 1), new Vector3Int(0, 0, -1), new Vector3Int(-1, 0, 0), new Vector3Int(1, 0, 0) };
+
+        while (openQueue.Count > 0)
+        {
+            Vector3Int current = openQueue.Dequeue();
+            if (closed.Contains(current)) continue;
+            closed.Add(current);
+
+            if (current == targetGridPos) return ReconstructPath(cameFrom, gCost, startGridPos, targetGridPos);
+
+            foreach (var dir in horizontalDirs)
+                ProcessNeighbor(current, current + dir, targetGridPos, openQueue, cameFrom, gCost, false, 0);
+
+            if (teleportConnections.ContainsKey(current))
+            {
+                foreach (var tele in teleportConnections[current])
+                    ProcessNeighbor(current, tele.Destination, targetGridPos, openQueue, cameFrom, gCost, true, tele.Cost);
+            }
+        }
+        return new PathResult { path = null, totalCost = 0 };
+    }
+
+    private void ProcessNeighbor(Vector3Int current, Vector3Int neighborPos, Vector3Int targetGridPos,
+        SimplePriorityQueue<Vector3Int> openQueue, Dictionary<Vector3Int, Vector3Int> cameFrom,
+        Dictionary<Vector3Int, int> gCost, bool isTeleport, int explicitCost)
+    {
+        Tile neighborTile = GetTileAt(neighborPos);
+        if (neighborTile == null) return;
+
+        // 점유 확인 (도착지는 제외)
+        if (neighborTile.OccupyingObject != null && neighborPos != targetGridPos) return;
+
+        // [핵심] 텔레포트가 아니면 엣지 통과 여부 확인
+        if (!isTeleport && !IsEdgePassable(current, neighborPos)) return;
+
+        int moveCost = isTeleport ? explicitCost : neighborTile.Cost;
+
+        int tentativeGCost = gCost.GetValueOrDefault(current, int.MaxValue) + moveCost;
+
+        if (tentativeGCost < gCost.GetValueOrDefault(neighborPos, int.MaxValue))
+        {
+            cameFrom[neighborPos] = current;
+            gCost[neighborPos] = tentativeGCost;
+            int priority = tentativeGCost + GetHeuristicCost(neighborPos, targetGridPos);
+            openQueue.Enqueue(neighborPos, priority);
+        }
+    }
+
+    private int GetHeuristicCost(Vector3Int from, Vector3Int to)
+    {
+        return Mathf.Abs(from.x - to.x) + Mathf.Abs(from.z - to.z) + Mathf.Abs(from.y - to.y);
+    }
+
+    private PathResult ReconstructPath(Dictionary<Vector3Int, Vector3Int> cameFrom, Dictionary<Vector3Int, int> gCost, Vector3Int start, Vector3Int end)
+    {
+        List<Vector3> path = new List<Vector3>();
+        List<int> costs = new List<int>();
+        Vector3Int current = end;
+
+        while (current != start)
+        {
+            path.Add(GridUtils.GridToWorld(current));
+            costs.Add(gCost[current]);
+            if (!cameFrom.ContainsKey(current)) break;
+            current = cameFrom[current];
+        }
+        path.Add(GridUtils.GridToWorld(start));
+        costs.Add(0);
+        path.Reverse(); costs.Reverse();
+        return new PathResult { path = path, cumulativeCosts = costs, totalCost = gCost[end] };
+    }
+
+    public List<Tile> FindReachableTiles(Vector3Int startGridPos, int range)
+    {
+        // (이전 코드와 동일하므로 생략 가능하나 컴파일 안전을 위해 전체 필요시 유지)
+        // ... (기존 FindReachableTiles 로직) ...
+        // 간략하게 필수 로직만 포함
+        Dictionary<Vector3Int, int> gCost = new Dictionary<Vector3Int, int>();
+        Queue<Vector3Int> queue = new Queue<Vector3Int>();
+        queue.Enqueue(startGridPos);
+        gCost[startGridPos] = 0;
+        Vector3Int[] horizontalDirs = { new Vector3Int(0, 0, 1), new Vector3Int(0, 0, -1), new Vector3Int(-1, 0, 0), new Vector3Int(1, 0, 0) };
+
+        while (queue.Count > 0)
+        {
+            Vector3Int current = queue.Dequeue();
+            int currentCost = gCost[current];
+            foreach (var dir in horizontalDirs)
+            {
+                Vector3Int neighbor = current + dir;
+                if (!IsEdgePassable(current, neighbor)) continue;
+                Tile t = GetTileAt(neighbor);
+                if (t == null || (t.OccupyingObject != null)) continue;
+                int newCost = currentCost + t.Cost;
+                if (newCost <= range)
+                {
+                    if (!gCost.ContainsKey(neighbor) || newCost < gCost[neighbor])
+                    {
+                        gCost[neighbor] = newCost;
+                        queue.Enqueue(neighbor);
+                    }
+                }
+            }
+        }
+        List<Tile> finalTiles = new List<Tile>();
+        foreach (var pos in gCost.Keys) { Tile t = GetTileAt(pos); if (t != null) finalTiles.Add(t); }
+        return finalTiles;
+    }
+
+    private class SimplePriorityQueue<T>
+    {
+        private List<KeyValuePair<T, int>> elements = new List<KeyValuePair<T, int>>();
+        public int Count => elements.Count;
+        public void Enqueue(T item, int priority)
+        {
+            elements.Add(new KeyValuePair<T, int>(item, priority));
+            elements.Sort((a, b) => a.Value.CompareTo(b.Value));
+        }
+        public T Dequeue()
+        {
+            var item = elements[0].Key;
+            elements.RemoveAt(0);
+            return item;
+        }
+    }
+    public void EditorScanMap()
+    {
+        // 딕셔너리 초기화
+        if (tileMap == null) tileMap = new Dictionary<Vector3Int, Tile>();
+        tileMap.Clear();
+
+        // 씬에 있는 모든 Tile 컴포넌트를 찾음
+        Tile[] allTiles = FindObjectsOfType<Tile>();
+
+        foreach (var tile in allTiles)
+        {
+            if (!tileMap.ContainsKey(tile.Coordinate))
+            {
+                tileMap.Add(tile.Coordinate, tile);
+            }
+        }
+        Debug.Log($"[MapManager] Editor Scan Complete. Registered {tileMap.Count} tiles.");
+    }
+}
+
+==================== TargetUIManager.cs (경로: ./fakecom/Assets/Scripts/Manager/TargetUIManager.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+using System.Linq; // .FirstOrDefault() 사용을 위해 추가
+
+/// <summary>
+/// 월드 공간에 있는 타겟의 UI(명중률, 데미지)를 표시하고 관리합니다.
+/// </summary>
+public class TargetUIManager : MonoBehaviour
+{
+    [Header("--- 참조 ---")]
+    [Tooltip("정보를 표시할 UI 프리팹 (TargetInfoUI, Billboard 컴포넌트 포함)")]
+    [SerializeField] private TargetInfoUI infoUiPrefab;
+
+    [Tooltip("UI가 배치될 World Space 캔버스")]
+    [SerializeField] private Canvas worldCanvas;
+
+    [Header("--- 풀링 설정 ---")]
+    [Tooltip("미리 생성해 둘 UI 오브젝트의 수")]
+    [SerializeField] private int initialPoolSize = 10;
+
+    private List<TargetInfoUI> uiPool;
+    private Dictionary<Transform, TargetInfoUI> activeUIs;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+        Initialize();
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.Unregister<TargetUIManager>(this);
+    }
+
+    private void Initialize()
+    {
+        uiPool = new List<TargetInfoUI>();
+        activeUIs = new Dictionary<Transform, TargetInfoUI>();
+
+        if (infoUiPrefab == null || worldCanvas == null)
+        {
+            // Canvas가 없는 경우(테스트 씬 등)를 대비해 자동 검색
+            var canvasObj = GameObject.Find("WorldSpaceCanvas");
+            if (canvasObj) worldCanvas = canvasObj.GetComponent<Canvas>();
+
+            if (worldCanvas == null || infoUiPrefab == null)
+            {
+                Debug.LogWarning("TargetUIManager: Prefab 또는 Canvas가 없어 비활성화됩니다.");
+                enabled = false;
+                return;
+            }
+        }
+
+        for (int i = 0; i < initialPoolSize; i++)
+        {
+            TargetInfoUI newUi = Instantiate(infoUiPrefab, worldCanvas.transform);
+            newUi.transform.localScale = Vector3.one;
+            newUi.SetActive(false);
+            uiPool.Add(newUi);
+        }
+    }
+
+    /// <summary>
+    /// [수정] AbilityDataSO를 기반으로 예상 결과 UI를 표시합니다.
+    /// </summary>
+    public void ShowInfoForTarget(UnitStatus attacker, UnitStatus target, AbilityDataSO ability)
+    {
+        if (target == null || activeUIs.ContainsKey(target.transform)) return;
+
+        TargetInfoUI uiToShow = GetAvailableUI();
+        if (uiToShow == null) return;
+
+        // 1. 임시 명중률 (TODO: CombatCalculator 도입 시 교체)
+        int hitChance = 0;
+        if (attacker != null)
+            hitChance = Mathf.Clamp(attacker.Aim - target.Evasion, 0, 100);
+        
+        string hitChanceString = $"{hitChance}%";
+
+        // 2. 데미지 정보 추출
+        string damageString = "-";
+        if (ability != null)
+        {
+            var damageEffect = ability.effects.OfType<DamageEffectSO>().FirstOrDefault();
+            if (damageEffect != null)
+            {
+                damageString = $"{damageEffect.minDamage}-{damageEffect.maxDamage}";
+            }
+        }
+
+        uiToShow.SetInfo(hitChanceString, damageString);
+
+        // 위치 설정
+        uiToShow.transform.position = target.transform.position + (Vector3.up * 1.8f);
+        uiToShow.SetActive(true);
+        activeUIs[target.transform] = uiToShow;
+    }
+
+    public void ClearAll()
+    {
+        if (activeUIs == null || activeUIs.Count == 0) return;
+
+        List<Transform> targets = new List<Transform>(activeUIs.Keys);
+        foreach (var target in targets)
+        {
+            if (activeUIs.TryGetValue(target, out TargetInfoUI ui))
+            {
+                ui.SetActive(false);
+                uiPool.Add(ui);
+                activeUIs.Remove(target);
+            }
+        }
+    }
+
+    private TargetInfoUI GetAvailableUI()
+    {
+        if (uiPool != null && uiPool.Count > 0)
+        {
+            TargetInfoUI ui = uiPool[uiPool.Count - 1];
+            uiPool.RemoveAt(uiPool.Count - 1);
+            return ui;
+        }
+        // 풀이 비었을 때 새로 생성하는 로직도 추가할 수 있습니다.
+        Debug.LogWarning("TargetInfoUI 풀이 비었습니다.");
+        return null;
+    }
+}
+
+
+==================== CombatManager.cs (경로: ./fakecom/Assets/Scripts/Manager/CombatManager.cs) ====================
+using UnityEngine;
+using System.Collections;
+
+public class CombatManager : MonoBehaviour
+{
+    [Header("Action Camera Settings")]
+    [SerializeField, Tooltip("액션 카메라 진입 후 공격 연출까지의 대기 시간")]
+    private float preActionDelay = 0.6f;
+    [SerializeField, Tooltip("공격 연출 후 타격 판정까지의 대기 시간")]
+    private float actionImpactDelay = 0.5f;
+    [SerializeField, Tooltip("타격 판정 후 카메라가 복귀하기까지의 대기 시간")]
+    private float postActionDelay = 1.0f;
+    [SerializeField, Tooltip("모든 시퀀스가 끝나고 턴 종료까지의 대기 시간")]
+    private float endSequenceDelay = 0.5f;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+
+    public void ExecuteAbility(AbilityDataSO ability, UnitStatus attacker, UnitStatus target)
+    {
+        StartCoroutine(AbilitySequence(ability, attacker, target));
+    }
+
+    private IEnumerator AbilitySequence(AbilityDataSO ability, UnitStatus attacker, UnitStatus target)
+    {
+        // [수정] CombatCalculator를 통해 공격 결과 요청
+        CombatCalculator.AttackResult result = CombatCalculator.ResolveAttack(attacker, target);
+
+        Debug.Log($"[Combat] 명중:{result.IsHit}, 크리:{result.IsCrit}, 데미지:{result.Damage}");
+
+        var cameraController = ServiceLocator.Get<CameraController>();
+        // [수정] 액션캠 발동 조건을 결과값에서 가져옴
+        bool playActionCam = (result.IsCrit) && (cameraController != null);
+
+        if (playActionCam)
+        {
+            cameraController.EnableActionView(attacker.transform, target.transform);
+            // '컷' 연출에서는 카메라 이동 시간이 없으므로, 공격 전 짧은 연출 대기
+            if (preActionDelay > 0) yield return new WaitForSeconds(preActionDelay);
+        }
+
+        // ... 애니메이션 트리거 ...
+        if (actionImpactDelay > 0) yield return new WaitForSeconds(actionImpactDelay);
+
+        // [수정] 크리티컬 시, 타격 직전에 카메라 흔들림 효과 호출
+        if (result.IsCrit && cameraController != null)
+        {
+            cameraController.PlayImpactShake();
+        }
+
+        // [수정] 결과에 따라 데미지 적용 또는 MISS 처리
+        var damageTextManager = ServiceLocator.Get<DamageTextManager>();
+        if (damageTextManager != null)
+        {
+            if (result.IsHit)
+            {
+                // TODO: Attacker 정보 넘기기
+                target.TakeDamage(result.Damage, false, result.IsCrit, target.LastFinalPenalty);
+
+                HitColorType color = result.IsCrit ? HitColorType.Red : HitColorType.Yellow;
+                damageTextManager.ShowDamage(target.transform.position, result.Damage.ToString(), color);
+            }
+            else
+            {
+                damageTextManager.ShowDamage(target.transform.position, "MISS", HitColorType.Miss);
+            }
+        }
+        else
+        {
+            Debug.LogError("[CombatManager] DamageTextManager를 찾을 수 없습니다.");
+            if (result.IsHit)
+            {
+                target.TakeDamage(result.Damage, false, result.IsCrit, target.LastFinalPenalty);
+            }
+        }
+
+        if (playActionCam)
+        {
+            if (postActionDelay > 0) yield return new WaitForSeconds(postActionDelay);
+            cameraController.SetTarget(attacker.transform, false);
+        }
+
+        if (endSequenceDelay > 0) yield return new WaitForSeconds(endSequenceDelay);
+                // ServiceLocator.Get<TurnManager>().EndTurn();
+                ServiceLocator.Get<TurnManager>().EndTurn(); 
+                
+                Debug.Log("시퀀스 종료, 턴을 종료합니다.");
+    }
+}
+
+==================== InputManager.cs (경로: ./fakecom/Assets/Scripts/Manager/InputManager.cs) ====================
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+
+public class InputManager : MonoBehaviour
+{
+    private PlayerControls playerControls;
+
+    // --- [출력 포트] 외부 스크립트들이 구독(Connect)할 이벤트들 ---
+    public event Action<Vector2> OnMouseMove;
+    public event Action OnMouseClick;
+    public event Action OnCameraRecenter;
+    public event Action OnTurnEndInvoked;
+    public event Action<bool> OnCameraRotate;
+    public event Action OnSkill1Invoked;
+
+    // --- [출력 포트] 폴링용 프로퍼티 ---
+    public Vector2 CameraMoveVector { get; private set; }
+    public float CameraKeyRotateAxis { get; private set; }
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Global);
+    }
+
+    private void OnEnable()
+    {
+        if (playerControls == null)
+        {
+            playerControls = new PlayerControls();
+        }
+        playerControls.Gameplay.Enable();
+
+        // --- 배선 작업 ---
+        playerControls.Gameplay.MousePosition.performed += HandleMouseMove;
+        playerControls.Gameplay.MouseClick.performed += HandleMouseClick;
+        playerControls.Gameplay.CameraRecenter.performed += HandleCameraRecenter; // 키보드 입력(8번키)은 이벤트를 발생시킴
+        playerControls.Gameplay.TurnEnd.performed += HandleTurnEndKey;
+        
+        var skill1Action = playerControls.asset.FindAction("Skill1");
+        if (skill1Action != null) skill1Action.performed += HandleSkill1;
+        else Debug.LogWarning("[InputManager] 'Skill1' 액션을 찾을 수 없습니다.");
+
+        // 폴링용 값 연결
+        playerControls.Gameplay.CameraMove.performed += ctx => CameraMoveVector = ctx.ReadValue<Vector2>();
+        playerControls.Gameplay.CameraMove.canceled += ctx => CameraMoveVector = Vector2.zero;
+        
+        var keyRotateAction = playerControls.asset.FindAction("CameraKeyRotate");
+        if(keyRotateAction != null)
+        {
+            keyRotateAction.performed += ctx => CameraKeyRotateAxis = ctx.ReadValue<float>();
+            keyRotateAction.canceled += ctx => CameraKeyRotateAxis = 0f;
+        }
+        else Debug.LogWarning("[InputManager] 'CameraKeyRotate' 액션을 찾을 수 없습니다.");
+
+        // 이벤트용 값 연결
+        playerControls.Gameplay.CameraRotate.performed += ctx => OnCameraRotate?.Invoke(true);
+        playerControls.Gameplay.CameraRotate.canceled += ctx => OnCameraRotate?.Invoke(false);
+    }
+
+    private void OnDisable()
+    {
+        if (playerControls != null)
+        {
+            playerControls.Gameplay.Disable();
+            // 모든 배선 해제 (생략)
+        }
+    }
+    
+    #region Handlers
+    private void HandleMouseMove(InputAction.CallbackContext context)
+    {
+        OnMouseMove?.Invoke(context.ReadValue<Vector2>());
+    }
+
+    private void HandleMouseClick(InputAction.CallbackContext context)
+    {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+        OnMouseClick?.Invoke();
+    }
+
+    // 키보드 입력으로 이벤트 발생
+    private void HandleCameraRecenter(InputAction.CallbackContext context)
+    {
+        OnCameraRecenter?.Invoke();
+    }
+
+    // [추가] UI 버튼 클릭으로 이벤트 발생
+    public void InvokeCameraRecenter()
+    {
+        OnCameraRecenter?.Invoke();
+    }
+
+    public void InvokeTurnEnd()
+    {
+        OnTurnEndInvoked?.Invoke();
+    }
+
+    private void HandleTurnEndKey(InputAction.CallbackContext context)
+    {
+        OnTurnEndInvoked?.Invoke();
+    }
+    
+    private void HandleSkill1(InputAction.CallbackContext context)
+    {
+        OnSkill1Invoked?.Invoke();
+    }
+
+    public void InvokeSkill1()
+    {
+        OnSkill1Invoked?.Invoke();
+    }
+    #endregion
+
+    public Vector2 GetMouseDelta()
+    {
+        if (playerControls != null && playerControls.Gameplay.MouseDelta != null)
+        {
+            return playerControls.Gameplay.MouseDelta.ReadValue<Vector2>();
+        }
+        return Vector2.zero;
+    }
+
+    public bool IsCameraRotatePressed()
+    {
+        if (playerControls != null && playerControls.Gameplay.CameraRotate != null)
+        {
+            return playerControls.Gameplay.CameraRotate.IsPressed();
+        }
+        return false;
+    }
+}
+
+
+==================== TurnManager.cs (경로: ./fakecom/Assets/Scripts/Manager/TurnManager.cs) ====================
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class TurnManager : MonoBehaviour
+{
+    [Tooltip("1초당 감소하는 TS 수치입니다.")]
+    [SerializeField] private float tsDecrementPerSecond = 5f;
+
+    private List<UnitStatus> allUnits = new List<UnitStatus>();
+    public UnitStatus ActiveUnit { get; private set; }
+    private bool isTurnActive = false;
+
+    public event System.Action<UnitStatus> OnTurnStarted;
+    public event System.Action<List<UnitStatus>> OnTimelineUpdated;
+
+    private CameraController cameraController;
+    private InputManager inputManager;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+
+    private void Start()
+    {
+        InitializeSceneDependencies();
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        
+        inputManager = ServiceLocator.Get<InputManager>();
+        if (inputManager != null)
+        {
+            inputManager.OnTurnEndInvoked += EndTurn;
+            // [수정] OnCameraRecenter 이벤트를 구독하여 활성 유닛 포커스 기능 수행
+            inputManager.OnCameraRecenter += HandleCameraRecenterInput;
+        }
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (inputManager != null)
+        {
+            inputManager.OnTurnEndInvoked -= EndTurn;
+            // [수정] 이벤트 구독 해제
+            inputManager.OnCameraRecenter -= HandleCameraRecenterInput;
+        }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        StartCoroutine(WaitAndInitialize());
+    }
+    private IEnumerator WaitAndInitialize()
+    {
+        yield return null;
+        InitializeSceneDependencies();
+    }
+
+    private void InitializeSceneDependencies()
+    {
+        cameraController = ServiceLocator.Get<CameraController>();
+        if (inputManager == null) inputManager = ServiceLocator.Get<InputManager>();
+
+        allUnits = FindObjectsOfType<UnitStatus>().OrderBy(u => u.gameObject.name).ToList();
+
+        foreach (var unit in allUnits)
+        {
+            unit.CurrentTS = Random.Range(20f, 40f) / unit.Agility;
+        }
+
+        isTurnActive = false;
+        ActiveUnit = null;
+        
+        OnTimelineUpdated?.Invoke(allUnits);
+    }
+    
+    private void Update()
+    {
+        if (!isTurnActive)
+        {
+            bool timelineChanged = false;
+            float tsToDecrement = tsDecrementPerSecond * Time.deltaTime;
+
+            if (allUnits == null) return;
+
+            foreach (var unit in allUnits)
+            {
+                if (unit == null) continue;
+
+                if (unit.CurrentTS > 0)
+                {
+                    unit.CurrentTS -= tsToDecrement;
+                    timelineChanged = true;
+                }
+
+                if (unit.CurrentTS <= 0)
+                {
+                    unit.CurrentTS = 0;
+                    StartTurn(unit);
+                    break;
+                }
+            }
+
+            if (timelineChanged) OnTimelineUpdated?.Invoke(allUnits);
+        }
+    }
+
+    private void StartTurn(UnitStatus unit)
+    {
+        isTurnActive = true;
+        ActiveUnit = unit;
+        ActiveUnit.ResetTurnData();
+
+        if (cameraController != null)
+        {
+            cameraController.SetTarget(ActiveUnit.transform, false);
+        }
+
+        ActiveUnit.OnTurnStart();
+
+        // [TODO] 만약 유닛 상태가 Incapacitated(무력화)라면 
+        // 50% 확률로 "행동 불능" 로그를 띄우고 바로 EndTurn()을 호출하는 로직 추가 필요
+        // 예: if (ActiveUnit.Condition == UnitCondition.Incapacitated && Random.value < 0.5f) { ... }
+
+        if (ActiveUnit.IsDead)
+        {
+            Debug.Log($"{ActiveUnit.name}은(는) 턴 시작과 동시에 사망했습니다.");
+            EndTurn();
+            return;
+        }
+
+        OnTurnStarted?.Invoke(ActiveUnit);
+    }
+
+    public void EndTurn()
+    {
+        if (!isTurnActive || ActiveUnit == null) return;
+        
+        var pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        if(pathVisualizer != null) pathVisualizer.ClearAll();
+        
+        ActiveUnit.CurrentTS += ActiveUnit.CalculateNextTurnPenalty();
+        ActiveUnit.ResetTurnData();
+        ActiveUnit = null;
+        isTurnActive = false;
+    }
+
+    public void UpdateUnitTurnDelay(UnitStatus unit, float oldTS, float newTS, bool isCrit)
+    {
+        StartCoroutine(ProcessTurnDelayAnimation(unit, oldTS, newTS, isCrit));
+    }
+    
+    private IEnumerator ProcessTurnDelayAnimation(UnitStatus unit, float startTS, float targetTS, bool isCrit)
+    {
+        // ... (이하 생략)
+        if (!isCrit)
+        {
+            float duration = 0.3f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                unit.CurrentTS = Mathf.Lerp(startTS, targetTS, t);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+        }
+        else
+        {
+            float difference = targetTS - startTS;
+            float overshootAmount = difference * 0.5f;
+            float overshootTarget = targetTS + overshootAmount;
+            float phase1Duration = 0.2f;
+            float p1Timer = 0f;
+            while (p1Timer < phase1Duration)
+            {
+                p1Timer += Time.deltaTime;
+                float t = p1Timer / phase1Duration;
+                float easeT = 1f - Mathf.Pow(1f - t, 3);
+                unit.CurrentTS = Mathf.Lerp(startTS, overshootTarget, easeT);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+            unit.CurrentTS = overshootTarget;
+            float phase2Duration = 0.3f;
+            float p2Timer = 0f;
+            while (p2Timer < phase2Duration)
+            {
+                p2Timer += Time.deltaTime;
+                float t = p2Timer / phase2Duration;
+                float smoothT = t * t * (3f - 2f * t);
+                unit.CurrentTS = Mathf.Lerp(overshootTarget, targetTS, smoothT);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+        }
+        unit.CurrentTS = targetTS;
+        OnTimelineUpdated?.Invoke(allUnits);
+    }
+
+    // [추가] CameraRecenter 이벤트 핸들러
+    private void HandleCameraRecenterInput()
+    {
+        if (cameraController != null && ActiveUnit != null)
+        {
+            cameraController.SetTarget(ActiveUnit.transform, true); // 즉시 이동
+        }
+    }
+}
+
+
+==================== QTEManager.cs (경로: ./fakecom/Assets/Scripts/Manager/QTEManager.cs) ====================
+using UnityEngine;
+using System;
+
+public class QTEManager : MonoBehaviour
+{
+    private GlobalSettingsSO globalSettings;
+
+    [Header("--- Execution References ---")]
+    [Tooltip("실제 UI 동작을 담당하는 컨트롤러 스크립트를 연결하세요.")]
+    [SerializeField] private QTEController qteController; 
+
+
+    private void Awake()
+    {
+        // 씬 전환 시 해제되도록 Scene 스코프로 등록
+        ServiceLocator.Register<QTEManager>(this, ManagerScope.Scene);
+
+        globalSettings = ServiceLocator.Get<GlobalSettingsSO>();
+
+        if (globalSettings == null)
+        {
+            Debug.LogWarning("[QTEManager] GlobalSettingsSO가 연결되지 않았습니다!");
+        }
+    }
+
+    /// <summary>
+    /// [동기 방식] 즉시 성공 여부를 반환해야 하는 경우 (기존 코드 호환용)
+    /// </summary>
+    public bool GetQTESuccessInstant(QTEType type)
+    {
+        if (globalSettings == null)
+        {
+            Debug.LogWarning("[QTEManager] GlobalSettingsSO가 연결되지 않아 기본값(true)을 반환합니다.");
+            return true;
+        }
+
+        // 1. 타입에 맞는 확률값 가져오기
+        float chance = 0f;
+        switch (type)
+        {
+            case QTEType.Survival:
+                chance = globalSettings.probSurvival; // 0.5f 등
+                break;
+            case QTEType.AttackCrit:
+                chance = globalSettings.probAttackCrit;
+                break;
+            case QTEType.EnemyCrit:
+                chance = globalSettings.probEnemyCrit;
+                break;
+                // 필요한 타입들을 추가...
+        }
+
+        // 2. 확률 판정 (0~1 사이 랜덤값이 chance보다 작으면 성공)
+        return UnityEngine.Random.value <= chance;
+    }
+    /// <summary>
+    /// [비동기 방식] UI가 뜨고 플레이어가 누를 때까지 기다려야 하는 경우 (Synchro-Pulse 등)
+    /// </summary>
+    /// <param name="type">QTE 종류</param>
+    /// <param name="onResult">결과(성공/실패)를 돌려받을 콜백 함수</param>
+    public void StartQTE(QTEType type, Action<bool> onResult)
+    {
+        if (globalSettings == null)
+        {
+            onResult?.Invoke(false);
+            return;
+        }
+
+        Debug.Log($"[QTEManager] {type} 타입의 QTE 시작 요청.");
+
+        // [수정 완료] 이제 컨트롤러에게 진짜 일을 시킵니다!
+        if (qteController != null)
+        {
+            qteController.StartQTE(type, onResult);
+        }
+        else
+        {
+            Debug.LogWarning("[QTEManager] QTE Controller가 연결되지 않았습니다. (테스트용 자동 성공)");
+            onResult?.Invoke(true);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.Unregister<QTEManager>(this);
+    }
+}
+
+==================== DamageTextManager.cs (경로: ./fakecom/Assets/Scripts/Manager/DamageTextManager.cs) ====================
+using UnityEngine;
+
+public enum HitColorType
+{
+    Miss,   // ȸ
+    Red,    //  (Ϲ/)
+    Yellow, //  (/ġŸ)
+    Green   //  (Ϻ/ȸ)
+}
+
+public class DamageTextManager : MonoBehaviour
+{
+    [SerializeField] private GameObject damageTextPrefab; // Ʊ  
+    [SerializeField] private Canvas worldCanvas; // WorldSpaceCanvas
+
+    // ̱  CombatManager  ϰų ServiceLocator 
+    // ⼱ ǻ CombatManager ٿ  ̹Ƿ public ޼常  վθ .
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+    private void OnDestroy()
+    {
+        if (ServiceLocator.IsRegistered<DamageTextManager>())
+        {
+            ServiceLocator.Unregister<DamageTextManager>(this);
+        }
+    }
+
+    public void ShowDamage(Vector3 position, string text, HitColorType colorType)
+    {
+
+        if (damageTextPrefab == null) return;
+
+        // 1. ĵ ã (  ã)
+        if (worldCanvas == null)
+        {
+            var canvasObj = GameObject.Find("WorldSpaceCanvas");
+            if (canvasObj) worldCanvas = canvasObj.GetComponent<Canvas>();
+        }
+        Transform parent = worldCanvas != null ? worldCanvas.transform : null;
+
+        // 2.  ġ: Ӹ  (Y + 1.5)
+        Vector3 spawnPos = position + Vector3.up * 1.5f;
+
+        // 3. 
+        GameObject obj = Instantiate(damageTextPrefab, spawnPos, Quaternion.identity, parent);
+        DamageText dmgText = obj.GetComponent<DamageText>();
+
+        // 4.  
+        Color finalColor = Color.white;
+        switch (colorType)
+        {
+            case HitColorType.Miss:
+                finalColor = Color.gray;
+                break;
+            case HitColorType.Red:
+                finalColor = new Color(1f, 0.3f, 0.3f); //  
+                break;
+            case HitColorType.Yellow:
+                finalColor = Color.yellow;
+                break;
+            case HitColorType.Green:
+                finalColor = Color.green;
+                break;
+        }
+
+        // 5. ؽƮ 
+        if (dmgText != null)
+        {
+            dmgText.Setup(text, finalColor);
+        }
+    }
+}
+

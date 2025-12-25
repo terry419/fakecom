@@ -1,0 +1,29 @@
+# IDE
+.vs/
+.vscode/
+
+# Visual Studio
+*.suo
+*.user
+*.userprefs
+*.sln
+*.csproj
+*.unityproj
+
+# Unity
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+MemoryCaptures/
+UserSettings/
+
+# Meta files (중요!)
+*.meta
+
+# OS
+.DS_Store
+Thumbs.db
+.DS_Store?

@@ -1,0 +1,7 @@
+git add .
+git commit -m "Player jump feature completed"
+git push
+
+복붙 방법
+cd D:\Unity
+.\SyncToColab.ps1

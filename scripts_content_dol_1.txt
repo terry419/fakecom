@@ -1,0 +1,2882 @@
+==================== DataManager.cs (경로: ./fakecom/Assets/Scripts/Manager/DataManager.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+public class DataManager : MonoBehaviour
+{
+    // --- 설정 상수 ---
+    private const string UNIT_LIBRARY_PATH = "Units"; // Resources/Units 폴더
+    private const string SAVE_FILE_NAME = "savegame.json";
+
+    // --- 데이터 저장소 ---
+    private Dictionary<string, UnitDataSO> unitLibrary = new Dictionary<string, UnitDataSO>();
+    public GameData CurrentData { get; private set; }
+    private string saveFilePath;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Global);
+        saveFilePath = Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
+        
+        // 1. 도감(Library) 로드
+        LoadUnitLibrary();
+    }
+
+    private void LoadUnitLibrary()
+    {
+        UnitDataSO[] soFiles = Resources.LoadAll<UnitDataSO>(UNIT_LIBRARY_PATH);
+
+        if (soFiles.Length == 0)
+        {
+            GLog.Error("!!! [CRITICAL] 유닛 라이브러리가 완전히 비어있습니다 !!!");
+            GLog.Error($"  1. 'Assets/Resources/{UNIT_LIBRARY_PATH}' 폴더가 있는지 확인하세요.");
+            GLog.Error("  2. 폴더 안에 UnitDataSO 파일들이 들어있는지 확인하세요.");
+            return;
+        }
+
+        foreach (var so in soFiles)
+        {
+            if (string.IsNullOrEmpty(so.UnitID))
+            {
+                GLog.Error($"UnitID가 비어있는 SO 발견: {so.name} (스킵됨)");
+                continue;
+            }
+
+            if (unitLibrary.ContainsKey(so.UnitID))
+            {
+                GLog.Warning($"중복된 UnitID 발견: {so.UnitID}. ({so.name})은(는) 무시됩니다.");
+                continue;
+            }
+
+            unitLibrary.Add(so.UnitID, so);
+        }
+        GLog.Info($"[DataManager] 유닛 라이브러리 구축 완료 ({unitLibrary.Count}개 로드됨)");
+    }
+
+    /// <summary>
+    /// 게임 데이터를 초기화합니다.
+    /// </summary>
+    /// <returns>성공 여부</returns>
+    public bool InitializeData()
+    {
+        if (File.Exists(saveFilePath))
+        {
+            return LoadGame();
+        }
+        else
+        {
+            NewGame();
+            return true;
+        }
+    }
+
+    public void NewGame()
+    {
+        CurrentData = new GameData();
+        
+        // [안전장치] "Player_1"이 실제로 있는지 확인하고, 없으면 라이브러리의 첫 번째 유닛으로 대체
+        string defaultUnitID = "Player_1";
+        if (!unitLibrary.ContainsKey(defaultUnitID))
+        {
+            if (unitLibrary.Count > 0)
+            {
+                defaultUnitID = unitLibrary.Keys.First();
+                GLog.Warning($"기본 ID 'Player_1'을 찾을 수 없어 '{defaultUnitID}'로 대체합니다.");
+            }
+            else
+            {
+                GLog.Error("[FATAL] 라이브러리가 비어있어 기본 유닛을 생성할 수 없습니다!");
+                return;
+            }
+        }
+
+        // 초기 데이터 생성
+        UnitDataSO data = GetUnitData(defaultUnitID);
+        int startHP = data != null ? data.BaseStats.MaxHP : 10;
+
+        CurrentData.Roster.Add(new UnitSaveData { UnitID = defaultUnitID, CurrentHP = startHP });
+        
+        GLog.Info("[DataManager] 새 게임 데이터 생성됨");
+        SaveGame();
+    }
+
+    public bool SaveGame()
+    {
+        try
+        {
+            if (CurrentData == null) return false;
+
+            CurrentData.SaveTimestamp = System.DateTime.UtcNow.Ticks;
+            string json = JsonUtility.ToJson(CurrentData, true);
+            
+            string directory = Path.GetDirectoryName(saveFilePath);
+            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+            File.WriteAllText(saveFilePath, json);
+            GLog.Info($"게임 저장 완료: {saveFilePath}"); // [수정] 경로 명시
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            GLog.Error($"게임 저장 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool LoadGame()
+    {
+        try
+        {
+            if (!File.Exists(saveFilePath))
+            {
+                GLog.Warning($"저장 파일 없음: {saveFilePath}");
+                return false;
+            }
+
+            string json = File.ReadAllText(saveFilePath);
+            CurrentData = JsonUtility.FromJson<GameData>(json);
+            
+            if (CurrentData == null) throw new System.Exception("JSON 파싱 실패 (데이터 null)");
+
+            GLog.Info($"[DataManager] 게임 로드 완료: {saveFilePath}"); // [수정] 경로 명시
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            GLog.Error($"게임 로드 실패: {ex.Message}");
+            CurrentData = null; // [안전장치] 상태 초기화
+            return false;
+        }
+    }
+
+    public UnitDataSO GetUnitData(string unitID)
+    {
+        if (unitLibrary.TryGetValue(unitID, out var data)) return data;
+        GLog.Error($"UnitID '{unitID}'를 찾을 수 없습니다!");
+        return null;
+    }
+}
+
+
+==================== PaletteIDDrawer.cs (경로: ./fakecom/Assets/Scripts/Editor/PaletteIDDrawer.cs) ====================
+using UnityEngine;
+using UnityEditor;
+using System.Collections.Generic;
+using System.Linq;
+
+[CustomPropertyDrawer(typeof(PaletteIDAttribute))]
+public class PaletteIDDrawer : PropertyDrawer
+{
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        // ObjectPaletteSO ãƼ ID  Ӵٿ ִ 
+        var guids = AssetDatabase.FindAssets("t:ObjectPaletteSO");
+        if (guids.Length == 0)
+        {
+            EditorGUI.PropertyField(position, property, label);
+            return;
+        }
+
+        string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+        ObjectPaletteSO palette = AssetDatabase.LoadAssetAtPath<ObjectPaletteSO>(path);
+
+        if (palette == null || palette.items == null)
+        {
+            EditorGUI.PropertyField(position, property, label);
+            return;
+        }
+
+        List<string> ids = palette.items.Select(x => x.id).ToList();
+        if (ids.Count == 0)
+        {
+            EditorGUI.PropertyField(position, property, label);
+            return;
+        }
+
+        int currentIndex = Mathf.Max(0, ids.IndexOf(property.stringValue));
+        int newIndex = EditorGUI.Popup(position, label.text, currentIndex, ids.ToArray());
+
+        if (newIndex >= 0 && newIndex < ids.Count)
+        {
+            property.stringValue = ids[newIndex];
+        }
+    }
+}
+
+==================== UnitStatus.cs (경로: ./fakecom/Assets/Scripts/Units/UnitStatus.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[RequireComponent(typeof(StatusEffectController))]
+public class UnitStatus : MonoBehaviour
+{
+    [Header("--- Data Source ---")]
+    [Tooltip("기본 데이터 소스 ScriptableObject")]
+    public UnitDataSO unitData;
+
+    // 전역 설정 데이터 (GlobalSettingsSO)
+    [SerializeField] private GlobalSettingsSO globalSettings;
+
+    [Header("--- Live Data (Visual Only) ---")]
+    [SerializeField] private int currentHP;
+    [SerializeField] private float currentTS = 0f; // Turn Score (행동 순서 관련)
+    [field: SerializeField, Tooltip("현재 남은 이동력입니다.")] public int RemainingMobility { get; private set; }
+    [SerializeField] private UnitCondition condition = UnitCondition.Normal;
+
+    [Header("--- Neural Sync System (New) ---")]
+    [Range(0, 200)]
+    [SerializeField] private float currentSync; // 신경 동기화 수치 (0~200)
+    private bool hasSynchroPulseTriggered = false; // 싱크로 펄스 1회 발동 체크
+    private bool isClockLocked = false;         // 시스템 과부하(클락 락) 상태 여부
+
+    [Header("--- Turn Action Flags (Visual Only) ---")]
+    [SerializeField] private bool hasMoved = false;
+    [SerializeField] private bool hasAttacked = false;
+    [SerializeField] private int usedMoveCost = 0;
+
+    // 데미지 발생 시 다음 TS 수치에 반영하기 위한 임시 저장소
+    private float damagePenaltyPool = 0f;
+
+    // 세이브 데이터 캐싱 (참조용)
+    private UnitSaveData cachedSaveData;
+
+    // 외부 컴포넌트 및 프로퍼티
+    public StatusEffectController StatusController { get; private set; }
+    private Animator _animator;
+    public bool IsDead { get; private set; }
+    public int CurrentHP => currentHP;
+    public float CurrentTS { get => currentTS; set => currentTS = value; }
+    public UnitCondition Condition { get => condition; set => condition = value; }
+    public bool HasMoved { get => hasMoved; set => hasMoved = value; }
+    public bool HasAttacked { get => hasAttacked; set => hasAttacked = value; }
+    public int UsedMoveCost { get => usedMoveCost; set => usedMoveCost = value; }
+
+    // UnitDataSO 기반 데이터 접근 프로퍼티
+    public bool CanMoveAfterAttack => unitData != null && unitData.ClassType == ClassType.Scout;
+    public int MaxMobility => unitData != null ? unitData.BaseStats.Mobility : 0;
+    public int Agility => unitData != null ? unitData.BaseStats.Agility : 1;
+    public int AttackRange => unitData != null ? unitData.BaseStats.Range : 1;
+    public int Aim => unitData != null ? unitData.BaseStats.Aim : 0;
+    public int Evasion => unitData != null ? unitData.BaseStats.Evasion : 0;
+    public float CritChance => unitData != null ? unitData.BaseStats.CritChance : 0f;
+
+    [field: SerializeField] public float LastFinalPenalty { get; private set; } // 마지막으로 계산된 TS 페널티 저장
+
+    private void Awake()
+    {
+        StatusController = GetComponent<StatusEffectController>();
+        IsDead = false;
+
+        // [배치] UnitDataSO 할당 체크
+        if (unitData == null)
+        {
+            Debug.LogError($"[UnitStatus] {gameObject.name}의 UnitDataSO가 설정되지 않았습니다!");
+            return;
+        }
+
+        // 기본 상태 초기화 (SceneInitializer 등에서 덮어쓰기 가능)
+        currentHP = unitData.BaseStats.MaxHP;
+        RemainingMobility = unitData.BaseStats.Mobility;
+
+        // Neural Sync 초기화
+        // unitData에 기본 수치가 있다면 사용, 없다면 100으로 초기화
+        currentSync = 100f;
+    }
+
+    private void Start()
+    {
+        float baseActionCost = 10f;
+        LastFinalPenalty = (baseActionCost * 1.0f) / Agility;
+    }
+
+    /// <summary>
+    /// 세이브 데이터(UnitSaveData)로부터 유닛 정보를 초기화하고 캐싱합니다.
+    /// SceneInitializer 또는 로딩 로직에서 호출됩니다.
+    /// </summary>
+    public void InitializeFromSaveData(UnitSaveData saveData)
+    {
+        if (saveData == null) return;
+
+        // 세이브 데이터 캐싱
+        cachedSaveData = saveData;
+
+        // 현재 체력 복구
+        currentHP = saveData.CurrentHP;
+
+        // (확장용) 경험치 등의 추가 데이터 로드 시 여기서 처리
+        // this.experience = saveData.Experience;
+
+        Debug.Log($"[{gameObject.name}] 세이브 데이터 초기화 완료 (HP: {currentHP})");
+
+        if (currentHP <= 0) CheckSurvival(false);
+    }
+
+    public bool CanPerformAction(int requiredMobility)
+    {
+        return RemainingMobility >= requiredMobility;
+    }
+
+    /// <summary>
+    /// 이번 턴의 행동 결과를 바탕으로 다음 턴까지의 지연 시간(TS) 페널티를 계산합니다.
+    /// </summary>
+    public float CalculateNextTurnPenalty()
+    {
+        float actionPenalty = 0f;
+        float tsModifier = 1.0f;
+
+        if (hasAttacked) actionPenalty += 60f; // 공격 페널티
+        if (hasMoved)
+        {
+            // 이동 거리에 따른 피로도 기반 페널티 계산
+            float fatigueRate = (float)usedMoveCost / MaxMobility;
+            actionPenalty += (40f * fatigueRate);
+        }
+
+        // 아무 행동도 하지 않았을 때의 최소 대기 시간
+        if (!hasMoved && !hasAttacked) actionPenalty = 10f;
+
+        // 피격 시 쌓인 페널티 추가 후 초기화
+        actionPenalty += damagePenaltyPool;
+        damagePenaltyPool = 0f;
+
+        // 상태(Condition)에 따른 보정치 적용
+        switch (condition)
+        {
+            case UnitCondition.Hopeful:
+                tsModifier = 0.8f;  // 20% 단축 (이득)
+                break;
+            case UnitCondition.Inspired:
+                tsModifier = 0.9f;  // 10% 단축
+                break;
+            case UnitCondition.Normal:
+            case UnitCondition.Incapacitated:
+                tsModifier = 1.0f;  // 표준
+                break;
+            case UnitCondition.Fleeing:
+                tsModifier = 1.5f;  // 50% 지연 (불이익)
+                break;
+            case UnitCondition.FriendlyFire:
+            case UnitCondition.SelfHarm:
+                tsModifier = 2.0f;  // 2배 지연 (매우 불리)
+                break;
+        }
+
+        // 최종 계산: (행동 페널티 * 난수 보정 * 상태 보정) / 민첩성
+        float finalPenalty = (actionPenalty * Random.Range(0.8f, 1.2f) * tsModifier) / Agility;
+        LastFinalPenalty = finalPenalty;
+        return finalPenalty;
+    }
+
+    // ========================================================================
+    // [시스템] Neural Sync Logic (동기화 관련 로직)
+    // ========================================================================
+
+    /// <summary>
+    /// 신경 동기화 수치를 갱신하고 상태 변화를 체크합니다.
+    /// </summary>
+    public void UpdateSync(float amount, string reason = "")
+    {
+        if (globalSettings == null) return;
+
+        // 1. 변화 전 수치 기록
+        float previousSync = currentSync;
+
+        // 2. 수치 합산 및 클램핑 (0~200)
+        currentSync = Mathf.Clamp(currentSync + amount, 0f, 200f);
+
+        // 3. [ClockLock 해제 검사]
+        // 시스템 잠금 상태에서 수치가 회복되어 기준치(100)를 넘었는지 확인
+        if (isClockLocked && amount > 0)
+        {
+            if (currentSync >= 100f)
+            {
+                isClockLocked = false;
+                Debug.Log($"<color=green>[System Restored] {name}의 ClockLock이 해제되었습니다!</color>");
+            }
+        }
+
+        // 4. [Synchro-Pulse 발동 검사]
+        // 정상 범주(50 이상)에서 미만으로 떨어졌을 때 1회에 한해 펄스 발생
+        bool isDroppingBelowThreshold = (previousSync >= globalSettings.thresholdNormal && currentSync < globalSettings.thresholdNormal);
+
+        if (!isClockLocked && isDroppingBelowThreshold && !hasSynchroPulseTriggered)
+        {
+            HandleSynchroPulse();
+        }
+
+        // 5. 상태 갱신
+        UpdateConditionFromSync();
+    }
+
+
+    /// <summary>
+    /// 싱크로 수치가 급격히 낮아질 때 발생하는 최후의 보루(펄스)를 처리합니다.
+    /// </summary>
+    private void HandleSynchroPulse()
+    {
+        if (hasSynchroPulseTriggered) return;
+
+        hasSynchroPulseTriggered = true; // 일회성 발동 체크
+
+        // 1. 오버클럭 시도 확률 체크 (예: 5%)
+        if (Random.value <= globalSettings.baseOverclockChance)
+        {
+            Debug.Log($"<color=cyan>[Synchro-Pulse] {name} 임계 동기화 도달! QTE 발생...</color>");
+
+            // 2. QTE 매니저 호출
+            var qte = ServiceLocator.Get<QTEManager>();
+            if (qte != null)
+            {
+                qte.StartQTE(QTEType.SynchroPulse, (bool isSuccess) =>
+                {
+                    // 3. QTE 결과 반영
+                    if (isSuccess)
+                    {
+                        // [성공] 오버클럭 발동
+                        currentSync = globalSettings.overclockSuccessValue; // 약 160
+                        isClockLocked = false;
+                        UpdateConditionFromSync();
+                        Debug.Log($"<color=cyan>[Overclock] {name} 시스템 한계 돌파!</color>");
+                    }
+                    else
+                    {
+                        // [실패] 시스템 잠금
+                        isClockLocked = true;
+                        UpdateConditionFromSync();
+                        Debug.Log("<color=red>[ClockLock] QTE 실패... 시스템이 잠깁니다.</color>");
+                    }
+                });
+            }
+            else
+            {
+                // 매니저가 없을 경우 기본적으로 잠금 처리
+                isClockLocked = true;
+                UpdateConditionFromSync();
+            }
+        }
+        else
+        {
+            // 확률을 뚫지 못했을 경우 (95% 등) 바로 잠금
+            isClockLocked = true;
+            UpdateConditionFromSync();
+            Debug.Log("<color=red>[ClockLock] 오버클럭 기회를 놓쳤습니다. (확률 실패)</color>");
+        }
+    }
+
+    /// <summary>
+    /// 현재 신경 동기화 수치에 기반하여 유닛의 상태(Condition)를 결정합니다.
+    /// </summary>
+    private void UpdateConditionFromSync()
+    {
+        // 1. [ClockLock 우선 체크]
+        // 시스템 잠금 상태라면 수치와 무관하게 '불능' 상태로 처리
+        if (isClockLocked)
+        {
+            condition = UnitCondition.Incapacitated;
+            return;
+        }
+
+        // 2. [수치 기반 상태 결정]
+        UnitCondition newCondition;
+
+        if (currentSync >= globalSettings.thresholdHopeful) newCondition = UnitCondition.Hopeful;
+        else if (currentSync >= globalSettings.thresholdInspired) newCondition = UnitCondition.Inspired;
+        else if (currentSync >= globalSettings.thresholdNormal) newCondition = UnitCondition.Normal;
+        else
+        {
+            // 50 미만 하향 구간
+            if (currentSync >= globalSettings.thresholdIncapacitated) newCondition = UnitCondition.Incapacitated;
+            else if (currentSync >= globalSettings.thresholdFleeing) newCondition = UnitCondition.Fleeing;
+            else if (currentSync >= globalSettings.thresholdFriendlyFire) newCondition = UnitCondition.FriendlyFire;
+            else newCondition = UnitCondition.SelfHarm;
+        }
+
+        if (condition != newCondition)
+        {
+            condition = newCondition;
+        }
+    }
+
+    // ========================================================================
+    // [전투] TakeDamage & Survival Logic
+    // ========================================================================
+
+    public void TakeDamage(int amount, bool isMyTurn, bool isCrit, float finalPenalty, bool isStatusEffect = false)
+    {
+        if (IsDead) return;
+        currentHP = Mathf.Max(0, currentHP - amount);
+
+        // 1. 사망 체크 시 isMyTurn 전달!
+        if (currentHP <= 0)
+        {
+            CheckSurvival(isMyTurn);
+            return;
+        }
+
+        if (unitData.UnitTeam == UnitDataSO.Team.Player && cachedSaveData != null)
+        {
+            cachedSaveData.CurrentHP = currentHP;
+        }
+
+        float lastActionCost = finalPenalty;
+        var settings = ServiceLocator.Get<GlobalSettingsSO>();
+        float ratioNormal = settings != null ? settings.tsPenaltyRatioNormal : 0.1f;
+        float ratioCrit = settings != null ? settings.tsPenaltyRatioCrit : 0.2f;
+
+        float penaltyVal = isCrit ? lastActionCost * ratioCrit : lastActionCost * ratioNormal;
+
+        if (!isStatusEffect)
+        {
+            UpdateSync(isCrit ? -5f : 0f, "TakeDamage");
+
+            if (!isMyTurn)
+            {
+                float oldTS = currentTS;
+                currentTS += penaltyVal;
+                var turnManager = ServiceLocator.Get<TurnManager>();
+                turnManager?.UpdateUnitTurnDelay(this, oldTS, currentTS, isCrit);
+            }
+            else
+            {
+                damagePenaltyPool += penaltyVal;
+            }
+
+            Debug.Log($"[{gameObject.name}] 피격! HP:{currentHP}, TS페널티:{penaltyVal}");
+        }
+    }
+
+    /// <summary>
+    /// 유닛의 사망 직전 생존 확률을 계산합니다.
+    /// </summary>
+    public float CalculateSurvivalChance()
+    {
+        if (globalSettings == null) return 0f;
+        if (currentSync < 5f) return 0f; // 최소 동기화 요구치
+
+        // 1. 기본 생존 확률 (유닛 데이터 기반)
+        float pBase = 0.05f;
+
+        // 동기화 수치가 높을수록 생존 확률 증가
+        float syncFactor = (currentSync - globalSettings.minSyncOffset) / globalSettings.syncDivisor;
+        float pSync = pBase * syncFactor * globalSettings.baseFormulaMultiplier;
+
+        // 2. 유닛 상태에 따른 가중치
+        float mState = GetSurvivalMultiplier();
+
+        // 3. 디버프에 의한 생존율 페널티
+        float mDebuff = 1.0f;
+        if (StatusController != null)
+        {
+            mDebuff = StatusController.GetTotalSurvivalPenalty();
+        }
+
+        return Mathf.Clamp01(pSync * mState * mDebuff);
+    }
+
+    private float GetSurvivalMultiplier()
+    {
+        if (globalSettings == null) return 1.0f;
+
+        switch (condition)
+        {
+            case UnitCondition.Hopeful: return globalSettings.multiplierHopeful;
+            case UnitCondition.Inspired: return globalSettings.multiplierInspired;
+            case UnitCondition.Normal: return globalSettings.multiplierNormal;
+            case UnitCondition.Incapacitated: return globalSettings.multiplierIncapacitated;
+            case UnitCondition.Fleeing: return globalSettings.multiplierFleeing;
+            case UnitCondition.FriendlyFire: return globalSettings.multiplierFriendlyFire;
+            case UnitCondition.SelfHarm: return globalSettings.multiplierSelfHarm;
+            default: return 1.0f;
+        }
+    }
+
+    /// <summary>
+    /// 체력이 0이 되었을 때 생존 여부를 체크합니다 (확률 및 QTE).
+    /// </summary>
+    private void CheckSurvival(bool isMyTurn)
+    {
+        // 1단계: 생존 확률 계산 (신경 동기화 기반)
+        float survivalChance = CalculateSurvivalChance();
+
+        // 2단계: 주사위 굴리기
+        if (UnityEngine.Random.value <= survivalChance)
+        {
+            bool qteSuccess = false;
+            var qteManager = ServiceLocator.Get<QTEManager>();
+
+            if (qteManager != null)
+            {
+                // 확률을 통과한 유닛에게 주어지는 마지막 기회 (QTE)
+                qteSuccess = qteManager.GetQTESuccessInstant(QTEType.Survival);
+            }
+
+            // QTE 성공 시 체력 1로 생존
+            if (qteSuccess)
+            {
+                currentHP = 1;
+                if (cachedSaveData != null) cachedSaveData.CurrentHP = 1;
+
+                Debug.Log($"[Survival] {name} 기사회생! (확률:{survivalChance:P1}, QTE:{qteSuccess})");
+                return;
+            }
+        }
+
+        // 확률 실패 혹은 QTE 실패 시 최종 사망
+        HandleDeath(isMyTurn);
+    }
+
+    public void ConsumeMobility(int amount)
+    {
+        if (amount > RemainingMobility) RemainingMobility = 0;
+        else RemainingMobility -= amount;
+    }
+
+    private async void HandleDeath(bool isMyTurn)
+    {
+        if (IsDead) return;
+        IsDead = true;
+        Debug.Log($"{gameObject.name} 사망하였습니다.");
+
+        // 애니메이션 대기 로직 적용
+        if (_animator != null && unitData != null)
+        {
+            _animator.SetTrigger(unitData.deathAnimationTrigger);
+
+            // 상태 전환 대기 (0.1초)
+            await Task.Delay(100);
+
+            // 애니메이션 종료 대기
+            while (_animator.GetCurrentAnimatorStateInfo(0).IsName(unitData.deathStateName) &&
+                   _animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1.0f)
+            {
+                await Task.Yield();
+            }
+        }
+        else
+        {
+            await Task.Delay(500); // 애니메이터 없으면 그냥 0.5초 대기
+        }
+
+        gameObject.SetActive(false);
+
+        // 내 턴일 경우 턴 넘기기
+        if (isMyTurn)
+        {
+            var turnManager = ServiceLocator.Get<TurnManager>();
+            turnManager?.EndTurn();
+        }
+    }
+
+    public void OnTurnStart()
+    {
+        // 턴 시작 시 상태 이상 지속시간/효과 갱신
+        StatusController.TickEffects();
+
+        if (IsDead)
+        {
+            Debug.Log($"{gameObject.name}은(는) 이미 사망 상태이므로 턴을 건너뜁니다.");
+
+            // 사망한 유닛의 턴이 돌아온 경우 즉시 턴 종료 알림
+            var turnManager = ServiceLocator.Get<TurnManager>();
+            if (turnManager != null)
+            {
+                turnManager.EndTurn();
+            }
+            return;
+        }
+    }
+
+    public void ResetTurnData()
+    {
+        hasMoved = false;
+        hasAttacked = false;
+        usedMoveCost = 0;
+        RemainingMobility = MaxMobility;
+    }
+}
+
+==================== PlayerInputCoordinator.cs (경로: ./fakecom/Assets/Scripts/Input/PlayerInputCoordinator.cs) ====================
+using Cysharp.Threading.Tasks;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class PlayerInputCoordinator : MonoBehaviour
+{
+    [Header("Settings")]
+    [Tooltip("전역 매니저이므로 Inspector 할당은 무시될 수 있습니다. 씬 로드 시 자동 할당됩니다.")]
+    [SerializeField] private Camera mainCamera;
+
+    // --- Managers ---
+    private InputManager inputManager;
+    private TurnManager turnManager;
+    private MapManager mapManager;
+
+    // --- State Machine ---
+    [SerializeField] private PlayerActionState currentPlayerActionState = PlayerActionState.Idle;
+    private Dictionary<PlayerActionState, IPlayerStateHandler> stateHandlers;
+    private IPlayerStateHandler currentStateHandler;
+    public event Action<PlayerActionState> OnPlayerActionStateChanged;
+
+    private Vector2 lastMousePosition;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+
+    private void Start()
+    {
+        InitializeManagers();
+        InitializeStateHandlers();
+
+        if (turnManager != null)
+        {
+            turnManager.OnTurnStarted += HandleTurnStarted;
+        }
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnsubscribeInputEvents();
+
+        if (turnManager != null)
+        {
+            turnManager.OnTurnStarted -= HandleTurnStarted;
+        }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        StartCoroutine(WaitAndInitialize());
+    }
+
+    private IEnumerator WaitAndInitialize()
+    {
+        yield return null;
+
+        InitializeManagers();
+        InitializeStateHandlers();
+
+        UnsubscribeInputEvents();
+        SubscribeInputEvents();
+
+        if (turnManager != null)
+        {
+            turnManager.OnTurnStarted -= HandleTurnStarted;
+            turnManager.OnTurnStarted += HandleTurnStarted;
+        }
+
+        SetPlayerActionState(PlayerActionState.Idle);
+
+        Debug.Log("[PlayerInputCoordinator] Initialized and Input Subscribed");
+    }
+
+    private void InitializeManagers()
+    {
+        mainCamera = Camera.main;
+        inputManager = ServiceLocator.Get<InputManager>();
+        turnManager = ServiceLocator.Get<TurnManager>();
+        mapManager = ServiceLocator.Get<MapManager>();
+    }
+
+    private void InitializeStateHandlers()
+    {
+        stateHandlers = new Dictionary<PlayerActionState, IPlayerStateHandler>
+        {
+            // PlayerIdleStateHandler 생성자는 이전 수정본(3D 호환)을 따름
+            { PlayerActionState.Idle, new PlayerIdleStateHandler(this, mainCamera) },
+            { PlayerActionState.ExecutingAction, new PlayerExecutingActionStateHandler() },
+            // PlayerAttackState도 생성자가 있다면 수정 필요 여부 확인 요망 (일단 유지)
+            { PlayerActionState.SelectingAttackTarget, new PlayerAttackState(this) }
+        };
+        currentStateHandler = stateHandlers[PlayerActionState.Idle];
+    }
+
+    private void SubscribeInputEvents()
+    {
+        if (inputManager != null)
+        {
+            inputManager.OnMouseClick += HandleMouseClick;
+            inputManager.OnMouseMove += HandleMouseMove;
+            inputManager.OnSkill1Invoked += HandleSkill1;
+        }
+    }
+
+    private void UnsubscribeInputEvents()
+    {
+        if (inputManager != null)
+        {
+            inputManager.OnMouseClick -= HandleMouseClick;
+            inputManager.OnMouseMove -= HandleMouseMove;
+            inputManager.OnSkill1Invoked -= HandleSkill1;
+        }
+    }
+
+    public void SetPlayerActionState(PlayerActionState newState)
+    {
+        if (stateHandlers == null || (currentStateHandler != null && currentPlayerActionState == newState)) return;
+
+        currentStateHandler?.OnExit();
+        currentPlayerActionState = newState;
+
+        if (stateHandlers.TryGetValue(newState, out IPlayerStateHandler newHandler))
+        {
+            currentStateHandler = newHandler;
+            currentStateHandler.OnEnter();
+        }
+        OnPlayerActionStateChanged?.Invoke(newState);
+    }
+
+    private void HandleTurnStarted(UnitStatus unit)
+    {
+        if (unit != null && unit.GetComponent<PlayerController>() != null)
+        {
+            SetPlayerActionState(PlayerActionState.Idle);
+            UpdateReachableRange();
+        }
+        else
+        {
+            SetPlayerActionState(PlayerActionState.ExecutingAction);
+        }
+    }
+
+    private void HandleMouseMove(Vector2 mousePosition)
+    {
+        this.lastMousePosition = mousePosition;
+        currentStateHandler?.HandleMouseMove(mousePosition);
+    }
+
+    private void HandleMouseClick()
+    {
+        currentStateHandler?.HandleMouseClick(this.lastMousePosition);
+    }
+
+    // [핵심 수정] 3D 좌표계 호환성 업데이트
+    public void UpdateReachableRange()
+    {
+        var pVisualizer = ServiceLocator.Get<PathVisualizer>();
+        var tGenerator = ServiceLocator.Get<TilemapGenerator>();
+        var mManager = ServiceLocator.Get<MapManager>();
+
+        UnitStatus activeUnit = turnManager?.ActiveUnit;
+
+        // 매니저 유효성 검사
+        if (activeUnit == null || tGenerator == null || pVisualizer == null || mManager == null)
+        {
+            pVisualizer?.ClearAll();
+            return;
+        }
+
+        pVisualizer.ClearReachableRange();
+        pVisualizer.ClearPath();
+
+        // 1. 유닛의 현재 위치 가져오기
+        Vector3 unitPos = activeUnit.transform.position;
+
+        // 2. [수정] GridUtils를 사용하여 정확한 3D 그리드 좌표 계산
+        // (기존의 Width / 2f 더하는 로직 제거)
+        int startX = GridUtils.SnapCoordinate(unitPos.x);
+        int startZ = GridUtils.SnapCoordinate(unitPos.z);
+        // 높이 계산 (1층=1, 2.5m 단위)
+        int startY = Mathf.RoundToInt(unitPos.y / 2.5f);
+
+        Vector3Int startGridPos = new Vector3Int(startX, startY, startZ);
+
+        // 3. [수정] 3D 좌표를 받는 MapManager 메서드 호출
+        // (MapManager가 수정되었다면 이 호출이 정상 작동함)
+        var reachableTiles = mManager.FindReachableTiles(startGridPos, activeUnit.RemainingMobility);
+
+        pVisualizer.ShowReachableRange(reachableTiles);
+    }
+
+    private void HandleSkill1()
+    {
+        if (turnManager.ActiveUnit == null) return;
+
+        if (currentPlayerActionState == PlayerActionState.SelectingAttackTarget)
+            SetPlayerActionState(PlayerActionState.Idle);
+        else if (currentPlayerActionState == PlayerActionState.Idle)
+            SetPlayerActionState(PlayerActionState.SelectingAttackTarget);
+    }
+}
+
+==================== PlayerControls.cs (경로: ./fakecom/Assets/Scripts/Input/PlayerControls.cs) ====================
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     This code was auto-generated by com.unity.inputsystem:InputActionCodeGenerator
+//     version 1.14.2
+//     from Assets/Scripts/Input/PlayerControls.inputactions
+//
+//     Changes to this file may cause incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Utilities;
+
+/// <summary>
+/// Provides programmatic access to <see cref="InputActionAsset" />, <see cref="InputActionMap" />, <see cref="InputAction" /> and <see cref="InputControlScheme" /> instances defined in asset "Assets/Scripts/Input/PlayerControls.inputactions".
+/// </summary>
+/// <remarks>
+/// This class is source generated and any manual edits will be discarded if the associated asset is reimported or modified.
+/// </remarks>
+/// <example>
+/// <code>
+/// using namespace UnityEngine;
+/// using UnityEngine.InputSystem;
+///
+/// // Example of using an InputActionMap named "Player" from a UnityEngine.MonoBehaviour implementing callback interface.
+/// public class Example : MonoBehaviour, MyActions.IPlayerActions
+/// {
+///     private MyActions_Actions m_Actions;                  // Source code representation of asset.
+///     private MyActions_Actions.PlayerActions m_Player;     // Source code representation of action map.
+///
+///     void Awake()
+///     {
+///         m_Actions = new MyActions_Actions();              // Create asset object.
+///         m_Player = m_Actions.Player;                      // Extract action map object.
+///         m_Player.AddCallbacks(this);                      // Register callback interface IPlayerActions.
+///     }
+///
+///     void OnDestroy()
+///     {
+///         m_Actions.Dispose();                              // Destroy asset object.
+///     }
+///
+///     void OnEnable()
+///     {
+///         m_Player.Enable();                                // Enable all actions within map.
+///     }
+///
+///     void OnDisable()
+///     {
+///         m_Player.Disable();                               // Disable all actions within map.
+///     }
+///
+///     #region Interface implementation of MyActions.IPlayerActions
+///
+///     // Invoked when "Move" action is either started, performed or canceled.
+///     public void OnMove(InputAction.CallbackContext context)
+///     {
+///         Debug.Log($"OnMove: {context.ReadValue&lt;Vector2&gt;()}");
+///     }
+///
+///     // Invoked when "Attack" action is either started, performed or canceled.
+///     public void OnAttack(InputAction.CallbackContext context)
+///     {
+///         Debug.Log($"OnAttack: {context.ReadValue&lt;float&gt;()}");
+///     }
+///
+///     #endregion
+/// }
+/// </code>
+/// </example>
+public partial class @PlayerControls: IInputActionCollection2, IDisposable
+{
+    /// <summary>
+    /// Provides access to the underlying asset instance.
+    /// </summary>
+    public InputActionAsset asset { get; }
+
+    /// <summary>
+    /// Constructs a new instance.
+    /// </summary>
+    public @PlayerControls()
+    {
+        asset = InputActionAsset.FromJson(@"{
+    ""version"": 1,
+    ""name"": ""PlayerControls"",
+    ""maps"": [
+        {
+            ""name"": ""Gameplay"",
+            ""id"": ""5e85b508-8823-4d55-b00c-4e9263d520b1"",
+            ""actions"": [
+                {
+                    ""name"": ""MouseClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""df1a713f-30a4-41f6-a1d2-c27a9f64c0d0"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""MousePosition"",
+                    ""type"": ""Value"",
+                    ""id"": ""5742b5dd-4157-4940-aec1-2f20e8a5e88b"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""CameraMove"",
+                    ""type"": ""Value"",
+                    ""id"": ""67785605-efdc-44ec-9929-36fa2f3a2df5"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""CameraRecenter"",
+                    ""type"": ""Button"",
+                    ""id"": ""2cd4d69c-131c-43b0-8126-0c3834b17f30"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""TurnEnd"",
+                    ""type"": ""Button"",
+                    ""id"": ""9fbed461-0f6c-43aa-994d-b6fbf8f9d595"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CameraRotate"",
+                    ""type"": ""Button"",
+                    ""id"": ""8ec42ed7-5da7-4c3e-af7f-8081afcfab19"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Skill1"",
+                    ""type"": ""Button"",
+                    ""id"": ""2819421d-93a3-4d00-909a-571f416cf83f"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CameraKeyRotate"",
+                    ""type"": ""Value"",
+                    ""id"": ""1e6e995d-b3a5-4892-b590-3e4cd038a84a"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""CameraZoom"",
+                    ""type"": ""Value"",
+                    ""id"": ""49bc3b2a-d3d7-41af-a68f-061e32cff6c6"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""MouseDelta"",
+                    ""type"": ""Value"",
+                    ""id"": ""8acf216d-b6f0-43fc-a3ed-c208af863653"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""d6699ed6-6efa-4cdd-b2d4-e9ead96f2811"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MouseClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""300582ea-6231-4d17-b15f-70ac14064eea"",
+                    ""path"": ""<Mouse>/position"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MousePosition"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d38be64e-b830-4586-bb64-7b1fb3a14cb1"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""2D Vector"",
+                    ""id"": ""35bdae32-7a10-42d3-b04e-cdd05f49ea3e"",
+                    ""path"": ""2DVector"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""5cbab457-0158-4f2a-973d-a5fb8e860a32"",
+                    ""path"": ""<Keyboard>/w"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""a0ddd435-790f-4268-a115-772b3609519d"",
+                    ""path"": ""<Keyboard>/s"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""60758fb9-f6a9-45ec-beee-1bf07a6fe4d0"",
+                    ""path"": ""<Keyboard>/a"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""c2aaab02-f5d4-43f8-95f6-f0f379e6de4b"",
+                    ""path"": ""<Keyboard>/d"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraMove"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""67eeacbf-0778-465f-bca8-a712c830e08e"",
+                    ""path"": ""<Keyboard>/8"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraRecenter"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e2b5a4ec-4f8b-4760-ad0f-c88b2f83853d"",
+                    ""path"": ""<Keyboard>/9"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""TurnEnd"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""bf442750-042a-46b9-84a5-32b1cdd191ed"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraRotate"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""395b04b5-8c13-412a-b801-741bb3e8ad2a"",
+                    ""path"": ""<Keyboard>/1"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Skill1"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a8632f04-089d-48fb-89db-4143b86b57d0"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraKeyRotate"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""1D Axis"",
+                    ""id"": ""490a92f6-ab7c-46ba-901e-9b00c0623b71"",
+                    ""path"": ""1DAxis"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraKeyRotate"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""negative"",
+                    ""id"": ""19708e5a-d54f-457a-987f-4558439caaf4"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraKeyRotate"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""positive"",
+                    ""id"": ""b622d8e0-fd2b-49a6-add9-6be9f88644ac"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraKeyRotate"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3945138e-0024-49b2-a9e5-2150f889e138"",
+                    ""path"": ""<Mouse>/scroll/down"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CameraZoom"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""9bedb5d2-ce5e-4cbb-9a47-e40669d82c4a"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MouseDelta"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
+        }
+    ],
+    ""controlSchemes"": []
+}");
+        // Gameplay
+        m_Gameplay = asset.FindActionMap("Gameplay", throwIfNotFound: true);
+        m_Gameplay_MouseClick = m_Gameplay.FindAction("MouseClick", throwIfNotFound: true);
+        m_Gameplay_MousePosition = m_Gameplay.FindAction("MousePosition", throwIfNotFound: true);
+        m_Gameplay_CameraMove = m_Gameplay.FindAction("CameraMove", throwIfNotFound: true);
+        m_Gameplay_CameraRecenter = m_Gameplay.FindAction("CameraRecenter", throwIfNotFound: true);
+        m_Gameplay_TurnEnd = m_Gameplay.FindAction("TurnEnd", throwIfNotFound: true);
+        m_Gameplay_CameraRotate = m_Gameplay.FindAction("CameraRotate", throwIfNotFound: true);
+        m_Gameplay_Skill1 = m_Gameplay.FindAction("Skill1", throwIfNotFound: true);
+        m_Gameplay_CameraKeyRotate = m_Gameplay.FindAction("CameraKeyRotate", throwIfNotFound: true);
+        m_Gameplay_CameraZoom = m_Gameplay.FindAction("CameraZoom", throwIfNotFound: true);
+        m_Gameplay_MouseDelta = m_Gameplay.FindAction("MouseDelta", throwIfNotFound: true);
+    }
+
+    ~@PlayerControls()
+    {
+        UnityEngine.Debug.Assert(!m_Gameplay.enabled, "This will cause a leak and performance issues, PlayerControls.Gameplay.Disable() has not been called.");
+    }
+
+    /// <summary>
+    /// Destroys this asset and all associated <see cref="InputAction"/> instances.
+    /// </summary>
+    public void Dispose()
+    {
+        UnityEngine.Object.Destroy(asset);
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.bindingMask" />
+    public InputBinding? bindingMask
+    {
+        get => asset.bindingMask;
+        set => asset.bindingMask = value;
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.devices" />
+    public ReadOnlyArray<InputDevice>? devices
+    {
+        get => asset.devices;
+        set => asset.devices = value;
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.controlSchemes" />
+    public ReadOnlyArray<InputControlScheme> controlSchemes => asset.controlSchemes;
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.Contains(InputAction)" />
+    public bool Contains(InputAction action)
+    {
+        return asset.Contains(action);
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.GetEnumerator()" />
+    public IEnumerator<InputAction> GetEnumerator()
+    {
+        return asset.GetEnumerator();
+    }
+
+    /// <inheritdoc cref="IEnumerable.GetEnumerator()" />
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.Enable()" />
+    public void Enable()
+    {
+        asset.Enable();
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.Disable()" />
+    public void Disable()
+    {
+        asset.Disable();
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.bindings" />
+    public IEnumerable<InputBinding> bindings => asset.bindings;
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.FindAction(string, bool)" />
+    public InputAction FindAction(string actionNameOrId, bool throwIfNotFound = false)
+    {
+        return asset.FindAction(actionNameOrId, throwIfNotFound);
+    }
+
+    /// <inheritdoc cref="UnityEngine.InputSystem.InputActionAsset.FindBinding(InputBinding, out InputAction)" />
+    public int FindBinding(InputBinding bindingMask, out InputAction action)
+    {
+        return asset.FindBinding(bindingMask, out action);
+    }
+
+    // Gameplay
+    private readonly InputActionMap m_Gameplay;
+    private List<IGameplayActions> m_GameplayActionsCallbackInterfaces = new List<IGameplayActions>();
+    private readonly InputAction m_Gameplay_MouseClick;
+    private readonly InputAction m_Gameplay_MousePosition;
+    private readonly InputAction m_Gameplay_CameraMove;
+    private readonly InputAction m_Gameplay_CameraRecenter;
+    private readonly InputAction m_Gameplay_TurnEnd;
+    private readonly InputAction m_Gameplay_CameraRotate;
+    private readonly InputAction m_Gameplay_Skill1;
+    private readonly InputAction m_Gameplay_CameraKeyRotate;
+    private readonly InputAction m_Gameplay_CameraZoom;
+    private readonly InputAction m_Gameplay_MouseDelta;
+    /// <summary>
+    /// Provides access to input actions defined in input action map "Gameplay".
+    /// </summary>
+    public struct GameplayActions
+    {
+        private @PlayerControls m_Wrapper;
+
+        /// <summary>
+        /// Construct a new instance of the input action map wrapper class.
+        /// </summary>
+        public GameplayActions(@PlayerControls wrapper) { m_Wrapper = wrapper; }
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/MouseClick".
+        /// </summary>
+        public InputAction @MouseClick => m_Wrapper.m_Gameplay_MouseClick;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/MousePosition".
+        /// </summary>
+        public InputAction @MousePosition => m_Wrapper.m_Gameplay_MousePosition;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/CameraMove".
+        /// </summary>
+        public InputAction @CameraMove => m_Wrapper.m_Gameplay_CameraMove;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/CameraRecenter".
+        /// </summary>
+        public InputAction @CameraRecenter => m_Wrapper.m_Gameplay_CameraRecenter;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/TurnEnd".
+        /// </summary>
+        public InputAction @TurnEnd => m_Wrapper.m_Gameplay_TurnEnd;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/CameraRotate".
+        /// </summary>
+        public InputAction @CameraRotate => m_Wrapper.m_Gameplay_CameraRotate;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/Skill1".
+        /// </summary>
+        public InputAction @Skill1 => m_Wrapper.m_Gameplay_Skill1;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/CameraKeyRotate".
+        /// </summary>
+        public InputAction @CameraKeyRotate => m_Wrapper.m_Gameplay_CameraKeyRotate;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/CameraZoom".
+        /// </summary>
+        public InputAction @CameraZoom => m_Wrapper.m_Gameplay_CameraZoom;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/MouseDelta".
+        /// </summary>
+        public InputAction @MouseDelta => m_Wrapper.m_Gameplay_MouseDelta;
+        /// <summary>
+        /// Provides access to the underlying input action map instance.
+        /// </summary>
+        public InputActionMap Get() { return m_Wrapper.m_Gameplay; }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Enable()" />
+        public void Enable() { Get().Enable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Disable()" />
+        public void Disable() { Get().Disable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.enabled" />
+        public bool enabled => Get().enabled;
+        /// <summary>
+        /// Implicitly converts an <see ref="GameplayActions" /> to an <see ref="InputActionMap" /> instance.
+        /// </summary>
+        public static implicit operator InputActionMap(GameplayActions set) { return set.Get(); }
+        /// <summary>
+        /// Adds <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <param name="instance">Callback instance.</param>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c> or <paramref name="instance"/> have already been added this method does nothing.
+        /// </remarks>
+        /// <seealso cref="GameplayActions" />
+        public void AddCallbacks(IGameplayActions instance)
+        {
+            if (instance == null || m_Wrapper.m_GameplayActionsCallbackInterfaces.Contains(instance)) return;
+            m_Wrapper.m_GameplayActionsCallbackInterfaces.Add(instance);
+            @MouseClick.started += instance.OnMouseClick;
+            @MouseClick.performed += instance.OnMouseClick;
+            @MouseClick.canceled += instance.OnMouseClick;
+            @MousePosition.started += instance.OnMousePosition;
+            @MousePosition.performed += instance.OnMousePosition;
+            @MousePosition.canceled += instance.OnMousePosition;
+            @CameraMove.started += instance.OnCameraMove;
+            @CameraMove.performed += instance.OnCameraMove;
+            @CameraMove.canceled += instance.OnCameraMove;
+            @CameraRecenter.started += instance.OnCameraRecenter;
+            @CameraRecenter.performed += instance.OnCameraRecenter;
+            @CameraRecenter.canceled += instance.OnCameraRecenter;
+            @TurnEnd.started += instance.OnTurnEnd;
+            @TurnEnd.performed += instance.OnTurnEnd;
+            @TurnEnd.canceled += instance.OnTurnEnd;
+            @CameraRotate.started += instance.OnCameraRotate;
+            @CameraRotate.performed += instance.OnCameraRotate;
+            @CameraRotate.canceled += instance.OnCameraRotate;
+            @Skill1.started += instance.OnSkill1;
+            @Skill1.performed += instance.OnSkill1;
+            @Skill1.canceled += instance.OnSkill1;
+            @CameraKeyRotate.started += instance.OnCameraKeyRotate;
+            @CameraKeyRotate.performed += instance.OnCameraKeyRotate;
+            @CameraKeyRotate.canceled += instance.OnCameraKeyRotate;
+            @CameraZoom.started += instance.OnCameraZoom;
+            @CameraZoom.performed += instance.OnCameraZoom;
+            @CameraZoom.canceled += instance.OnCameraZoom;
+            @MouseDelta.started += instance.OnMouseDelta;
+            @MouseDelta.performed += instance.OnMouseDelta;
+            @MouseDelta.canceled += instance.OnMouseDelta;
+        }
+
+        /// <summary>
+        /// Removes <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <remarks>
+        /// Calling this method when <paramref name="instance" /> have not previously been registered has no side-effects.
+        /// </remarks>
+        /// <seealso cref="GameplayActions" />
+        private void UnregisterCallbacks(IGameplayActions instance)
+        {
+            @MouseClick.started -= instance.OnMouseClick;
+            @MouseClick.performed -= instance.OnMouseClick;
+            @MouseClick.canceled -= instance.OnMouseClick;
+            @MousePosition.started -= instance.OnMousePosition;
+            @MousePosition.performed -= instance.OnMousePosition;
+            @MousePosition.canceled -= instance.OnMousePosition;
+            @CameraMove.started -= instance.OnCameraMove;
+            @CameraMove.performed -= instance.OnCameraMove;
+            @CameraMove.canceled -= instance.OnCameraMove;
+            @CameraRecenter.started -= instance.OnCameraRecenter;
+            @CameraRecenter.performed -= instance.OnCameraRecenter;
+            @CameraRecenter.canceled -= instance.OnCameraRecenter;
+            @TurnEnd.started -= instance.OnTurnEnd;
+            @TurnEnd.performed -= instance.OnTurnEnd;
+            @TurnEnd.canceled -= instance.OnTurnEnd;
+            @CameraRotate.started -= instance.OnCameraRotate;
+            @CameraRotate.performed -= instance.OnCameraRotate;
+            @CameraRotate.canceled -= instance.OnCameraRotate;
+            @Skill1.started -= instance.OnSkill1;
+            @Skill1.performed -= instance.OnSkill1;
+            @Skill1.canceled -= instance.OnSkill1;
+            @CameraKeyRotate.started -= instance.OnCameraKeyRotate;
+            @CameraKeyRotate.performed -= instance.OnCameraKeyRotate;
+            @CameraKeyRotate.canceled -= instance.OnCameraKeyRotate;
+            @CameraZoom.started -= instance.OnCameraZoom;
+            @CameraZoom.performed -= instance.OnCameraZoom;
+            @CameraZoom.canceled -= instance.OnCameraZoom;
+            @MouseDelta.started -= instance.OnMouseDelta;
+            @MouseDelta.performed -= instance.OnMouseDelta;
+            @MouseDelta.canceled -= instance.OnMouseDelta;
+        }
+
+        /// <summary>
+        /// Unregisters <param cref="instance" /> and unregisters all input action callbacks via <see cref="GameplayActions.UnregisterCallbacks(IGameplayActions)" />.
+        /// </summary>
+        /// <seealso cref="GameplayActions.UnregisterCallbacks(IGameplayActions)" />
+        public void RemoveCallbacks(IGameplayActions instance)
+        {
+            if (m_Wrapper.m_GameplayActionsCallbackInterfaces.Remove(instance))
+                UnregisterCallbacks(instance);
+        }
+
+        /// <summary>
+        /// Replaces all existing callback instances and previously registered input action callbacks associated with them with callbacks provided via <param cref="instance" />.
+        /// </summary>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c>, calling this method will only unregister all existing callbacks but not register any new callbacks.
+        /// </remarks>
+        /// <seealso cref="GameplayActions.AddCallbacks(IGameplayActions)" />
+        /// <seealso cref="GameplayActions.RemoveCallbacks(IGameplayActions)" />
+        /// <seealso cref="GameplayActions.UnregisterCallbacks(IGameplayActions)" />
+        public void SetCallbacks(IGameplayActions instance)
+        {
+            foreach (var item in m_Wrapper.m_GameplayActionsCallbackInterfaces)
+                UnregisterCallbacks(item);
+            m_Wrapper.m_GameplayActionsCallbackInterfaces.Clear();
+            AddCallbacks(instance);
+        }
+    }
+    /// <summary>
+    /// Provides a new <see cref="GameplayActions" /> instance referencing this action map.
+    /// </summary>
+    public GameplayActions @Gameplay => new GameplayActions(this);
+    /// <summary>
+    /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "Gameplay" which allows adding and removing callbacks.
+    /// </summary>
+    /// <seealso cref="GameplayActions.AddCallbacks(IGameplayActions)" />
+    /// <seealso cref="GameplayActions.RemoveCallbacks(IGameplayActions)" />
+    public interface IGameplayActions
+    {
+        /// <summary>
+        /// Method invoked when associated input action "MouseClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMouseClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "MousePosition" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMousePosition(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraMove" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraMove(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraRecenter" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraRecenter(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "TurnEnd" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnTurnEnd(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraRotate" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraRotate(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Skill1" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSkill1(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraKeyRotate" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraKeyRotate(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraZoom" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraZoom(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "MouseDelta" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMouseDelta(InputAction.CallbackContext context);
+    }
+}
+
+
+==================== Direction.cs (경로: ./fakecom/Assets/Scripts/Enums/Direction.cs) ====================
+public enum Direction
+{
+    None = -1, // [ű] ȿ ʰų  
+    North = 0, // Z+
+    East = 1,  // X+
+    South = 2, // Z-
+    West = 3   // X-
+}
+
+==================== EdgeType.cs (경로: ./fakecom/Assets/Scripts/Enums/EdgeType.cs) ====================
+public enum EdgeType
+{
+    Open,       // շ  (̵ O, þ O)
+    SolidWall,  //   (̵ X, þ X)
+    Window,     // â (̵ X, þ  0.5)
+    Door,       //  (/  )
+    BrokenWall,  // μ  (̵ O, þ O -  )
+    Pillar       //
+}
+
+==================== UnitCondition.cs (경로: ./fakecom/Assets/Scripts/Enums/UnitCondition.cs) ====================
+public enum UnitCondition
+{
+    Hopeful, //희망찬 85% 이상 %는 morale 값.
+    Inspired, //고무됨 70% 이상
+    Normal,         // 정상 50% 이상
+    Incapacitated,  // 행동 불능 (턴 상실) 35%이하
+    Fleeing,        // 도주 20% 이하
+    FriendlyFire,   // 아군 오사 10% 이하
+    SelfHarm        // 자해 5% 이하
+}
+
+==================== PlayerActionState.cs (경로: ./fakecom/Assets/Scripts/Enums/PlayerActionState.cs) ====================
+// PlayerActionState.cs
+public enum PlayerActionState
+{
+    Idle,                   // 아무 행동도 하지 않고 다음 명령 대기
+    SelectingMoveTarget,    // 이동 타일을 선택 중
+    SelectingAttackTarget,  // 공격 대상을 선택 중
+    ConfirmingAttack,       // 공격 대상 선택 후 확정 대기 중 (2단계 확인)
+    ExecutingAction         // 이동 또는 공격 행동을 실행 중
+}
+
+==================== CoverType.cs (경로: ./fakecom/Assets/Scripts/Enums/CoverType.cs) ====================
+public enum CoverType
+{
+    None,   // 엄폐 없음
+    Half,   // 반엄폐 (허리 높이)
+    Full    // 완전 엄폐 (전신)
+}
+
+// 주인님 제안 4번: 보너스 계산 유틸리티
+public static class CoverTypeExtensions
+{
+    public static float GetDefenseBonus(this CoverType cover)
+    {
+        return cover switch
+        {
+            CoverType.Half => 0.25f,   // +25% 방어 보너스 (기획에 따라 변경 가능)
+            CoverType.Full => 0.50f,   // +50% 방어 보너스
+            _ => 0.0f
+        };
+    }
+}
+
+==================== ClassType.cs (경로: ./fakecom/Assets/Scripts/Enums/ClassType.cs) ====================
+public enum ClassType
+{
+    Assault,
+    Sniper,
+    Scout,
+    Enemy
+}
+
+
+==================== QTEType.cs (경로: ./fakecom/Assets/Scripts/Enums/QTEType.cs) ====================
+// ϸ: QTEType.cs
+public enum QTEType
+{
+    Survival,      //   (HP 0)
+    AttackCrit,    //   ũƼ
+    EnemyCrit,     //   /ī
+    SynchroPulse   // NS 50 ̸  (Ŭ ÷)
+}
+
+==================== BlockType.cs (경로: ./fakecom/Assets/Scripts/Enums/BlockType.cs) ====================
+public enum BlockType
+{
+    Empty,
+    Floor,      // ٴ
+    Wall,       //  ( ٴ)
+    Pillar,     //  (ڳʿ ٴ)
+    Connector   // ٸ 
+}
+
+==================== ObjectPaletteSO.cs (경로: ./fakecom/Assets/Scripts/Data/ObjectPaletteSO.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+
+[CreateAssetMenu(fileName = "New Object Palette", menuName = "Data/Object Palette")]
+public class ObjectPaletteSO : ScriptableObject
+{
+    [System.Serializable]
+    public struct EdgeConfig
+    {
+        public bool North, East, South, West;
+    }
+
+    [System.Serializable]
+    public struct PaletteItem
+    {
+        // [PaletteID]  Ʒ 2 ׸ ũƮ ݵ ʿմϴ.
+        [PaletteID] public string id;
+        public GameObject prefab;
+        public BlockType blockType;
+
+        [Header("Edge Settings")]
+        public EdgeType edgeType;
+
+        [Tooltip("  ⺻ (ȸ 0)   ")]
+        public EdgeConfig blockedEdges;
+
+        [Header("Properties")]
+        public bool isWalkable;
+        public bool isCover;
+        public bool blocksSight;
+        public float heightOffset;
+    }
+
+    public List<PaletteItem> items;
+
+    // [ȭ] Ÿ ȸ ųʸ
+    private Dictionary<string, PaletteItem> _itemLookup;
+
+    private void OnEnable()
+    {
+        _itemLookup = null;
+    }
+
+    private void OnValidate()
+    {
+        _itemLookup = null; //    ĳ ʱȭ
+    }
+
+    public PaletteItem? GetItem(string id)
+    {
+        if (_itemLookup == null) BuildLookup();
+        if (_itemLookup.TryGetValue(id, out var item)) return item;
+        return null;
+    }
+
+    private void BuildLookup()
+    {
+        _itemLookup = new Dictionary<string, PaletteItem>();
+        foreach (var item in items)
+        {
+            if (!string.IsNullOrEmpty(item.id) && !_itemLookup.ContainsKey(item.id))
+                _itemLookup.Add(item.id, item);
+        }
+    }
+}
+
+==================== GameData.cs (경로: ./fakecom/Assets/Scripts/Data/GameData.cs) ====================
+using System.Collections.Generic;
+
+[System.Serializable]
+public class GameData
+{
+    public string GameVersion = "1.0";
+    public long SaveTimestamp; //  ð
+    public int Gold = 0;
+    public int CurrentChapter = 1;
+
+    //  δ  Ʈ
+    public List<UnitSaveData> Roster = new List<UnitSaveData>();
+}
+
+[System.Serializable]
+public class UnitSaveData
+{
+    public string UnitID;      // UnitDataSO ã  ID (: "Player_1")
+    public int CurrentHP;      //  ü
+    public int Experience;     // ġ
+}
+
+==================== LevelDataSO.cs (경로: ./fakecom/Assets/Scripts/Data/LevelDataSO.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+public struct MapElement
+{
+    public Vector3Int coordinate; // x, y(), z
+    public string paletteID;      // Palette ϵ ID
+    public int rotationIndex;     // 0=0, 1=90, 2=180, 3=270
+}
+
+[CreateAssetMenu(fileName = "New Level Data", menuName = "Data/Level Data")]
+public class LevelDataSO : ScriptableObject
+{
+    public Vector3Int mapSize = new Vector3Int(20, 4, 20); // , (), 
+    public List<MapElement> mapElements = new List<MapElement>();
+
+    [Header("Spawn Points")]
+    public List<Vector3Int> playerSpawnPoints;
+    public List<Vector3Int> enemySpawnPoints;
+}
+
+==================== PlayerController.cs (경로: ./fakecom/Assets/Scripts/Player/PlayerController.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+using Cysharp.Threading.Tasks;
+
+public enum PlayerState { Idle, Moving }
+
+public class PlayerController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    [SerializeField] private float moveSpeed = 5.0f;
+    [SerializeField] private float teleportThreshold = 1.0f;
+
+    [Header("Model Settings")]
+    [SerializeField] private float surfaceOffset = 0.01f;
+
+    public PlayerState CurrentState { get; private set; } = PlayerState.Idle;
+    private Tile currentOccupiedTile;
+    private UnitStatus unitStatus;
+
+    private void Awake()
+    {
+        unitStatus = GetComponent<UnitStatus>();
+        OccupyCurrentTile();
+    }
+
+    private void OccupyCurrentTile()
+    {
+        Vector3Int gridPos = GridUtils.WorldToGrid(transform.position);
+        if (MapManager.Instance == null) return;
+
+        Tile nextTile = MapManager.Instance.GetTileAt(gridPos);
+        if (nextTile != null)
+        {
+            currentOccupiedTile = nextTile;
+            currentOccupiedTile.OccupyingObject = this;
+
+            float targetY = GridUtils.GetSurfaceY(nextTile, this.gameObject, surfaceOffset);
+            transform.position = new Vector3(currentOccupiedTile.transform.position.x, targetY, currentOccupiedTile.transform.position.z);
+        }
+    }
+
+    public async UniTask StartMovement(List<Vector3> path, int totalCost)
+    {
+        if (CurrentState != PlayerState.Idle) return;
+        if (unitStatus.RemainingMobility < totalCost) return;
+
+        if (currentOccupiedTile != null) currentOccupiedTile.OccupyingObject = null;
+
+        await FollowPath(path);
+
+        unitStatus.ConsumeMobility(totalCost);
+        OccupyCurrentTile();
+        unitStatus.HasMoved = true;
+        unitStatus.UsedMoveCost += totalCost;
+    }
+
+    private async UniTask FollowPath(List<Vector3> path)
+    {
+        CurrentState = PlayerState.Moving;
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector3 currentTarget = path[i];
+            Vector3Int cellPos = GridUtils.WorldToGrid(currentTarget);
+
+            float targetY = currentTarget.y;
+            if (MapManager.Instance != null)
+            {
+                Tile targetTile = MapManager.Instance.GetTileAt(cellPos);
+                if (targetTile != null)
+                {
+                    targetY = GridUtils.GetSurfaceY(targetTile, this.gameObject, surfaceOffset);
+                }
+            }
+
+            Vector3 adjustedTarget = new Vector3(currentTarget.x, targetY, currentTarget.z);
+            Vector3 flatPrev = new Vector3(transform.position.x, 0, transform.position.z);
+            Vector3 flatTarget = new Vector3(adjustedTarget.x, 0, adjustedTarget.z);
+
+            if (Vector3.Distance(flatPrev, flatTarget) > teleportThreshold)
+            {
+                transform.position = adjustedTarget;
+                await UniTask.Delay(200);
+            }
+            else
+            {
+                await MoveToPosition(adjustedTarget);
+            }
+        }
+        CurrentState = PlayerState.Idle;
+    }
+
+    private async UniTask MoveToPosition(Vector3 targetPosition)
+    {
+        Vector3 startPosition = transform.position;
+        float distance = Vector3.Distance(startPosition, targetPosition);
+        if (distance < 0.01f) return;
+
+        float duration = distance / moveSpeed;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            transform.position = Vector3.Lerp(startPosition, targetPosition, t);
+            await UniTask.Yield();
+        }
+        transform.position = targetPosition;
+    }
+}
+
+==================== IPlayerStateHandler.cs (경로: ./fakecom/Assets/Scripts/Player/StateHandlers/IPlayerStateHandler.cs) ====================
+using UnityEngine;
+
+public interface IPlayerStateHandler
+{
+    /// <summary>
+    /// 이 상태에 처음 진입했을 때 호출됩니다.
+    /// </summary>
+    void OnEnter();
+
+    /// <summary>
+    /// 이 상태에서 마우스 이동 이벤트를 처리합니다.
+    /// </summary>
+    /// <param name="mousePosition">현재 마우스 위치</param>
+    void HandleMouseMove(Vector2 mousePosition);
+
+    /// <summary>
+    /// 이 상태에서 마우스 클릭 이벤트를 처리합니다.
+    /// </summary>
+    /// <param name="mousePosition">클릭 시점의 마우스 위치</param>
+    void HandleMouseClick(Vector2 mousePosition);
+
+    /// <summary>
+    /// 이 상태에서 벗어날 때 호출됩니다.
+    /// </summary>
+    void OnExit();
+
+    /// <summary>
+    /// 이 상태에서 '취소' 입력을 처리합니다.
+    /// </summary>
+    /// <returns>입력을 처리했으면 true, 아니면 false</returns>
+    bool HandleCancel();
+}
+
+
+==================== PlayerAttackState.cs (경로: ./fakecom/Assets/Scripts/Player/StateHandlers/PlayerAttackState.cs) ====================
+using UnityEngine;
+using System.Linq;
+using System.Collections.Generic;
+
+public class PlayerAttackState : IPlayerStateHandler
+{
+    private readonly PlayerInputCoordinator coordinator;
+    private readonly TurnManager turnManager;
+    private readonly PathVisualizer pathVisualizer;
+    private readonly CombatManager combatManager;
+    private readonly TargetUIManager targetUIManager; 
+    
+    private UnitStatus currentTarget = null;
+    
+    // [임시] UI 표시 및 공격 테스트를 위한 기본 어빌리티
+    // 실제로는 PlayerInputCoordinator나 UnitStatus에서 현재 선택된 스킬을 가져와야 합니다.
+    private AbilityDataSO defaultAbility; 
+
+    public PlayerAttackState(PlayerInputCoordinator coordinator)
+    {
+        this.coordinator = coordinator;
+        
+        this.turnManager = ServiceLocator.Get<TurnManager>();
+        this.pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        this.combatManager = ServiceLocator.Get<CombatManager>();
+        this.targetUIManager = ServiceLocator.Get<TargetUIManager>();
+
+        // [임시] 리소스로부터 테스트용 어빌리티 로드 (없으면 null)
+        // 에디터에서 만든 "Ability_TestShot" 이름과 일치해야 함
+        defaultAbility = Resources.Load<AbilityDataSO>("Ability_TestShot");
+    }
+
+    public void OnEnter()
+    {
+        var activeUnit = turnManager.ActiveUnit;
+        if (activeUnit == null) return;
+        
+        pathVisualizer.ShowRangeCircle(activeUnit.transform.position, (float)activeUnit.AttackRange);
+
+        UpdateAllEnemyUIs(activeUnit);
+    }
+
+    public void OnExit()
+    {
+        currentTarget = null;
+        pathVisualizer.ClearRangeCircle();
+        
+        if(targetUIManager != null)
+            targetUIManager.ClearAll();
+    }
+
+    public void HandleMouseMove(Vector2 mousePosition)
+    {
+        var activeUnit = turnManager.ActiveUnit;
+        if (activeUnit == null) return;
+
+        Ray ray = Camera.main.ScreenPointToRay(mousePosition);
+
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f))
+        {
+            UnitStatus targetUnit = hit.collider.GetComponent<UnitStatus>();
+
+            if (targetUnit == null || targetUnit == activeUnit ||
+                targetUnit.unitData == null || targetUnit.unitData.UnitTeam != UnitDataSO.Team.Enemy)
+            {
+                currentTarget = null;
+                return;
+            }
+
+            float distance = Vector3.Distance(activeUnit.transform.position, targetUnit.transform.position);
+            // [수정] TargetUIManager의 GetRange()를 사용하도록 수정
+            if (defaultAbility != null && distance <= defaultAbility.targetingStrategy.GetRange())
+            {
+                if (currentTarget != targetUnit)
+                {
+                    currentTarget = targetUnit;
+                }
+            }
+            else
+            {
+                currentTarget = null;
+            }
+        }
+        else
+        {
+            currentTarget = null;
+        }
+    }
+
+    public void HandleMouseClick(Vector2 mousePosition)
+    {
+        if (currentTarget == null) return;
+
+        var activeUnit = turnManager.ActiveUnit;
+        if (activeUnit == null || activeUnit.HasAttacked) return;
+
+        // 공격 실행 시에도 어빌리티 데이터 전달
+        if (defaultAbility != null)
+        {
+            activeUnit.HasAttacked = true;
+            combatManager.ExecuteAbility(defaultAbility, activeUnit, currentTarget);
+            coordinator.SetPlayerActionState(PlayerActionState.Idle); // 공격 후 상태 전환
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerAttackState] 실행할 기본 어빌리티(Ability_TestShot)를 Resources 폴더에서 찾을 수 없습니다.");
+        }
+    }
+
+    public bool HandleCancel()
+    {
+        coordinator.SetPlayerActionState(PlayerActionState.Idle);
+        return true;
+    }
+    
+    private void UpdateAllEnemyUIs(UnitStatus activeUnit)
+    {
+        if (targetUIManager == null) return;
+
+        var allEnemies = Object.FindObjectsOfType<UnitStatus>()
+                           .Where(u => u.unitData != null && u.unitData.UnitTeam == UnitDataSO.Team.Enemy)
+                           .ToList();
+
+        foreach (var enemy in allEnemies)
+        {
+            // [수정] TargetUIManager의 GetRange()를 사용하도록 수정
+            if (defaultAbility != null && defaultAbility.targetingStrategy != null)
+            {
+                float distance = Vector3.Distance(activeUnit.transform.position, enemy.transform.position);
+                if (distance <= defaultAbility.targetingStrategy.GetRange())
+                {
+                    // [수정] 변경된 TargetUIManager 메서드 호출 (AbilityDataSO 전달)
+                    targetUIManager.ShowInfoForTarget(activeUnit, enemy, defaultAbility);
+                }
+            }
+        }
+    }
+}
+
+
+==================== PlayerExecutingActionStateHandler.cs (경로: ./fakecom/Assets/Scripts/Player/StateHandlers/PlayerExecutingActionStateHandler.cs) ====================
+using UnityEngine;
+
+/// <summary>
+/// 유닛이 이동 또는 공격 등 행동을 실행하는 동안 입력을 무시하기 위한 상태입니다.
+/// 모든 메서드는 의도적으로 비워 둡니다.
+/// </summary>
+public class PlayerExecutingActionStateHandler : IPlayerStateHandler
+{
+    public void OnEnter()
+    {
+        // 행동 실행 중에는 특별히 할 일이 없음
+    }
+
+    public void OnExit()
+    {
+        // 행동이 끝나고 다른 상태로 돌아갈 때
+    }
+
+    public void HandleMouseMove(Vector2 mousePosition)
+    {
+        // 행동 실행 중에는 마우스 이동 무시
+    }
+
+    public void HandleMouseClick(Vector2 mousePosition)
+    {
+        // 행동 실행 중에는 마우스 클릭 무시
+    }
+
+    public bool HandleCancel()
+    {
+        // 행동 실행 중에는 취소 불가
+        return false;
+    }
+}
+
+
+==================== PlayerIdleStateHandler.cs (경로: ./fakecom/Assets/Scripts/Player/StateHandlers/PlayerIdleStateHandler.cs) ====================
+using System.Collections.Generic;
+using UnityEngine;
+using Cysharp.Threading.Tasks;
+
+public class PlayerIdleStateHandler : IPlayerStateHandler
+{
+    private readonly PlayerInputCoordinator coordinator;
+    private readonly Camera mainCamera;
+    private readonly MapManager mapManager;
+    private readonly PathVisualizer pathVisualizer;
+    private readonly TurnManager turnManager;
+
+    private List<Vector3> currentPreviewPath;
+    private int currentPreviewCost;
+
+    private Vector3Int lastHoveredGridPos = new Vector3Int(-999, -999, -999);
+
+    public PlayerIdleStateHandler(PlayerInputCoordinator coordinator, Camera mainCamera)
+    {
+        this.coordinator = coordinator;
+        this.mainCamera = mainCamera;
+        this.mapManager = ServiceLocator.Get<MapManager>();
+        this.pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        this.turnManager = ServiceLocator.Get<TurnManager>();
+    }
+
+    public void OnEnter() { coordinator.UpdateReachableRange(); }
+    public void OnExit()
+    {
+        pathVisualizer.ClearAll();
+        currentPreviewPath = null;
+        currentPreviewCost = 0;
+    }
+
+    public void HandleMouseMove(Vector2 mousePosition)
+    {
+        UnitStatus activeUnit = turnManager.ActiveUnit;
+        if (activeUnit == null) return;
+
+        Ray ray = mainCamera.ScreenPointToRay(mousePosition);
+        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+
+        Tile hitTile = null;
+        foreach (var hit in hits)
+        {
+            var tile = hit.collider.GetComponent<Tile>();
+            if (tile != null) { hitTile = tile; break; }
+        }
+
+        if (hitTile == null) return;
+        if (hitTile.GridPosition == lastHoveredGridPos) return;
+        lastHoveredGridPos = hitTile.GridPosition;
+
+        // 1. 경로 계산
+        PathResult result = mapManager.FindPath(activeUnit.transform.position, hitTile.transform.position, 100);
+        currentPreviewPath = result.path;
+        currentPreviewCost = result.totalCost;
+
+        if (currentPreviewPath == null || currentPreviewPath.Count == 0)
+        {
+            pathVisualizer.ClearPath();
+            return;
+        }
+
+        // 2. UI 분기 (이미 계산된 누적 비용 사용)
+        List<Vector3> reachablePath = new List<Vector3>();
+        List<Vector3> unreachablePath = new List<Vector3>();
+
+        int mobilityLimit = activeUnit.RemainingMobility;
+
+        for (int i = 0; i < currentPreviewPath.Count; i++)
+        {
+            Vector3 pos = currentPreviewPath[i];
+            // [Safety] 인덱스 범위 체크 (이론상 같아야 하지만 안전장치)
+            int costAtNode = (result.cumulativeCosts != null && i < result.cumulativeCosts.Count)
+                             ? result.cumulativeCosts[i] : 0;
+
+            if (costAtNode <= mobilityLimit)
+                reachablePath.Add(pos);
+            else
+                unreachablePath.Add(pos);
+        }
+
+        pathVisualizer.ShowPath(reachablePath);
+        if (unreachablePath.Count > 0) pathVisualizer.ShowUnreachablePath(unreachablePath);
+    }
+
+    public async void HandleMouseClick(Vector2 mousePosition)
+    {
+        UnitStatus activeUnit = turnManager.ActiveUnit;
+        if (activeUnit == null) return;
+
+        if (currentPreviewPath != null && currentPreviewPath.Count > 0 && currentPreviewCost <= activeUnit.RemainingMobility)
+        {
+            // [Fix] 상태 변경(OnExit) 전에 데이터를 미리 백업!
+            List<Vector3> pathPayload = new List<Vector3>(currentPreviewPath);
+            int costPayload = currentPreviewCost;
+
+            pathVisualizer.ClearPath();
+
+            // 여기서 OnExit()가 호출되어 currentPreviewPath가 null이 됨
+            coordinator.SetPlayerActionState(PlayerActionState.ExecutingAction);
+
+            var controller = activeUnit.GetComponent<PlayerController>();
+            if (controller != null)
+            {
+                // 백업해둔 데이터를 전달
+                await controller.StartMovement(pathPayload, costPayload);
+            }
+
+            coordinator.SetPlayerActionState(PlayerActionState.Idle);
+        }
+    }
+
+    public bool HandleCancel() { return false; }
+}
+
+==================== CameraController.cs (경로: ./fakecom/Assets/Scripts/Camera/CameraController.cs) ====================
+using UnityEngine;
+using System.Collections; // [수정] IEnumerator 사용을 위해 필수 추가
+
+public class CameraController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    [SerializeField] private float moveSpeed = 10f;
+    [SerializeField] private float rotationSpeed = 100f;
+    [SerializeField] private float mouseRotationSpeed = 0.2f;
+    [SerializeField] private float smoothing = 5f;
+
+    [Header("Rotation Defaults")]
+    [SerializeField] private float defaultPitch = 45f;
+    [SerializeField] private float defaultYaw = 0f;
+
+    [Header("Zoom Settings")]
+    [Tooltip("카메라의 고정 줌 거리")]
+    [SerializeField] private float fixedZoomDistance = 10f;
+
+    [Header("Action View Settings")]
+    [SerializeField] private Vector3 actionViewOffset = new Vector3(0.5f, 1.8f, -2.0f);
+    [SerializeField] private float targetHeightOffset = 1.0f;
+
+    [Header("Debug Settings")]
+    [SerializeField] private Transform debugAttacker;
+    [SerializeField] private Transform debugTarget;
+
+    [Header("Shake Settings")]
+    [SerializeField] private float shakeDuration = 0.3f;
+    [SerializeField] private float shakeMagnitude = 0.2f; // 조금 더 잘 보이게 기본값 상향
+
+    // --- 내부 계층 구조 ---
+    private Transform boomTransform;      // 회전 담당 (Pitch/Yaw)
+    private Transform shakeHolderTransform; // [추가] 줌 담당 (Zoom Distance)
+    private Transform cameraTransform;    // [수정] 실제 카메라 & 쉐이크 담당 (Shake)
+
+    private InputManager inputManager;
+    private Vector3 targetPosition;
+
+    [SerializeField] private float currentYaw;
+    [SerializeField] private float currentPitch;
+
+    // --- 액션 뷰 상태 ---
+    private bool isActionView = false;
+    private Transform actionAttacker;
+    private Transform actionTarget;
+
+    // 쉐이크 코루틴 관리
+    private Coroutine currentShakeCoroutine;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+
+        // 1. 실제 카메라 찾기
+        Camera cam = GetComponentInChildren<Camera>();
+        if (cam == null)
+        {
+            Debug.LogError("[CameraController] 자식 계층에 Camera가 없습니다!");
+            enabled = false;
+            return;
+        }
+        cameraTransform = cam.transform;
+
+        // 2. CameraBoom 생성 또는 찾기
+        boomTransform = transform.Find("CameraBoom");
+        if (boomTransform == null)
+        {
+            GameObject boomObj = new GameObject("CameraBoom");
+            boomTransform = boomObj.transform;
+            boomTransform.SetParent(transform, false);
+        }
+
+        // 3. [개선] ShakeHolder (Zoom 담당) 생성 또는 찾기
+        shakeHolderTransform = boomTransform.Find("ShakeHolder");
+        if (shakeHolderTransform == null)
+        {
+            GameObject holderObj = new GameObject("ShakeHolder");
+            shakeHolderTransform = holderObj.transform;
+            shakeHolderTransform.SetParent(boomTransform, false);
+        }
+
+        // 4. 계층 구조 정리: Root -> Boom -> ShakeHolder -> Camera
+        if (cameraTransform.parent != shakeHolderTransform)
+        {
+            cameraTransform.SetParent(shakeHolderTransform);
+            // 카메라는 홀더의 정중앙에 위치 (쉐이크 전)
+            cameraTransform.localPosition = Vector3.zero;
+            cameraTransform.localRotation = Quaternion.identity;
+        }
+
+        targetPosition = transform.position;
+        currentPitch = defaultPitch;
+        currentYaw = defaultYaw;
+    }
+
+    private void Start()
+    {
+        inputManager = ServiceLocator.Get<InputManager>();
+    }
+
+    private void LateUpdate()
+    {
+        if (isActionView)
+        {
+            if (actionAttacker != null && actionTarget != null)
+            {
+                HandleActionView();
+            }
+        }
+        else
+        {
+            HandleNormalView();
+        }
+    }
+
+    private void HandleNormalView()
+    {
+        if (inputManager == null) return;
+
+        // --- 이동 ---
+        Vector2 moveInput = inputManager.CameraMoveVector;
+        if (moveInput.sqrMagnitude > 0.01f)
+        {
+            Quaternion heading = Quaternion.Euler(0, currentYaw, 0);
+            Vector3 forward = heading * Vector3.forward;
+            Vector3 right = heading * Vector3.right;
+            Vector3 moveDir = (forward * moveInput.y + right * moveInput.x).normalized;
+            targetPosition += moveDir * moveSpeed * Time.deltaTime;
+        }
+
+        // --- 회전 ---
+        if (inputManager.IsCameraRotatePressed())
+        {
+            Vector2 mouseDelta = inputManager.GetMouseDelta();
+            currentYaw += mouseDelta.x * mouseRotationSpeed;
+        }
+
+        float keyRotation = inputManager.CameraKeyRotateAxis;
+        if (Mathf.Abs(keyRotation) > 0.01f)
+        {
+            currentYaw += keyRotation * rotationSpeed * Time.deltaTime;
+        }
+
+        ApplyNormalTransform();
+    }
+
+    private void ApplyNormalTransform()
+    {
+        // 1. Root 이동
+        transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * smoothing);
+
+        // 2. Boom 회전
+        Quaternion targetRotation = Quaternion.Euler(currentPitch, currentYaw, 0);
+        boomTransform.rotation = Quaternion.Slerp(boomTransform.rotation, targetRotation, Time.deltaTime * smoothing);
+
+        // 3. [개선] ShakeHolder를 이용해 줌 거리 적용 (카메라는 건드리지 않음)
+        if (shakeHolderTransform != null)
+        {
+            Vector3 targetLocalPos = new Vector3(0, 0, -fixedZoomDistance);
+            shakeHolderTransform.localPosition = Vector3.Lerp(shakeHolderTransform.localPosition, targetLocalPos, Time.deltaTime * smoothing);
+        }
+    }
+
+    public void SetTarget(Transform target, bool immediate = false)
+    {
+        if (target == null) return;
+
+        if (isActionView) DisableActionView();
+
+        targetPosition = target.position;
+        currentPitch = defaultPitch;
+        currentYaw = defaultYaw;
+
+        if (shakeHolderTransform != null)
+        {
+            shakeHolderTransform.localPosition = new Vector3(0, 0, -fixedZoomDistance);
+        }
+
+        // 타겟 변경 시 쉐이크 초기화
+        StopShake();
+
+        if (immediate)
+        {
+            transform.position = targetPosition;
+            boomTransform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0);
+        }
+    }
+
+    public void EnableActionView(Transform attacker, Transform target)
+    {
+        if (cameraTransform == null || attacker == null || target == null) return;
+
+        actionAttacker = attacker;
+        actionTarget = target;
+        isActionView = true;
+
+        // 쉐이크 초기화 (액션뷰 진입 시 흔들림 멈춤)
+        StopShake();
+        HandleActionView();
+    }
+
+    public void DisableActionView()
+    {
+        isActionView = false;
+        actionAttacker = null;
+        actionTarget = null;
+        targetPosition = transform.position;
+
+        // 쉐이크 초기화
+        StopShake();
+    }
+
+    private void HandleActionView()
+    {
+        if (actionAttacker == null || actionTarget == null)
+        {
+            DisableActionView();
+            return;
+        }
+
+        Vector3 directionToTarget = (actionTarget.position - actionAttacker.position).normalized;
+        if (directionToTarget == Vector3.zero) directionToTarget = actionAttacker.forward;
+
+        Vector3 rightDir = Vector3.Cross(Vector3.up, directionToTarget).normalized;
+
+        Vector3 targetPos = actionAttacker.position
+                            + (rightDir * actionViewOffset.x)
+                            + (Vector3.up * actionViewOffset.y)
+                            + (directionToTarget * actionViewOffset.z);
+
+        Vector3 lookAtPoint = actionTarget.position + (Vector3.up * targetHeightOffset);
+        Quaternion targetRot = Quaternion.LookRotation(lookAtPoint - targetPos);
+
+        transform.position = targetPos;
+        boomTransform.rotation = targetRot;
+
+        // [개선] 액션뷰에서는 ShakeHolder를 0으로 초기화 (줌 없음)
+        if (shakeHolderTransform != null)
+        {
+            shakeHolderTransform.localPosition = Vector3.zero;
+            shakeHolderTransform.localRotation = Quaternion.identity;
+        }
+
+        // 카메라도 정위치 (쉐이크가 있다면 여기서 오프셋이 추가됨)
+        // cameraTransform.localPosition = Vector3.zero; (제거: 쉐이크 로직과 충돌 방지)
+    }
+
+    public void ToggleDebugActionView()
+    {
+        if (isActionView) DisableActionView();
+        else if (debugAttacker != null && debugTarget != null) EnableActionView(debugAttacker, debugTarget);
+        else Debug.LogWarning("[CameraController] 디버그 타겟이 없습니다.");
+    }
+
+    // --- Shake 기능 개선 ---
+
+    public void PlayImpactShake()
+    {
+        StopShake(); // 기존 쉐이크 중단 및 리셋
+        currentShakeCoroutine = StartCoroutine(Co_ImpactShake(shakeDuration, shakeMagnitude));
+    }
+
+    private void StopShake()
+    {
+        if (currentShakeCoroutine != null)
+        {
+            StopCoroutine(currentShakeCoroutine);
+            currentShakeCoroutine = null;
+        }
+        // 카메라 위치 원상 복구 (ShakeHolder 기준 0)
+        if (cameraTransform != null)
+        {
+            cameraTransform.localPosition = Vector3.zero;
+        }
+    }
+
+    private IEnumerator Co_ImpactShake(float duration, float magnitude)
+    {
+        float elapsed = 0.0f;
+
+        // [심화] 감쇠(Damping) 적용: 시간이 갈수록 흔들림이 약해지도록
+        while (elapsed < duration)
+        {
+            float damping = 1.0f - (elapsed / duration); // 1 -> 0 으로 감소
+            float currentMag = magnitude * damping;
+
+            float x = Random.Range(-1f, 1f) * currentMag;
+            float y = Random.Range(-1f, 1f) * currentMag;
+
+            // [개선] ShakeHolder 아래에서 Camera만 흔들기 때문에 줌 로직과 충돌 안 함
+            cameraTransform.localPosition = new Vector3(x, y, 0);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        cameraTransform.localPosition = Vector3.zero;
+        currentShakeCoroutine = null;
+    }
+}
+
+==================== Phase1Verifier.cs (경로: ./fakecom/Assets/Scripts/Test/Phase1Verifier.cs) ====================
+using UnityEngine;
+using System.Collections.Generic;
+
+public class Phase1Verifier : MonoBehaviour
+{
+    public MapManager mapManager;
+
+    [ContextMenu("Run Phase 1 Tests")]
+    public void RunTests()
+    {
+        // [ 1] MapManager ڵ ã   üũ
+        if (mapManager == null)
+        {
+            mapManager = FindObjectOfType<MapManager>();
+            if (mapManager == null)
+            {
+                Debug.LogError("[Phase1Verifier]  MapManager ϴ! ׽Ʈ ߴմϴ.");
+                return;
+            }
+        }
+
+        //  
+        Vector3Int posA = new Vector3Int(0, 0, 0);
+        Vector3Int posB = new Vector3Int(0, 0, 1);
+
+        Tile tileA = mapManager.GetTileAt(posA);
+        Tile tileB = mapManager.GetTileAt(posB);
+
+        // [ 2]  Ÿ  
+        if (tileA == null || tileB == null)
+        {
+            Debug.LogError($"[Phase1Verifier] ׽Ʈ Ÿ :\n" +
+                           $"  Tile at {posA}: {(tileA != null ? "" : "")}\n" +
+                           $"  Tile at {posB}: {(tileB != null ? "" : "")}\n" +
+                           $" TilemapGenerator  (0,0,0) (0,0,1)    ϼ.");
+            return;
+        }
+
+        int passCount = 0;
+        int totalTests = 8;
+        List<bool> results = new List<bool>();
+
+        // ʱȭ
+        tileA.Initialize(posA);
+        tileB.Initialize(posB);
+
+        // Test 1: ⺻  (Open)
+        bool r1 = mapManager.IsEdgePassable(posA, posB); //    !
+        LogTest("Test 1: ⺻  (Open)", r1 == true, ref results);
+
+        // Test 2: A North Wall
+        tileA.SetEdge(Direction.North, new EdgeInfo(EdgeType.SolidWall));
+        bool r2 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 2: A North Wall (̵ Ұ)", r2 == false, ref results);
+
+        // Test 3: A North Open 
+        tileA.SetEdge(Direction.North, EdgeInfo.Default);
+        bool r3 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 3: A North Open (̵ )", r3 == true, ref results);
+
+        // Test 4: B South Wall
+        tileB.SetEdge(Direction.South, new EdgeInfo(EdgeType.SolidWall));
+        bool r4 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 4: B South Wall (̵ Ұ)", r4 == false, ref results);
+
+        // Test 5: Window
+        tileB.SetEdge(Direction.South, EdgeInfo.Default);
+        tileA.SetEdge(Direction.North, new EdgeInfo(EdgeType.Window));
+        bool r5 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 5: Window (̵ Ұ)", r5 == false, ref results);
+
+        // Test 6: Door Closed
+        tileA.SetEdge(Direction.North, new EdgeInfo(EdgeType.Door, isOpen: false));
+        bool r6 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 6: Door Closed (̵ Ұ)", r6 == false, ref results);
+
+        // Test 7: Door Open
+        tileA.SetEdge(Direction.North, new EdgeInfo(EdgeType.Door, isOpen: true));
+        bool r7 = mapManager.IsEdgePassable(posA, posB);
+        LogTest("Test 7: Door Open (̵ )", r7 == true, ref results);
+
+        // Test 8:  üũ
+        tileA.SetEdge(Direction.North, EdgeInfo.Default);
+        tileB.SetEdge(Direction.South, new EdgeInfo(EdgeType.SolidWall));
+
+        bool r8 = mapManager.IsEdgePassable(posB, posA);
+        LogTest("Test 8:  üũ (B->A, B)", r8 == false, ref results);
+
+        foreach (var res in results) if (res) passCount++;
+
+        Debug.Log("================================================");
+        if (passCount == totalTests)
+            Debug.Log($"<color=green><b>[SUCCESS]  ׽Ʈ ! ({passCount}/{totalTests})</b></color>");
+        else
+            Debug.LogError($"<color=red><b>[FAILURE] ׽Ʈ  ߻! ({passCount}/{totalTests} )</b></color>");
+    }
+
+    private void LogTest(string name, bool success, ref List<bool> results)
+    {
+        results.Add(success);
+        string color = success ? "green" : "red";
+        string status = success ? "PASS" : "FAIL";
+        Debug.Log($"<color={color}>[{status}] {name}</color>");
+    }
+}
+
+==================== GlobalSettingsSO.cs (경로: ./fakecom/Assets/Scripts/ScriptableObjects/GlobalSettingsSO.cs) ====================
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "GlobalSettings", menuName = "Game Config/Global Settings")]
+public class GlobalSettingsSO : ScriptableObject
+{
+    // ========================================================================
+    // [Section 1] System & Technical Settings ( ý )
+    // ========================================================================
+
+    [Header("1. App Information")]
+    public string gameVersion = "1.0.0";
+    public bool isDevelopmentMode = true;
+
+    [Header("2. System Thresholds (Է   Ӱ谪)")]
+    [Tooltip("Է ȣ  ּ  ()")]
+    [Range(0f, 0.5f)] public float inputDeadZone = 0.1f;
+
+    [Tooltip("浹  ּ   ũ")]
+    public float physicsCollisionThreshold = 5.0f;
+
+    [Tooltip("ȣۿ  ִ Ÿ")]
+    public float interactionDistanceThreshold = 3.0f;
+
+    [Header("3. Graphics & Performance")]
+    public int targetFrameRate = 60;
+    public bool useVSync = false;
+
+    [Header("4. Audio Defaults")]
+    [Range(0f, 1f)] public float defaultMasterVolume = 1.0f;
+    [Range(0f, 1f)] public float defaultBGMVolume = 0.8f;
+    [Range(0f, 1f)] public float defaultSFXVolume = 1.0f;
+
+
+    // ========================================================================
+    // [Section 2] Gameplay General (Ϲ ÷ )
+    // ========================================================================
+
+    [Header("5. Global Gameplay Multipliers")]
+    [Tooltip(" ü ӵ  (1.0 =  ӵ)")]
+    [Range(0f, 5f)] public float globalTimeScale = 1.0f;
+
+    [Tooltip("ü ġ ȹ  (̺Ʈ   )")]
+    public float experienceMultiplier = 1.0f;
+
+    [Tooltip("ü  Ŀ  ")]
+    public float damageOutputMultiplier = 1.0f;
+
+
+    // ========================================================================
+    // [Section 3] Neural Sync & Survival System (Plan C ٽ )
+    // ========================================================================
+
+    [Header("6. Neural Sync State Thresholds (  )")]
+    [Tooltip("Hopeful    (180)")]
+    public float thresholdHopeful = 180f;
+
+    [Tooltip("Inspired    (150)")]
+    public float thresholdInspired = 150f;
+
+    [Tooltip("Normal    (50)")]
+    public float thresholdNormal = 50f;
+    // 50 ̸ Crisis/Error 
+
+    [Tooltip("Incapacitated    (35~49)")]
+    public float thresholdIncapacitated = 35f;
+
+    [Tooltip("Fleeing    (20~34)")]
+    public float thresholdFleeing = 20f;
+
+    [Tooltip("FriendlyFire    (5~19)")]
+    public float thresholdFriendlyFire = 5f; 
+    
+
+
+
+    [Header("7. Survival Multipliers ( Ȯ  M_State)")]
+    [Tooltip("Hopeful (180) : x1.5")]
+    public float multiplierHopeful = 1.5f;
+
+    [Tooltip("Inspired (150) : x1.2")]
+    public float multiplierInspired = 1.2f;
+
+    [Tooltip("Normal (50~149) : x1.0")]
+    public float multiplierNormal = 1.0f;
+
+    [Tooltip("Incapacitated (49~35) : x0.8")]
+    public float multiplierIncapacitated = 0.8f;
+
+    [Tooltip("Fleeing (34~20) : x0.5")]
+    public float multiplierFleeing = 0.5f;
+
+    [Tooltip("FriendlyFire (19~1) : x0.2")]
+    public float multiplierFriendlyFire = 0.2f;
+
+    [Tooltip("SelfHarm (0) : x0.0")]
+    public float multiplierSelfHarm = 0.0f;
+
+    [Header("8. Overclock Settings (Ŭ)")]
+    [Tooltip("ũ 50 ̸ ù   Ŭ ߵ Ȯ (5%)")]
+    [Range(0f, 1f)] public float overclockChance = 0.05f;
+
+    [Tooltip("Ŭ    ũ (160)")]
+    public float overclockSuccessSync = 160f;
+
+    [Header("9. Survival Formula Constants ( )")]
+    [Tooltip(" Ȯ    ּ ũ (CurrentSync - 5)")]
+    public float minSyncOffset = 5f;
+
+    [Tooltip(" Ȯ    и  (175)")]
+    public float syncDivisor = 175f;
+
+    [Tooltip(" Ȯ      (x2)")]
+    public float baseFormulaMultiplier = 2.0f;
+
+    [Header("--- NS Crisis Settings ---")]
+    [Tooltip("Ŭ ÷ ۵Ǵ Ӱ谪 (⺻ 50)")]
+    public float crisisThreshold = 50f;
+
+    [Tooltip("Ŭ    NS ġ (⺻ 160)")]
+    public float overclockSuccessValue = 160f;
+
+    [Tooltip("Ŭ  ⺻ Ȯ (5%)")]
+    [Range(0f, 1f)] public float baseOverclockChance = 0.05f;
+
+    [Tooltip("ClockLock(ý ) Ǳ  ؾ ϴ ǥ ġ (⺻ 100)")]
+    public float clockLockReleaseThreshold = 100f;
+
+    [Header("--- QTE Simulation Settings (׽Ʈ) ---")]
+    [Tooltip("̹ QTE  Ȯ (0.0 ~ 1.0)")]
+    [Range(0f, 1f)] public float probSurvival = 0.5f;
+
+    [Tooltip(" ũƼ QTE  Ȯ")]
+    [Range(0f, 1f)] public float probAttackCrit = 0.7f;
+
+    [Tooltip(" ݰ  QTE  Ȯ")]
+    [Range(0f, 1f)] public float probEnemyCrit = 0.4f;
+
+    [Tooltip("Synchro-Pulse(Ŭ) QTE  Ȯ")]
+    [Range(0f, 1f)] public float probSynchroPulse = 0.3f; // ̶  ư 
+
+    [Header("--- QTE System Settings ---")]
+    [Tooltip("QTE  , 尨 ִ   ð ()")]
+    public float qtePreDelay = 0.5f;
+
+    [Header("Turn System Penalty Ratios")]
+    [Tooltip("Ϲ ǰ  ų    (⺻ 0.1)")]
+    public float tsPenaltyRatioNormal = 0.1f;
+
+    [Tooltip("ũƼ ǰ  ų    (⺻ 0.2)")]
+    public float tsPenaltyRatioCrit = 0.2f;
+}
+
