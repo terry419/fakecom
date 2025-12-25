@@ -2,20 +2,15 @@ using UnityEngine;
 
 public class DataManager : MonoBehaviour
 {
-    private void Awake()
-    {
-        ServiceLocator.Register(this);
-    }
-
     public void Initialize()
     {
-        // ï¿½ï¿½ï¿½ß¿ï¿½ ï¿½ï¿½ï¿½Ìºï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½î°¨
+        // ³ªÁß¿¡ ¼¼ÀÌºê ÆÄÀÏ °æ·Î È®ÀÎ µîÀÇ ·ÎÁ÷ µé¾î°¨
     }
 
     public void LoadData(int slot)
     {
         Debug.Log($"[DataManager] Loading Save Slot {slot}...");
-        // TODO: JSONï¿½Ì³ï¿½ ï¿½ï¿½ï¿½Ì³Ê¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ð¾ï¿½ï¿½ï¿½ï¿½
+        // TODO: JSONÀÌ³ª ¹ÙÀÌ³Ê¸® ÆÄÀÏ ÀÐ¾î¿À±â
     }
 
     public void SaveData()
@@ -25,7 +20,7 @@ public class DataManager : MonoBehaviour
 
     public void ClearData()
     {
-        // ï¿½Þ¸ð¸®¿ï¿½ ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ null Ã³ï¿½ï¿½
+        // ¸Þ¸ð¸®¿¡ µé°í ÀÖ´ø ¾ÆÀÌÅÛ, ½ºÅÈ µîµî null Ã³¸®
         Debug.Log("[DataManager] In-memory data cleared.");
     }
 }
