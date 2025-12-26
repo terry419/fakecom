@@ -330,80 +330,82 @@
 * **경로(Invalid):** 이동력 초과 또는 이동 불가 지역(오브젝트/유닛 점유) → **빨간색(Red) 라인/타일**.  
 * **복합 경로:** 갈 수 있는 데까지는 파란색, 그 이후부터 빨간색으로 이어지는 **'부분 경로 표시'** 로직 명시.
 
-# **6.0. 기술 아키텍처 (Technical Architecture)**
+# **6.0. 기술 아키텍처 (Technical Architecture) \[수정됨\]**
 
-본 프로젝트는 **Unity 3D (URP)** 환경을 기반으로 하며, **Service Locator 패턴**을 통해 싱글톤의 의존성을 해결하고, 메모리 생명주기(Lifecycle)에 따라 매니저 시스템을 엄격히 관리한다.
+본 프로젝트는 **Unity 3D (URP)** 환경을 기반으로 하며, **Service Locator 패턴**과 **Initializer 패턴**을 결합하여 싱글톤의 폐해(결합도, 순서 문제)를 해결하고, 메모리 생명주기(Lifecycle)를 엄격히 통제한다.
 
-### **6.1. 개발 환경 및 기반 기술 (Development Stack)**
+### **6.0.1. 아키텍처 핵심 원칙 (Core Principles)**
+
+1. **서비스 로케이터 (Service Locator):** 모든 매니저 클래스는 싱글톤(Instance) 변수를 가지지 않으며, 오직 ServiceLocator를 통해서만 접근 가능하다.  
+2. **하이브리드 등록 (Hybrid Registration):**  
+   * **Global Scope:** 매니저가 스스로 등록하는 **자가 등록(Self-Registration)** 방식.  
+   * **Scene Scope:** 초기화 순서 보장을 위해 SceneInitializer가 등록하는 **중앙 관리(Centralized Registration)** 방식.  
+3. **인터페이스 기반 초기화:** "초기화가 필요한 모든 매니저는 `IInitializable` 인터페이스를 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 모든 초기화는 \*\*비동기(Async/Await)\*\*로 수행되며, 메인 스레드 블로킹(`WaitForCompletion`)을 엄격히 금지한다."  
+4. "**1단계(Registration):** `Awake()`에서는 오직 `ServiceLocator.Register(this)`와 자기 자신의 변수 할당만 수행한다. 타 매니저 참조 금지.  
+    **2단계(Injection):** 타 매니저 참조 및 리소스 로드는 `Initialize(settings)` 단계에서 수행하여 참조 무결성을 보장한다."  
+5. "초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(State)로 전이한다."
+
+---
+
+## **6.1. 개발 환경 및 기반 기술 (Development Stack)**
 
 | 구분 | 기술 스택 / 버전 | 선정 이유 및 비고 |
 | :---- | :---- | :---- |
 | **엔진** | **Unity 2022.3.62f1 (LTS)** | 장기 지원 버전(LTS)을 사용하여 개발 도중 엔진 버그로 인한 리스크 최소화. |
-| **렌더링** | **URP** (Universal Render Pipeline) | 로우 폴리 그래픽에 최적화된 성능. **Shader Graph**를 통한 캐릭터 실루엣(X-Ray), 포스트 프로세싱(Bloom) 구현 용이. |
+| **렌더링** | **URP** (Universal Render Pipeline) | 로우 폴리 그래픽에 최적화된 성능. Shader Graph를 통한 캐릭터 실루엣(X-Ray), 포스트 프로세싱(Bloom) 구현 용이. |
 | **입력** | **New Input System** | 키보드/마우스 및 게임패드 동시 지원. Action Map(Menu, Gameplay, QTE) 분리 용이. |
-| **비동기** | **UniTask** | 코루틴(Coroutine) 대비 가독성이 높고 오버헤드가 적은 async/await 패턴 사용. |
+| **비동기** | **UniTask** | 코루틴(Coroutine) 대비 가독성이 높고 오버헤드가 적은 async/await 패턴 사용. "Unity의 Native Coroutine 및 Addressables의 동기 함수(`WaitForCompletion`) 사용을 금지하고, 모든 비동기 로직을 UniTask로 통일." |
 | **리소스** | **Addressables** | 씬 전환 시 메모리 누수를 방지하고, 리소스의 비동기 로드/해제 관리. |
 | **데이터** | **ScriptableObject (SO)** | 기획 데이터(밸런스, 맵 정보)와 로직의 분리. JSON 직렬화 연동. |
 
 ---
 
-### **6.2. 시스템 계층 구조 (System Hierarchy)**
+## **6.2. 시스템 계층 구조 (System Hierarchy) \[수정됨\]**
 
-매니저 클래스는 메모리 상주 기간에 따라 **Global, Session, Scene**의 3단계 스코프로 분류하여 관리한다.
+매니저의 생명주기와 등록 주체에 따라 \*\*Global(App)\*\*과 **Scene(Session)** 두 가지 스코프로 명확히 구분한다.
 
-#### **(1) Global Scope (App Lifetime)**
+### **(1) Global Scope (App Lifetime)**
 
-앱 실행 시 생성 \~ 종료 시 파괴 (DontDestroyOnLoad)
+* **생명주기:** 앱 실행 시 AppInitializer에 의해 생성 \~ 앱 종료 시까지 유지 (DontDestroyOnLoad).  
+* **등록 방식:** **자가 등록 (Self-Registration)**. Awake()에서 ServiceLocator.Register(this) 호출.  
+* "단, `AppInitializer`는 매니저를 **생성(Instantiate)만** 하며, 등록 코드를 포함하지 않는다(의존성 제거)."  
+* **초기화 주체:** AppInitializer (Addressables 로드 및 생성 담당).
 
 | 매니저 이름 | 핵심 역할 | 주요 책임 및 기능 |
 | :---- | :---- | :---- |
 | **ServiceLocator** | **연결** | 모든 매니저의 등록/해제 및 접근점 제공 (싱글톤 대체). |
-| **GameManager** | **총괄** | 게임의 최상위 상태(FSM) 관리 및 앱 종료 처리. |
-| **DataManager** | **DB** | **(복구됨)** 게임 내 모든 고정 데이터(아이템, 유닛 스탯, 텍스트) 캐싱 및 제공. |
-| **ResourceManager** | **로더** | Addressables 에셋의 비동기 로드/해제 관리 (메모리 관리). |
-| **PoolManager** | **최적화** | **(복구됨)** 투사체, VFX, 데미지 텍스트 등의 오브젝트 풀링 관리. |
-| **AudioManager** | **소리** | BGM 크로스페이드, SFX 재생. |
-| **InputManager** | **입력** | 하드웨어 입력을 게임 Action으로 변환. |
-| **SceneLoader** | **전환** | 씬 비동기 로드 및 페이드 인/아웃 연출 (SceneTransitionManager 계승). |
-| **PopupController** | **알림** | **(복구됨)** 전역 에러 메시지 및 확인/취소 팝업 UI 표시. |
-| **SettingManager** | **설정** | 해상도, 사운드 등 로컬 설정 관리. |
+| **AppInitializer** | **시동** | "앱의 진입점(Entry Point). `AppConfig` 로드 및 Global 매니저 생성(Instantiate)을 담당한다. **\[개발 편의성\]:** `BootScene`이 아닌 일반 씬에서 실행 시, 자동으로 Global 환경을 구축(Bootstrap)하여 개발 속도를 저하시키지 않도록 한다." 단, 자동 부트스트랩의 호출(Trigger)은 SceneInitializer가 수행한다 |
+| **GameManager** | **총괄** | 게임의 최상위 상태(Main Menu ↔ InGame) 관리. |
+| **DataManager** | **DB** | 게임 내 모든 정적 데이터(SO) 및 세이브 데이터 로드/캐싱. |
+| **InputManager** | **입력** | 하드웨어 입력을 게임 Action으로 변환 및 레이어(UI/Game) 제어. |
+| **GlobalSettingsSO** | **설정** | 해상도, 사운드 볼륨 등 전역 설정 데이터 컨테이너. |
 
-#### **(2) Session Scope (Run Lifetime)**
+### **(2) Scene Scope (Session Lifetime)**
 
-새 게임 시작 \~ 엔딩/사망 시까지 유지
+* **생명주기:** 전투 씬(InGame) 로드 시 생성 \~ 씬 언로드 시 파괴.  
+* **등록 방식:** **중앙 관리 (Centralized Registration)**. **Awake() 사용 금지.**  
+* **초기화 주체:** SceneInitializer.
 
-| 매니저 이름 | 핵심 역할 | 주요 책임 |
+| 계층 (Layer) | 매니저 이름 | 주요 책임 |
 | :---- | :---- | :---- |
-| **ProgressionManager** | **진행도** | 캠페인 날짜, 해금 요소 저장. |
-| **SquadManager** | **부대** | 보유 대원 정보(체력, 장비) 관리. |
-| **InventoryManager** | **인벤** | 획득 물자 및 장비 관리. |
+| **Initializer** | **SceneInitializer** | •"씬 내 매니저의 생성(RegisterOrSpawn) 후, `Start()` 단계에서 \*\*비동기 루프(Async Loop)\*\*를 통해 순차적으로 `Initialize()`를 호출한다. 하나라도 실패 시 게임 진입을 차단한다." • 게임 종료(OnDestroy) 시 등록의 역순으로 안전하게 해제. |
+| **State Machine** | **SessionManager** | • 전투의 흐름(FSM) 관리 (Boot → Setup → TurnWaiting → UnitTurn...). • IInitializable 구현 및 상태 전이 제어. |
+| **System** | **TurnManager** | • 유닛의 TS(Turn Speed) 계산 및 턴 큐(Queue) 관리. |
+|  | **MapManager** | • 맵 생성(WFC/Module), NavMesh 베이크, 엄폐물 데이터 관리. |
+| **Combat** | **CombatManager** | • 공격/피격 판정 공식 계산 및 데미지 적용. |
+|  | **UnitManager** | • 유닛 스폰, 사망 처리, 리스트 관리. |
+| **Visual / UI** | **CameraManager** | • 시점 제어 및 액션 캠 연출. |
+|  | **TargetUIManager** | • 타겟 머리 위 UI(HP바, 명중률) 표시 및 풀링. |
+|  | **DamageTextMgr** | • 데미지 플로팅 텍스트 연출. |
 
-#### **(3) Scene Scope (Battle Lifetime)**
+### **(3) Scene Scope (Non-Battle)**
 
-전투 씬 진입 시 생성 \~ 종료 시 파괴
-
-| 매니저 이름 | 핵심 역할 | 주요 책임 |
-| :---- | :---- | :---- |
-| **TurnManager** | **시간** | 턴 순서 및 AP 관리. |
-| **MapManager** | **공간** | 3D 맵 생성, NavMesh, 엄폐물 관리. |
-| **UnitManager** | **유닛** | 유닛 스폰/사망 및 리스트 관리. |
-| **CameraManager** | **시점** | 쿼터뷰 제어 및 액션 캠. |
-| **BattleUIManager** | **UI** | 전투 HUD(게이지, HP) 제어. |
-| **LootManager** | **파밍** | 시체 생성 및 아이템 드랍 연산. |
-| **InteractionManager** | **상호작용** | 문 열기, 시체 뒤지기 판정. |
-| **FowManager** | **시야** | 전장의 안개(Fog) 계산 및 렌더링. |
-| **FxManager** | **연출** | PoolManager를 통해 전투 이펙트 재생 요청. |
-
-#### **(4) Scene Scope (Non-Battle)**
-
-*기지(Base) 및 월드맵(WorldMap) 씬 전용 매니저.*
+* 기지(Base) 및 월드맵(WorldMap) 씬 전용 매니저.
 
 | 씬 | 매니저 이름 | 주요 책임 및 기능 |
 | :---- | :---- | :---- |
 | **Base** | **BaseManager** | • 기지 내 UI 메뉴(연구, 병영, 정비) 네비게이션 처리. • SquadManager와 연동하여 대원 치료/훈련 로직 수행. |
 | **World** | **MissionManager** | • 랜덤 미션 생성 및 지역별 보상 데이터 관리. • 선택된 미션 정보를 Battle 씬으로 전달(MapDataSO). |
-
----
 
 ### **6.3. 핵심 시스템 구현 로직 (Core Implementation Logic)**
 
@@ -502,7 +504,8 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 Enum 관리 원칙: '1 Enum, 1 File'
 
 * 모든 열거형(Enum)은 각자의 의미를 가장 잘 나타내는 이름의 .cs 파일에 단독으로 정의한다. (예: CoverType.cs, UnitCondition.cs, PlayerActionState.cs)  
-* 목적:\* 프로젝트의 규모가 커지더라도 코드의 명확성과 유지보수성을 유지하고, 여러 개발자가 동시에 작업할 때 발생할 수 있는 병합 충돌을 원천적으로 방지하기 위함이다. 이는 프로젝트 전반의 '관심사 분리' 설계 원칙과 일관성을 유지한다.
+* 목적:\* 프로젝트의 규모가 커지더라도 코드의 명확성과 유지보수성을 유지하고, 여러 개발자가 동시에 작업할 때 발생할 수 있는 병합 충돌을 원천적으로 방지하기 위함이다. 이는 프로젝트 전반의 '관심사 분리' 설계 원칙과 일관성을 유지한다.  
+* "모든 비동기 메서드에는 접미사 `Async`를 붙이지 않더라도 반환 타입으로 구분한다(UniTask). `void` 반환 비동기 메서드(`async void`)는 이벤트 핸들러를 제외하고 금지하며, `async UniTaskVoid`를 사용한다."
 
 # 
 
@@ -1048,18 +1051,3 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 3\. **Sniper (저격형):** 원거리 및 고지대(HeightFactor) 가중치 높음.
 
 **13.2.3. 의사결정 방식:** 초기 단계에서는 Utility AI를 사용하여 행동별 점수를 산출하며, 추후 딥러닝을 통해 최적 가중치 산출 예정.
-
-## **14\. 개발계획**
-
-| 날짜 | 주제 | 오전 목표 (시스템/도구) | 오후 목표 (로직/데이터) |
-| :---- | :---- | :---- | :---- |
-| **Day 2** | **도구와 맵 (Tools)** | **\[Map Maker\]** ContextMenu 버튼 하나로 씬의 벽 위치를 LevelDataSO에 자동 저장하는 도구 제작. | **\[Object Setup\]** Tile.cs 정의 및 고저차가 포함된 테스트 맵 배치. |
-| **Day 3** | **무기와 병과 (Weapon)** | **\[Weapon Data\]** AnimationCurve (X:정규화 거리, Y:보정치)를 적용한 무기 SO 및 병과별 장착 제한 구현. | **\[Unit Data\]** 유닛 스폰 시 무기 장착 및 스탯 초기화 루프 구축 (로그 확인). |
-| **Day 4** | **전투 공식 (Math)** | **\[Dynamic Hit\]** 거리별 명중/데미지 곡선 실시간 연산 (CombatCalculator). | **\[Physical Cover\]** 벡터 내적을 이용한 물리적 엄폐(Angle/Height Factor) 구현. |
-| **Day 5** | **정산과 루팅 (Loot)** | **\[Pending List\]** 전투 중 획득한 아이템을 임시 저장하는 LootSettlement 시스템 구축. | **\[Damaged Item\]** 아이템에 '손상 상태' 플래그 추가 및 결과창 전송 로직 구현. |
-| **Day 6** | **행동과 제약 (Turn)** | **\[Class Constraint\]** "정찰병 공격 후 이동" 등 병과별 행동 순서 및 제약 로직. | **\[Height Logic\]** 3단계 고저차 이동 제한 및 시야 차폐(Raycast) 최적화. |
-| **Day 7** | **시야와 안개 (FOW)** | **\[FOW Engine\]** 타일 기반 시야 시스템 구축 및 MapManager 연동. | **\[Update Logic\]** 유닛 이동 시 1타일당 시야 갱신 처리 및 성능 최적화. |
-| **Day 8** | **정신력과 상태 (Psych)** | **\[Morale Logic\]** 사기 임계점(50%) 각성/디버프 및 0% 자해 로직. | **\[Status Effect\]** StatusEffectController를 통한 제압, 화염 상태이상 연동. |
-| **Day 9** | **액션의 완성 (QTE)** | **\[Unique QTE\]** 병과별 다른 UI/조작 방식(Hold, Focus, Timing) 모듈화. | **\[Dynamic Zone\]** 명중률에 따른 QTE 성공 영역 크기 실시간 조정. |
-| **Day 10** | **성장과 저장 (Loop)** | **\[Base & XP\]** 기지 수리공방 UI 기초 및 경험치 테이블 기반 유닛 성장 반영. | **\[Final Integration\]** 난이도별 자동 저장 시점 분기 및 전체 루프 최종 통합. |
-

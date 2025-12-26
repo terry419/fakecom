@@ -1,6 +1,7 @@
-    public enum ManagerScope
-    {
-        Global,   // 게임 종료 시까지 유지
-        Session,  // 한 번의 게임 플레이 세션 동안 유지
-        Scene     // 현재 씬(전투 등)에서만 유지
-    }
+// namespace 없음
+public enum ManagerScope
+{
+    Global,   // 앱 실행 ~ 종료
+    Session,  // 전투 세션
+    Scene     // 씬 로드 ~ 언로드
+}

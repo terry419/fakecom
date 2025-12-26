@@ -1,16 +1,19 @@
 using UnityEngine;
-using UnityEngine.AddressableAssets;
+using UnityEngine.AddressableAssets; // 어드레서블(리소스 관리) 기능 사용
 
+// 우클릭 -> Create -> System -> AppConfig 로 이 파일을 만들 수 있게 해줍니다.
 [CreateAssetMenu(fileName = "AppConfig", menuName = "System/AppConfig")]
 public class AppConfig : ScriptableObject
 {
-    [Header("Core Data")]
-    // GlobalSettings는 데이터이므로 에셋 레퍼런스로 유지합니다.
-    [SerializeField] private AssetReferenceT<GlobalSettingsSO> _globalSettingsRef;
+    [Header("UI 리소스")]
+    // 로딩 중에 띄울 화면 (프리팹)
+    public AssetReferenceGameObject BootCanvasRef;
 
-    // 매니저 프리팹 레퍼런스(GameObject)들은 모두 삭제했습니다.
-    // 더 이상 인스펙터에 일일이 넣을 필요 없습니다.
-
-    // Getter
-    public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef => _globalSettingsRef;
+    [Header("필수 매니저 (Global)")]
+    // 게임 끄기 전까지 절대 죽지 않는 매니저들
+    public AssetReferenceGameObject GlobalSettingsRef; // 소리 설정 등
+    public AssetReferenceGameObject GameManagerRef;    // 게임 총괄
+    public AssetReferenceGameObject DataManagerRef;    // 데이터 관리
+    public AssetReferenceGameObject InputManagerRef;   // 입력(키보드/마우스) 관리
+    public AssetReferenceGameObject SaveManagerRef;    // 저장/불러오기 관리
 }
