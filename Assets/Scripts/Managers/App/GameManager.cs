@@ -4,9 +4,20 @@ public class GameManager : MonoBehaviour
 {
     public bool IsPaused { get; private set; } = false;
 
+    private void Awake()
+    {
+        ServiceLocator.Register(this);
+        Debug.Log($"[Self-Register] {nameof(GameManager)} Registered.");
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.Unregister<GameManager>();
+    }
+
     public void Initialize()
     {
-        // 게임 상태 설정 초기화
+        // 게임 상태 초기화
     }
 
     public void StartGame()

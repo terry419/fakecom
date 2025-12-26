@@ -16,17 +16,7 @@ MonoBehaviour:
   m_Data:
     m_SerializedData: []
   m_GUID: cfa6d96333108bf41a202744f6c34c37
-  m_SerializeEntries:
-  - m_GUID: 028a1a5d62a8c8d4580d950cfde6b25c
-    m_Address: Assets/SO/Initializer/GlobalSettings.asset
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 237891dd83035484c95dd3bbabfcb38c
-    m_Address: Assets/Prefabs/InputManager_Prefab.prefab
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
+  m_SerializeEntries: []
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 6dab44de8aac0ed4199157ef46e50c4b, type: 2}
   m_SchemaSet:

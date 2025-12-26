@@ -4,27 +4,13 @@ using UnityEngine.AddressableAssets;
 [CreateAssetMenu(fileName = "AppConfig", menuName = "System/AppConfig")]
 public class AppConfig : ScriptableObject
 {
-    [Header("1. Core Data (Addressable)")]
-    // [중요] 타입 안정성을 위해 AssetReferenceT 사용
+    [Header("Core Data")]
+    // GlobalSettings는 데이터이므로 에셋 레퍼런스로 유지합니다.
     [SerializeField] private AssetReferenceT<GlobalSettingsSO> _globalSettingsRef;
 
-    [Header("2. Global Managers (Addressable)")]
-    [SerializeField] private AssetReferenceT<GameObject> _inputManagerRef;
+    // 매니저 프리팹 레퍼런스(GameObject)들은 모두 삭제했습니다.
+    // 더 이상 인스펙터에 일일이 넣을 필요 없습니다.
 
-    [SerializeField] private AssetReferenceT<GameObject> _dataManagerRef;
-    [SerializeField] private AssetReferenceT<GameObject> _gameManagerRef;
-
-#if UNITY_EDITOR
-    [Header("Editor Debug Info")]
-    [SerializeField] public GlobalSettingsSO _editorGlobalSettingsDebug;
-
-#endif
-
-    // -----------------------------------------------------------------------
-    // [핵심] AppInitializer가 갖다 쓸 수 있게 '열쇠(Getter)'를 줘야 함
-    // -----------------------------------------------------------------------
+    // Getter
     public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef => _globalSettingsRef;
-    public AssetReferenceT<GameObject> InputManagerRef => _inputManagerRef;
-    public AssetReferenceT<GameObject> DataManagerRef => _dataManagerRef;
-   public AssetReferenceT<GameObject> GameManagerRef => _gameManagerRef;
 }
