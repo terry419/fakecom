@@ -9,23 +9,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 540b354b3d66cbc45bfb19523995a983, type: 3}
-  m_Name: NewMapData
+  m_Script: {fileID: 11500000, guid: 6087123078ac1764999ff37e21fd4def, type: 3}
+  m_Name: Normal_Grenade
   m_EditorClassIdentifier: 
-  MapID: 
-  DisplayName: 
-  GridSize: {x: 0, y: 0}
-  MapPrefabRef:
+  ItemID: Item_Grenade
+  DisplayName: Item_Grenade
+  Icon: {fileID: 0}
+  Range: 0
+  AreaRadius: 0
+  BaseDamage: 0
+  DamageType: 0
+  StatusEffects:
+  - Type: 0
+    Chance: 0
+    Value: 0
+    Duration: 0
+  ExplosionVFX:
     m_AssetGUID: 
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  SpawnPoints:
-  - Position: {x: 0, y: 0, z: 0}
-    Team: 0
-    YRotation: 0
-  EnemyPool:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  MapLootTable: {fileID: 0}

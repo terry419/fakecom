@@ -9,7 +9,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 745e2b69e26b4424ab633dd8965360f3, type: 3}
-  m_Name: NewLootTable
+  m_Script: {fileID: 11500000, guid: b0f362b252e8ae5489ea7a4532ca01a9, type: 3}
+  m_Name: Armor_Basic_Vest
   m_EditorClassIdentifier: 
-  DropList: []
+  ArmorID: Armor_Basic_Vest
+  ArmorName: Armor_Basic_Vest
+  ArmorIcon: {fileID: 0}
+  DefenseTier: 1
+  MobilityPenalty: 0

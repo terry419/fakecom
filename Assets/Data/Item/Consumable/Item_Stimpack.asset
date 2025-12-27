@@ -10,7 +10,19 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 304e5f611e6de7946a8ae2a6cb5b159b, type: 3}
-  m_Name: NewConsumable
+  m_Name: Item_Stimpack
   m_EditorClassIdentifier: 
-  ItemID: 
-  DisplayName: 
+  ItemID: Item_Stimpack
+  DisplayName: Item_Stimpack
+  Icon: {fileID: 0}
+  EffectType: 6
+  EffectValue: 2
+  Duration: 3
+  TargetStatus: 0
+  TargetStat: 1
+  AttackTier: 0
+  UseVFX:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0

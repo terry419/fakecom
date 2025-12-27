@@ -7,34 +7,26 @@ public class ConsumableDataSO : ScriptableObject
     [Header("1. Basic Info")]
     public string ItemID;
     public string DisplayName;
-    public Sprite Icon; // [Hybrid] UI 표시용
+    public Sprite Icon;
 
-    [Header("2. Effect Logic")]
+    [Header("2. Effect Logic (Self/Team Only)")]
+    [Tooltip("아이템의 주 용도 (Heal, BuffStat, CureStatus, GrantImmunity, RestoreNS)")]
     public ItemEffectType EffectType;
 
-    [Tooltip("피해량, 회복량, 혹은 스탯 증가량")]
-    public float EffectValue;
+    [Tooltip("회복량(Heal/RestoreNS) 또는 스탯 상승량(BuffStat)")]
+    public float Value;
 
-    [Tooltip("지속 턴 수 (0 = 즉시 발동, 1 이상 = 버프/장판 지속)")]
+    [Tooltip("지속 턴 수 (Buff/Immunity일 때만 사용. 0 = 즉시)")]
     public int Duration;
 
-    [Header("3. Specific Targets")]
-    [Tooltip("[Cure/Immunity] 치료하거나 막아줄 상태이상")]
+    [Header("3. Targets")]
+    [Tooltip("[Cure/Immunity] 치료하거나 예방할 상태이상 종류")]
     public StatusType TargetStatus;
 
-    [Tooltip("[Buff] 강화할 스탯 종류")]
+    [Tooltip("[Buff] 강화할 스탯 종류 (Mobility, Aim 등)")]
     public StatType TargetStat;
 
-    [Header("4. Combat Specs")]
-    [Tooltip("[Ammo Only] 탄약의 공격 등급 (T1~T5)")]
-    public int AttackTier;
-
-    [Tooltip("투척 사거리 (0 = 자신 사용)")]
-    public int Range;
-
-    [Tooltip("효과 범위 반경 (1.0 = 단일, 2.5 = 폭발 등)")]
-    public float AreaRadius;
-
-    [Header("5. Visuals")]
-    public AssetReferenceGameObject VFX_Ref; // 폭발/사용 이펙트
+    [Header("4. Visuals")]
+    [Tooltip("사용 시 재생할 이펙트")]
+    public AssetReferenceGameObject UseVFX;
 }

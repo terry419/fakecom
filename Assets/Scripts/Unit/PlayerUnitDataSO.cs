@@ -18,18 +18,22 @@ public class PlayerUnitDataSO : ScriptableObject
     public int Agility;
     public int Aim;
     public int Evasion;
+
+    [Range(0f, 100f)]
     public float CritChance = 5f;
 
     [Header("4. Player Loadout")]
+    [Tooltip("기본 지급 주무기")]
     public WeaponDataSO MainWeapon;
+
+    [Tooltip("기본 지급 방어구")]
     public ArmorDataSO BodyArmor;
 
-    [Header("5. Neural Sync")]
-    [Tooltip("기본 생존 확률 (Assault: 5, Scout: 8, Sniper: 2)")]
-    public float BaseSurvivalChance = 5f;
-    [Tooltip("초기 싱크로율 (기본 100)")]
-    public float BaseNeuralSync = 100f;
-    [Tooltip("오버클럭 성공 기본 확률")]
-    public float BaseOverclockChance = 5f;
+    // [삭제됨] StartingAmmo, ExtraItems 
+    // -> 모든 소모품/탄약은 공용 인벤토리(상점 구매분)를 사용함
 
+    [Header("5. Neural Sync")]
+    public float BaseSurvivalChance = 5f;
+    public float BaseNeuralSync = 100f;
+    public float BaseOverclockChance = 5f;
 }
