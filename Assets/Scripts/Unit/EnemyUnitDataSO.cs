@@ -7,11 +7,11 @@ public class EnemyUnitDataSO : ScriptableObject
     [Header("1. Identity")]
     public string UnitID;
     public string UnitName;
-    public EnemyUnitType EnemyType; // Normal, Elite, Boss
+    public EnemyUnitType EnemyType; // ì¼ë°˜, ì—˜ë¦¬íŠ¸, ë³´ìŠ¤
 
     [Header("2. Visual")]
     public AssetReferenceGameObject ModelPrefab;
-    public AssetReferenceGameObject HitVFX; // ÇÇ°İ ½Ã ¹ß»ıÇÏ´Â À¯´Ö °íÀ¯ ÀÌÆåÆ®
+    public AssetReferenceGameObject HitVFX; // í”¼ê²© ì‹œ ë°œìƒí•˜ëŠ” íƒ€ê²© ì´í™íŠ¸ ì—ì…‹
 
     [Header("3. Base Stats")]
     public int MaxHP;
@@ -19,14 +19,23 @@ public class EnemyUnitDataSO : ScriptableObject
     public int Agility;
     public int Aim;
     public int Evasion;
+    public float CritChance = 0f;
 
     [Header("4. AI Intelligence (Learning Data)")]
-    [Tooltip("À¯´Ö º»ÀÎÀÇ Áö´É ¼öÁØ (1~10). µö·¯´× ½ºÄÚ¾î °¡ÁßÄ¡¿¡ ¿µÇâÀ» Áİ´Ï´Ù.")]
+    [Tooltip("ê¸°ë³¸ ì¸ê³µì§€ëŠ¥ ë ˆë²¨ (1~10). ë ˆë²¨ì´ ë†’ì„ìˆ˜ë¡ ì „ìˆ ì  íŒë‹¨ ìˆ˜ì¹˜ê°€ ìƒìŠ¹í•©ë‹ˆë‹¤.")]
     public int BaseAILevel = 1;
 
-    [Tooltip("ÁÖº¯ ¾Æ±º¿¡°Ô ºÎ¿©ÇÏ´Â Áö´É º¸³Ê½º/Æä³ÎÆ¼. À½¼öµµ °¡´ÉÇÕ´Ï´Ù.")]
+    [Tooltip("ì£¼ë³€ ì•„êµ°ì—ê²Œ ë¶€ì—¬í•˜ëŠ” ì§€íœ˜ ë³´ë„ˆìŠ¤/í˜ë„í‹° ìˆ˜ì¹˜ì…ë‹ˆë‹¤.")]
     public int CommandAIBonus = 0;
 
     [Header("5. Enemy Specific")]
     public LootTableSO DropTable;
+
+    [Header("6. Neural Sync")]
+    [Tooltip("ê¸°ë³¸ ìƒì¡´ í™•ë¥  (ê¸°ë³¸ê°’ 0)")]
+    public float BaseSurvivalChance = 0f;
+    [Tooltip("ì´ˆê¸° ì‹±í¬ë¡œìœ¨ (ê¸°ë³¸ 100)")]
+    public float BaseNeuralSync = 100f;
+    [Tooltip("ì˜¤ë²„í´ëŸ­ ì„±ê³µ ê¸°ë³¸ í™•ë¥ ")]
+    public float BaseOverclockChance = 0f;
 }

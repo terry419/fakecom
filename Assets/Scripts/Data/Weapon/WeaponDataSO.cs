@@ -19,10 +19,14 @@ public class WeaponDataSO : ScriptableObject
 
     [Header("3. Ballistics")]
     public AnimationCurve AccuracyCurve;
-    // DmgFalloffCurve´Â »ç¿ëÀÚ ¿äÃ»À¸·Î »èÁ¦µÇ¾ú½À´Ï´Ù.
+    // DmgFalloffCurveëŠ” GDDì—ë§Œ ìˆê³  ì‹¤ì œ êµ¬í˜„ì—ëŠ” ì—†ìŠµë‹ˆë‹¤.
 
     [Header("4. Visual Effects (Hitscan)")]
-    public AssetReferenceGameObject MuzzleVFX;  // ¹ß»ç È¿°ú
-    public AssetReferenceGameObject TracerVFX;  // ±ËÀû È¿°ú
-    public AssetReferenceGameObject ImpactVFX;  // ÇÇ°İ À§Ä¡ Æø¹ß/ÅºÂø È¿°ú
+    public AssetReferenceGameObject MuzzleVFX;  // ë°œì‚¬ íš¨ê³¼
+    public AssetReferenceGameObject TracerVFX;  // ê¶¤ì  íš¨ê³¼
+    public AssetReferenceGameObject ImpactVFX;  // í”¼ê²© ìœ„ì¹˜ í­ë°œ/ì¶©ëŒ íš¨ê³¼
+
+    [Header("5. Logic")]
+    [Tooltip("ê³µê²© QTE ë¯¸ë‹ˆê²Œì„ ë¡œì§ ëª¨ë“ˆ")]
+    public AssetReferenceGameObject ActionModule;
 }

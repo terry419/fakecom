@@ -15,11 +15,19 @@ MonoBehaviour:
   UnitID: 
   UnitName: 
   Role: 0
-  ModelPrefab: {fileID: 0}
-  BaseStats:
-    MaxHP: 0
-    Mobility: 0
-    Agility: 0
-    Aim: 0
-    Evasion: 0
-    CritChance: 0
+  ModelPrefab:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  MaxHP: 0
+  Mobility: 0
+  Agility: 0
+  Aim: 0
+  Evasion: 0
+  CritChance: 5
+  MainWeapon: {fileID: 0}
+  BodyArmor: {fileID: 0}
+  BaseSurvivalChance: 5
+  BaseNeuralSync: 100
+  BaseOverclockChance: 5

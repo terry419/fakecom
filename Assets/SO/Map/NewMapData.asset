@@ -20,6 +20,12 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  SpawnPoints: []
-  EnemyPool: []
+  SpawnPoints:
+  - Position: {x: 0, y: 0, z: 0}
+    Team: 0
+    YRotation: 0
+  EnemyPool:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   MapLootTable: {fileID: 0}

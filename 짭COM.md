@@ -51,7 +51,8 @@
 
 2\. 출격 준비 (Provision)
 
-* 미션 시작 직전, 자금을 소모하여 이번 작전에 필요한 \*\*소모품(탄약, 수류탄, 회복 키트, 주사기 등)\*\*을 구매하고 인벤토리에 배분.  
+* 미션 시작 직전, 상점이 열리며 \*\*소모품(탄약, 수류탄, 회복약 등등)\*\*을 구매한다.  
+* 구매한 물품은 개인에게 지급되지 않고, \*\*\[원정대 가방\]\*\*에 일괄 보관된다.  
 * **Player Spawn Point**와 **Enemy Spawn Point**를 맵 데이터(`LevelDataSO`)에서 어떻게 가져와 배치할지 로직필요
 
 3\. 전술 전투 (Tactical Combat)
@@ -139,7 +140,7 @@
   * ***조작 방식:** 버튼을 누르면 게이지가 빠르게 **상승 하강 반복**, \*\*\[성공 영역\]\*\*에서 버튼을 뗌.*  
 * ***고유 기술:***  
   * ***\[Slot 4\] 파편 수류탄 (Frag):** (기본 범위 폭발).*  
-  * ***\[Slot 5\] 제압 사격 (Suppression):** 기본 데미지 \+ **이동력 0 (이동 불가)** 부여. 쿨타임 적용.*
+  * ***\[Slot 5\] 제압 사격 (Suppression):** 특정 지역을 경계하며 해당 지역에서 움직임이 감지된 적에게 공격을 가함. QTE action은 따로 발동하지 않으며 계산된 최종 명중률에 따라 명중률 적용.*
 
 ***(2) 저격병 (Sniper)***
 
@@ -330,20 +331,19 @@
 * **경로(Invalid):** 이동력 초과 또는 이동 불가 지역(오브젝트/유닛 점유) → **빨간색(Red) 라인/타일**.  
 * **복합 경로:** 갈 수 있는 데까지는 파란색, 그 이후부터 빨간색으로 이어지는 **'부분 경로 표시'** 로직 명시.
 
-# **6.0. 기술 아키텍처 (Technical Architecture) \[수정됨\]**
+# **6.0. 기술 아키텍처 (Technical Architecture)** 
 
 본 프로젝트는 **Unity 3D (URP)** 환경을 기반으로 하며, **Service Locator 패턴**과 **Initializer 패턴**을 결합하여 싱글톤의 폐해(결합도, 순서 문제)를 해결하고, 메모리 생명주기(Lifecycle)를 엄격히 통제한다.
 
-### **6.0.1. 아키텍처 핵심 원칙 (Core Principles)**
+#### **6.0.1. 아키텍처 핵심 원칙 (Core Principles)**
 
-1. **서비스 로케이터 (Service Locator):** 모든 매니저 클래스는 싱글톤(Instance) 변수를 가지지 않으며, 오직 ServiceLocator를 통해서만 접근 가능하다.  
-2. **하이브리드 등록 (Hybrid Registration):**  
-   * **Global Scope:** 매니저가 스스로 등록하는 **자가 등록(Self-Registration)** 방식.  
-   * **Scene Scope:** 초기화 순서 보장을 위해 SceneInitializer가 등록하는 **중앙 관리(Centralized Registration)** 방식.  
-3. **인터페이스 기반 초기화:** "초기화가 필요한 모든 매니저는 `IInitializable` 인터페이스를 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 모든 초기화는 \*\*비동기(Async/Await)\*\*로 수행되며, 메인 스레드 블로킹(`WaitForCompletion`)을 엄격히 금지한다."  
-4. "**1단계(Registration):** `Awake()`에서는 오직 `ServiceLocator.Register(this)`와 자기 자신의 변수 할당만 수행한다. 타 매니저 참조 금지.  
-    **2단계(Injection):** 타 매니저 참조 및 리소스 로드는 `Initialize(settings)` 단계에서 수행하여 참조 무결성을 보장한다."  
-5. "초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(State)로 전이한다."
+1. **서비스 로케이터 (Service Locator):** 모든 매니저 클래스는 싱글톤(Instance) 변수를 가지지 않으며, 오직 `ServiceLocator`를 통해서만 접근 가능하다.  
+2. **하이브리드 등록 (Hybrid Registration): Global 매니저는 자신의 Awake()에서 스스로를 등록한다(자가 등록). 반면, 씬의 생명주기에 종속적인 Session 및 Scene 매니저는 SceneInitializer에 의해 중앙에서 등록을 관리한다(중앙 등록). 이를 통해 각 스코프의 특성에 맞는 등록 방식을 사용한다.**  
+3. **2단계 초기화 (Two-Phase Initialization):**  
+   *  **1단계 (등록 \- Awake): 모든 매니저는 Awake()에서 ServiceLocator에 등록하는 작업 외에는 아무것도 하지 않는다. 다른 매니저를 참조하거나 사용하는 코드는 절대 금지한다.**  
+   * **2단계 (의존성 주입 및 초기화 \- Initialize): 모든 매니저가 등록된 후, Initializer(AppInitializer 또는 SceneInitializer)가 각  매니저의 Initialize(context) 메서드를 호출한다. 이 단계에서 비로소 ServiceLocator.Get\<T\>()을 통해 다른 매니저를 안전하게 참조하고 필요한 로직을 초기화한다.**  
+4. **인터페이스 기반 비동기 초기화:** 초기화가 필요한 모든 매니저는 `IInitializable`을 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 메인 스레드 블로킹(`WaitForCompletion`)은 어떠한 경우에도 금지한다.  
+5. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.
 
 ---
 
@@ -355,14 +355,16 @@
 | **렌더링** | **URP** (Universal Render Pipeline) | 로우 폴리 그래픽에 최적화된 성능. Shader Graph를 통한 캐릭터 실루엣(X-Ray), 포스트 프로세싱(Bloom) 구현 용이. |
 | **입력** | **New Input System** | 키보드/마우스 및 게임패드 동시 지원. Action Map(Menu, Gameplay, QTE) 분리 용이. |
 | **비동기** | **UniTask** | 코루틴(Coroutine) 대비 가독성이 높고 오버헤드가 적은 async/await 패턴 사용. "Unity의 Native Coroutine 및 Addressables의 동기 함수(`WaitForCompletion`) 사용을 금지하고, 모든 비동기 로직을 UniTask로 통일." |
-| **리소스** | **Addressables** | 씬 전환 시 메모리 누수를 방지하고, 리소스의 비동기 로드/해제 관리. |
+| **리소스** | **Addressables \+ Direct Ref (Hybrid)** | **\[하이브리드 리소스 정책\]**  • **Heavy Assets (VFX, Prefab, Audio):** `AssetReference`를 사용하여 비동기 로드(메모리 절약). • **Light Assets (UI Icon, SO Data):** `Sprite/Type` 직접 참조를 사용하여 즉각적인 UI 갱신(UX 향상) 및 구현 복잡도 감소.  |
 | **데이터** | **ScriptableObject (SO)** | 기획 데이터(밸런스, 맵 정보)와 로직의 분리. JSON 직렬화 연동. |
 
 ---
 
 ## **6.2. 시스템 계층 구조 (System Hierarchy) \[수정됨\]**
 
-매니저의 생명주기와 등록 주체에 따라 \*\*Global(App)\*\*과 **Scene(Session)** 두 가지 스코프로 명확히 구분한다.
+매니저의 생명주기와 등록 주체에 따라 \*\*Global(App)\*\*, Session 과 **Scene(Session)** 두 가지 스코프로 명확히 구분한다. 
+
+**Global/Session/Scene Scope 공통:** "모든 매니저는 독립적인 모듈로서 스스로를 로케이터에 등록하며, Initializer는 오직 생성과 비동기 초기화 트리거(Trigger) 역할만 수행한다."
 
 ### **(1) Global Scope (App Lifetime)**
 
@@ -383,7 +385,6 @@
 ### **(2) Scene Scope (Session Lifetime)**
 
 * **생명주기:** 전투 씬(InGame) 로드 시 생성 \~ 씬 언로드 시 파괴.  
-* **등록 방식:** **중앙 관리 (Centralized Registration)**. **Awake() 사용 금지.**  
 * **초기화 주체:** SceneInitializer.
 
 | 계층 (Layer) | 매니저 이름 | 주요 책임 |
@@ -409,7 +410,7 @@
 
 ### **6.3. 핵심 시스템 구현 로직 (Core Implementation Logic)**
 
-#### **(1) 물리 레이어 구성 (Physics Layers)**
+#### **1\. 물리 레이어 구성 (Physics Layers)**
 
 Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
@@ -423,7 +424,7 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
 #### 
 
-#### **(2) 전투 공식 파이프라인 (Combat Formula Pipeline)**
+#### **2\. 전투 공식 파이프라인 (Combat Formula Pipeline)**
 
 공격 시도 시 다음 순서로 연산하여 최종 결과를 도출한다.
 
@@ -445,7 +446,7 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
 * **PHit \= Attacker.Accuracy \- RCover**
 
-#### **(3) 시체 루팅 시스템 (Looting Logic)**
+#### **3\. 시체 루팅 시스템 (Looting Logic)**
 
 * **생성:** UnitManager가 적 사망 확인 → LootManager에게 사망 위치 전달 → LootManager가 해당 타일에 Corpse 프리팹 생성.  
 * **상호작용:**  
@@ -453,10 +454,10 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
   2. InteractionManager가 '조사하기(Search)' 액션 활성화.  
   3. 실행 시 ActionCount  소모 → LootManager가 LootTable을 굴려 아이템 생성 → InventoryManager로 즉시 지급.  
   4. 시체 오브젝트는 '빈 시체' 상태로 변경 (재조사 불가).  
-  5. 전투 중 유닛이 시체를 조사하거나 상자를 열면 아이템이 인벤토리에 즉시 들어오는 대신, \*\*'획득 예정 리스트(Pending Loot)'\*\*에 누적  
+  5. 전투 중 유닛이 시체를 조사하거나 상자를 열면 아이템이 나오며 이를 원정대 가방에 넣을 수 있음. 장비/티팩트는 전투 중 교환이 불가하지만 소모품은 전투 중 즉시 사용가능.  
   6. 전투 승리/퇴각 후 결과 화면에서 해당 리스트가 세이브 데이터의 공용 창고(`InventoryManager`)로 일괄 전송
 
-#### **(4) 이동 및 길찾기 (Movement & Pathfinding)**
+#### **4\. 이동 및 길찾기 (Movement & Pathfinding)**
 
 * **기술:** A\\ 알고리즘을 사용한 순수 그리드 기반 길찾기.  
 * **비용 계산: 길찾기는 각 타일의 '이동 비용(Cost)'을 고려하여 최단 경로가 아닌 '최소 비용' 경로를 탐색한다.**  
@@ -468,7 +469,7 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 * 기본적으로 동일 높이(Level) 내에서만 인접 타일로 이동 가능하다.  
 * **연결 이동 (Teleport):** 현재 타일이 \*\*'연결 오브젝트(Connector)'\*\*의 노드일 경우, 물리적 거리를 무시하고 연결된 목적지 타일로 이동 경로를 확장한다.
 
-#### **(5) 유닛-컨트롤러 아키텍처 (Unit-Controller Architecture)**
+#### **5\. 유닛-컨트롤러 아키텍처 (Unit-Controller Architecture)**
 
 본 프로젝트는 유닛의 데이터/상태와 제어 로직을 명확히 분리하는 컨트롤러 패턴을 따른다.
 
@@ -483,6 +484,22 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
   * \`AIController\`는 자체적인 AI 로직에 따라 판단하여 Unit에게 명령을 내린다.
 
 
+#### **6\. 사망 장비 회수 및 임시 창고 로직** 
+
+**사망 발생:** 아군 유닛 HP가 0이 되어 사망(`Dead`) 상태 전환.  
+**자동 탈착:** 해당 유닛의 `MainWeapon`과 `BodyArmor`가 즉시 장착 해제됨.  
+**가방 전송:** `InventoryManager`(공용 가방)로 아이템 추가 시도.  
+**공간 판정:**
+
+* **공간 있음:** 정상적으로 가방에 들어감.  
+* **공간 없음 (Full):**  
+  * **\[임시 보관함(Temporary Stash)\]** UI 팝업 생성.  
+  * 플레이어는 기존 아이템을 버리거나, 회수된 장비를 포기해야 함.
+
+**소실 타이머 (Expiration):**
+
+* 이 임시 보관함 상태는 \*\*\[다음 유닛의 턴 종료 시점\]\*\*까지 유지됨.  
+* 이때까지 정리하지 않으면 임시 보관함에 남은 아이템은 **영구 소실(Destroy)** 처리됨.  
   
 
 
@@ -507,7 +524,25 @@ Enum 관리 원칙: '1 Enum, 1 File'
 * 목적:\* 프로젝트의 규모가 커지더라도 코드의 명확성과 유지보수성을 유지하고, 여러 개발자가 동시에 작업할 때 발생할 수 있는 병합 충돌을 원천적으로 방지하기 위함이다. 이는 프로젝트 전반의 '관심사 분리' 설계 원칙과 일관성을 유지한다.  
 * "모든 비동기 메서드에는 접미사 `Async`를 붙이지 않더라도 반환 타입으로 구분한다(UniTask). `void` 반환 비동기 메서드(`async void`)는 이벤트 핸들러를 제외하고 금지하며, `async UniTaskVoid`를 사용한다."
 
-# 
+### **6.6. 유닛-컨트롤러 실행 구조 (Implementation)**
+
+| 클래스명 | 타입 | 주요 역할 | 설명 |
+| :---- | :---- | :---- | :---- |
+| **PlayerUnitDataSO** | ScriptableObject | 기본 스펙 정의 | 유닛의 변하지 않는 기본 데이터 (최대 HP, 기본 스탯, 병과 등)를 정의하는 데이터 컨테이너. |
+| **EnemyUnitDataSO** | ScriptableObject | 기본 스펙 정의 | 유닛의 변하지 않는 기본 데이터 (최대 HP, 기본 스탯, 병과 등)를 정의하는 데이터 컨테이너. |
+| **Unit.cs** | MonoBehaviour | 상태 관리 및 행동 주체 | 전장에 스폰되는 모든 유닛 게임 오브젝트에 부착. \`UnitDataSO\`를 참조하여 자신의 상태를 초기화하며, 현재 HP, 위치, 버프/디버프 등 실시간으로 변하는 상태를 관리. \`MoveTo()\`, \`TakeDamage()\` 등 외부의 명령을 받아 행동을 '실행'하는 역할. |
+| **PlayerController.cs** | 일반 C\# 클래스 | 판단 및 명령 주체 (플레이어) | \`TurnManager\`에게 턴을 부여받으면 활성화. 유저 입력을 받아 상황을 '판단'하고, 자신이 조종하는 \`Unit\` 인스턴스에게 \`Attack()\`, \`MoveTo()\` 같은 명령을 '지시'하는 두뇌 역할. |
+| **AIController.cs** | 일반 C\# 클래스 | 판단 및 명령 주체 (AI) | \`TurnManager\`에게 턴을 부여받으면 활성화. AI 로직에 따라 상황을 '판단'하고, 자신이 조종하는 \`Unit\` 인스턴스에게 \`Attack()\`, \`MoveTo()\` 같은 명령을 '지시'하는 두뇌 역할. |
+
+\*\*실행 흐름:\*\*
+
+    1\.  \`UnitManager\`가 \`UnitDataSO\`를 기반으로 \`Unit\` 프리팹을 전장에 스폰한다.
+
+    2\.  \`TurnManager\`가 다음 턴 유닛을 결정하고, 해당 \`Unit\`의 컨트롤러(\`PlayerController\` 또는 \`AIController\`)를 활성화한다.
+
+    3\.  컨트롤러는 입력을 받거나 스스로 판단하여 \`Unit\`에게 행동을 명령한다.
+
+    4\.  \`Unit\`은 명령에 따라 행동(애니메이션, 이동, 상태 변경 등)을 수행한다.
 
 # **7.0. UI/UX 시스템 (User Interface & Experience)**
 
@@ -525,7 +560,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | :---- | :---- | :---- |
 | **좌측 하단**  (Unit Status) | **유닛 정보 패널** | • **초상화:** 현재 턴 유닛의 얼굴. • **HP 바:** 현재 체력 / 최대 체력 (수치 포함). • **상태 아이콘:** 버프/디버프 (마우스 오버 시 툴팁). |
 | **우측 하단**  (Weapon Info) | **무기 패널** | • **무기 이미지:** 현재 장착 중인 주무기. • **기본 스펙:** 공격력 범위 (ex: 4-6), 치명타 확률. |
-| **하단 중앙**  (Skill Deck) | **스킬 바 및 \[소모품 슬롯 (1\~2칸)\]** | • **아이콘 리스트:** 기본 사격, 경계(Overwatch), 직업 스킬. • **단축키:** 키보드 숫자키(1\~9) 또는 패드 십자키/범퍼 연동. |
+| **하단 중앙**  (Skill Deck) | **원정대 창고 및 스킬 바 및** | 하단 중앙에 원정대 창고가 나오며 그 위에 작은 버튼으로 공격, 스킬, 턴종료, 카메라 초기화 등의 기능이 담긴 버튼을 배치. |
 | **타겟 상단**  (World Space) | **타겟 정보** | • **HP 바:** 적의 남은 체력. • **방어 상태:** 엄폐 아이콘 (방패 모양 \- 깨짐/반/완전). • **명중률:** 최종 계산된 Hit Chance (%). |
 | **화면 중앙**  (Overlay) | **QTE 패널** | • **공격 시:** 무기별 액티브 게이지 (Attack Phase에만 팝업). • **방어 시:** 위기 감지 경고 및 커맨드 입력창 (Defense Phase에만 팝업). |
 | **공격 활성화 유닛 주변**  | **공격 사거리 표시 원** | World Distance(반경, Radius)로 계산하며, 이를 시각적으로 보여주는 **Decal/Gizmo** 시스템이 필요함 |
@@ -572,7 +607,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
    * **0.5초 대기:** 플레이어가 "내가 공격받는구나"를 인지할 시간 부여.  
 3. **QTE 판정 및 발동 (Conditional QTE):**  
    * **조건 체크:** 이번 공격이 **\[치명타\]** 혹은 \*\*\[사망(Lethal)\]\*\*에 해당하는가?  
-   * **True (위기):** **CalculateSurvivalChance() 확률로 경감 및 즉사 방지 QTE 발동. 성공 시 경감(50%) / HP 1로 생존하며, 실패 시 영구 사망함.**"  
+   * **True (위기):** **CalculateSurvivalChance() 확률로 경감 및 즉사 방지 QTE 발동. 성공 시 경감(20%) / HP 1로 생존하며, 실패 시 경감이 적용되지 않거나 사망발동.**"  
    * QTE 성공 시: **체력 1을 남기고 생존.**  
    * **다수 타겟 발생 시: 무작위(Random) 순서로 순차적(Sequential) QTE 진행.**  
    * **False (일반):** QTE 없이 바로 피격 연출로 진행.  
@@ -612,52 +647,68 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 게임 내 모든 콘텐츠 데이터는 ScriptableObject로 정의하며, DataManager를 통해 로드 및 참조된다.
 
-### **8.1. UnitDataSO (유닛 기본 정보)**
+### **8.1. PlayerUnitDataSO (유닛 기본 정보)**
 
-아군 대원 및 적군 유닛의 공통 스펙.
+| 대분류 | 필드명 (Variable) | 데이터 타입 | 상세 설명 및 역할 |
+| :---- | :---- | :---- | :---- |
+| 1\. Identity | UnitID | string | 시스템 내부 식별 ID (예: Player\_Assault\_01). |
+|  | UnitName | string | UI에 표시될 유닛 이름. |
+|  | Role | Enum (ClassType) | 병과 (Assault, Sniper, Scout). |
+| 2\. Visual | ModelPrefab | AssetReference | \[Hybrid\] 유닛의 3D 모델 프리팹 (Addressables). |
+| 3\. Base Stats | MaxHP | int | 유닛의 최대 체력. |
+| (구조체 내부) | Mobility | int | 1턴당 이동 가능한 타일 수. |
+|  | Agility | int | 턴 대기 시간(TS) 계산용 민첩성 수치. |
+|  | Aim | int | 기본 사격 명중률 (%). |
+|  | Evasion | int | 피격 시 회피 확률 및 QTE 난이도 영향. |
+|  | CritChance | float | 치명타 발생 기본 확률 (0.0 \~ 100.0). |
+| 4\. Loadout | MainWeapon | WeaponDataSO | 기본 장착 주무기 데이터. |
+|  | BodyArmor | ArmorDataSO | 기본 장착 방어구 데이터 (방어 등급 결정). |
 
-* **수정사항:** 적군은 방어 등급(DefTier)을 가지지 않으므로 해당 필드를 삭제했습니다.
+### 
 
-| 필드명 | 타입 | 설명 |
-| :---- | :---- | :---- |
-| **UnitID** | string | 유닛 고유 ID |
-| **UnitName** | string | UI 표시 이름 |
-| **ClassType** | Enum | 병과 (Assault, Sniper, Scout, Enemy) |
-| **CanMoveAfterAttack** | bool | 공격 후 이동 가능 여부 (병과별 특성) |
-| **ModelPrefab** | AssetReference | 3D 모델 프리팹 |
-| **BaseStats** | Struct | 기본 능력치 묶음 |
-| └ MaxHP | int | 최대 체력 |
-| └ Mobility | int | 이동 거리 (타일 수) |
-| └ Agility | int | 민첩성 (턴 순서 TS 계산용) |
-| └ Aim | int | 기본 명중률 |
-| └ Evasion | int | 기본 회피율 |
-| └ CritChance | float | 기본 치명타 확률 |
-| DefaultLoadout | Struct | 기본 장비 세팅 |
-| └ `MainWeapon` | WeaponDataSO | 기본 주무기  |
-| └ `BodyArmor` | ArmorDataSO | 기본 방어구 (없으면 T0) |
-| └ `StartingAmmo` | ConsumableDataSO | **기본 탄약** (공격 등급 결정, 적군은 무한 사용) |
-| └ **`ExtraItems`** | List\<ConsumableDataSO\> | **추가 소지품 (수류탄, 회복약 등). 적군은 이를 1회성으로 사용함.** |
-| **AI\_Behavior** | SO | (적군용) AI 행동 패턴 트리 참조 |
+### **8.2. EnemyUnitDataSO (유닛 기본 정보)**
 
-### **8.2. WeaponDataSO (무기 데이터)**
+| 대분류 | 필드명 (Variable) | 데이터 타입 | 상세 설명 및 역할 |
+| :---- | :---- | :---- | :---- |
+| 1\. Identity | UnitID | string | 시스템 내부 식별 ID. |
+|  | UnitName | string | UI 표시 이름. |
+|  | EnemyType | Enum | 등급 구분 (Normal, Elite, Boss). |
+| 2\. Visual | ModelPrefab | AssetReference | \[Hybrid\] 적군 모델 프리팹. |
+|  | HitVFX | AssetReference | \[Hybrid\] 피격 시 발생하는 유닛 고유 이펙트 (피, 기계 파편 등). |
+| 3\. Base Stats | MaxHP | int | 적군의 최대 체력. |
+| (구조체 내부) | Mobility | int | 1턴당 이동 가능한 타일 수. |
+|  | Agility | int | 민첩성 (턴 속도). |
+|  | Aim | int | 기본 명중률. |
+|  | Evasion | int | 기본 회피율. |
+|  | CritChance | float | 기본 치명타 확률. |
+| 4\. AI Logic | BaseAILevel | int | \[AI\] 유닛 본인의 지능 레벨 (1\~10). 딥러닝 스코어 가중치. |
+|  | CommandAIBonus | int | \[AI\] 주변(시야 내) 아군에게 부여하는 지능 보너스. (음수 가능) |
+| 5\. Reward | DropTable | LootTableSO | 사망 시 드랍할 아이템 및 확률 테이블. |
 
-무기의 스펙과 액션 기믹 정의. (공용 탄약 소모)
+### 
 
-| 필드명 | 타입 | 설명 |
-| :---- | :---- | :---- |
-| WeaponID | string | 무기 ID |
-| WeaponType | Enum | 무기군 (Rifle, Sniper, Shotgun, Melee) |
-| Damage | MinMaxInt | 기본 피해량 범위 (ex: 4 \~ 6\) |
-| Range | int | 사거리 (타일 수) |
-| DmgFalloff | AnimationCurve | 거리별 데미지 배율 그래프 |
-| ActionModule | ActionModuleSO | 공격 시 실행될 QTE 로직 및 UI 프리팹 참조 |
-| CritBonus | float | 치명타 추가 데미지 배율 |
-| VFX\_Ref | AssetReference | 발사/타격 이펙트 |
-| AccuracyCurve | AnimationCurve | 거리(X)에 따른 명중 보정값(Y) 그래프. |
-| DamageFalloffCurve | AnimationCurve | 거리(X)에 따른 데미지 배율(Y: 0\~1.5) 그래프. |
-| AllowedClass | Enum | 이 무기를 장착 가능한 병과(Assault, Sniper, Scout). |
+### 
 
-### **8.3. ArmorDataSO (방어구 데이터)**
+### **8.3. WeaponDataSO (무기 데이터)**
+
+| 대분류 | 필드명 (Variable) | 데이터 타입 | 상세 설명 및 역할 |
+| :---- | :---- | :---- | :---- |
+| **1\. Identity** | WeaponID | string | 무기 식별 ID. |
+|  | WeaponName | string | 인벤토리/HUD 표시 이름. |
+|  | WeaponIcon | Sprite | **\[Hybrid\]** UI 아이콘 (직접 참조). |
+| **2\. Specs** | Type | Enum (WeaponType) | 무기 종류 (Rifle, Sniper, Shotgun). |
+|  | AllowedClasses | List\<Enum\> | 장착 가능 병과 리스트. |
+|  | Damage\_Min | int | (MinMaxInt 내부) 최소 데미지. |
+|  | Damage\_Max | int | (MinMaxInt 내부) 최대 데미지. |
+|  | Range | int | 최대 사거리 (타일 수). |
+|  | CritBonus | float | 치명타 시 데미지 배율 (기본 1.5). |
+| **3\. Ballistics** | AccuracyCurve | AnimationCurve | 거리(X)에 따른 명중률(Y) 변화 그래프. |
+| **4\. VFX** | MuzzleVFX | AssetReference | **\[Visual\]** 발사 순간 총구 화염 이펙트. |
+|  | TracerVFX | AssetReference | **\[Visual\]** 총알 궤적 이펙트 (Hitscan 표현용). |
+|  | ImpactVFX | AssetReference | **\[Visual\]** 탄착 지점 폭발/피격 이펙트. |
+| **5\. Logic** | ActionModule | AssetReference | **\[Logic\]** 공격 QTE 미니게임 로직 모듈. |
+
+### **8.4. ArmorDataSO (방어구 데이터)**
 
 아군 대원 전용 방어구.
 
@@ -669,7 +720,9 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | **DefenseTier** | int | 방어 등급 (T1\~T5) |
 | **MobilityPenalty** | int | **이동력 감소량**. (예: 1 입력 시 이동력 \-1) |
 
-### **8.4. ConsumableDataSO (소모품 및 탄약 데이터)**
+### 
+
+### **8.5. ConsumableDataSO (소모품 및 탄약 데이터)**
 
 전투 중 사용하는 아이템 및 탄약. 캠프 구매/환불 데이터 포함.
 
@@ -694,11 +747,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 ### 
 
-### 
-
-### 
-
-### **8.5. ActionModuleSO (액션 기믹 모듈)**
+### **8.5. QTEActionModuleSO (액션 기믹 모듈)**
 
 무기별 미니게임 로직.
 
@@ -710,6 +759,8 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | **DifficultyParams** | float\[\] | 난이도 변수 |
 | **TimeLimit** | float | 입력 제한 시간 |
 
+### 
+
 ### **8.6. AbilityDataSO (어빌리티 데이터)**
 
 병과 스킬 정의.
@@ -719,15 +770,55 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | **AbilityID** | string | 어빌리티 고유 ID |
 | **AbilityName** | string | UI 표시 이름 |
 | **AbilityIcon** | AssetReference | UI에 표시될 아이콘 |
-| **AbilityType** | Enum | 액티브(스킬), 패시브(특성) 등 구분 |
 | **TargetType** | Enum | 자신, 적 단일, 범위, 경로 등 타겟팅 방식 |
-| **SlotPrefence** | Enum | 선호 슬롯 (Primary, Special, Grenade, Item 등) |
 | **Cooldown** | int | 재사용 대기시간 (턴 단위)  |
 | **EndsTurn** | bool | 사용 시 턴 강제 종료 여부 |
-| **Effects** | List\<EffectSO\> | 데미지, 버프, 디버프 등 실제 효과 목록 |
-| **Costs** | List\<ResourceCost\> | 어빌리티 사용 시 소모되는 자원 목록. |
+| **Effects** | List\<AbilityEffect\>  | 이 어빌리티가 발동시킬 효과 목록. |
+| **Costs** |  List\<ResourceCost\> | 어빌리티 사용 시 소모되는 자원 목록. |
 
 ### 
+
+\`AbilityEffect\` 구조체 정의
+
+       \* AbilityDataSO의 Effects 리스트에 들어갈 단일 효과를 정의하는 구조체. ScriptableObject가 아닌 간단한 직렬화 클래스로 구성하여 복잡성을 낮춘다.
+
+public enum EffectType
+
+{
+
+    Damage,      // 피해
+
+    Heal,        // 회복
+
+    ApplyStatus  // 상태이상 적용
+
+    // 추후 디버프, 버프 등 추가 가능
+
+}
+
+\[System.Serializable\]
+
+public class AbilityEffect
+
+{
+
+    \[Tooltip("이 효과가 어떤 종류의 행동을 할지 결정합니다.")\]
+
+    public EffectType Type;
+
+    \[Tooltip("피해량, 회복량 등 효과의 수치 값입니다.")\]
+
+    public float Value;
+
+    \[Tooltip("상태이상 효과일 경우, 적용할 상태이상 SO를 지정합니다.")\]
+
+    public StatusEffectSO StatusEffect; // StatusEffectSO는 별도 정의 필요
+
+    \[Tooltip("상태이상의 지속 시간(턴)입니다.")\]
+
+    public int Duration;
+
+}
 
 \`ResourceCost\` 구조체 정의
 
@@ -770,7 +861,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 ### **9.2. 데미지 산출 파이프라인 (Damage Pipeline)**
 
-공격 적중 시, 최종 데미지는 다음 단계의 연산을 거쳐 결정된다.
+1) 공격 적중 시, 최종 데미지는 다음 단계의 연산을 거쳐 결정된다.
 
 FinalDamage \= BaseDmg × fdmg (d)  × Efficiency × CritMod
 
@@ -785,6 +876,34 @@ fdmg(d) : 무기별 damageFolloffCurve에서 산출된 배율
 | **3\. 공방 효율** | Efficiency | 탄약 공격 등급과 방어 등급 차이에 따른 보정 (9.3항). |
 | **4\. 치명타** | CritMod | **기본 1.5배**. (추후 스킬/아이템에 의해 합연산으로 증가 가능). |
 | **5\. 최종 처리** | Result | 계산 결과는 소수점 둘째 자리까지 유지하되, UI에는 정수로 표시. |
+
+2) 개념: 데미지 계산 전체 과정을 하나의 거대한 함수로 만들지 않고, 각 계산 단계를 독립적인 '데미지 조율기(Damage Modifier)' 부품으로 분리한다. CombatManager는 이 조율기들을 순서대로 실행시키는 컨베이어 벨트 역할을 한다  
+   구현: 모든 '데미지 조율기' 클래스는 IDamageModifier 인터페이스를 구현하며, CombatManager는 List\<IDamageModifier\>를 통해 파이프라인을 구성하고 실행한다.  
+   // 모든 데미지 조율기가 구현해야 하는 인터페이스  
+   public interface IDamageModifier  
+    {  
+   // currentDamage: 이전 단계까지 계산된 데미지  
+    // context: 공격자, 방어자 등 모든 전투 정보가 담긴 객체  
+   float Apply(float currentDamage, CombatContext context);  
+   }  
+   최종 데미지 공식:  
+         FinalDamage \= BaseDmg × RangeMod × Efficiency × CritMod  
+         (각 변수는 아래 파이프라인 단계에서 순차적으로 계산 및 적용됨)  
+   파이프라인 단계별 설명:  
+   
+
+| 순서 | 단계 (변수명) | 설명 및 공식 | 파이프라인 구현체 (예시) |
+| :---- | :---- | :---- | :---- |
+| **1** | **기본 피해**  (BaseDmg) | WeaponDataSO의 Min\~Max 범위 내 랜덤 추출. 이 값이 파이프라인의 초기 입력값이 됨. | BaseDamageCalculator |
+| **2** | **거리 보정**  (RangeMod) | DmgFalloff.Evaluate(Distance) (0.00 \~ 1.00). 이전 데미지에 곱연산. | RangeDamageModifier |
+| **3** | **공방 효율**  (Efficiency) | 탄약 공격 등급과 방어 등급 차이에 따른 보정 (9.3항). 이전 데미지에 곱연산. | TierEfficiencyModifier |
+| **4** | **치명타**  (CritMod) | 기본 1.5배 (추후 스킬/아이템에 의해 합연산으로 증가 가능). 이전 데미지에 곱연산. | CriticalDamageModifier |
+| **5** | **최종 처리**  (Result) | 최종값을 \[5, 99\] 범위로 제한(Clamp)하고, 소수점을 버려 정수로 변환. | FinalDamageClampModifier |
+
+   
+
+ 
+
 
 ### **9.3. 공방 효율 공식 (Tier Efficiency)**
 
@@ -939,10 +1058,8 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 
 * 탄약은 이 게임의 핵심 자원이므로, 어빌리티 시스템과 아래와 같이 연동된다  
 * 탄약 인벤토리: UnitStatus는 유닛이 소지한 탄약의 종류와 수량을 Dictionary\<AmmoDataSO, int\> 형태로 관리한다. 또한, 현재 선택된 탄약이 무엇인지 currentSelectedAmmo 상태를 가진다.  
-* '탄약 교체' 행동 (6번 슬롯): 6번 슬롯의 '탄약 교체' 어빌리티는 일반 공격/스킬과 다르다. 이 어빌리티를 실행하면, 유닛의  탄약 인벤토리를 보여주고 currentSelectedAmmo 상태를 변경하는 특수 UI를 호출한다  
-* 탄약 소모: '주무기 사격'과 같은 무기 어빌리티는 Costs 필드에 { ResourceType: Ammo, Amount: 1 }을 가진다. 어빌리티 실행 시,  
-*   시스템은 유닛의 currentSelectedAmmo 종류의 탄약이 인벤토리에 있는지 확인하고, 있다면 1만큼 차감한다. 탄약이 없다면 해당 어빌리티는 비활성화된다.  
-* 
+* 유닛은 원정대 가방에서 총알을 자동으로 꺼내 사용하며, 게임 시작 시 원정대 가방에 여러 티어의 총알이 있다면 가장 낮은 레벨의 티어를 우선 장착한다.  
+* 원정대 가방에서 현재 active unit이 장착하고 있는 총알은 녹색 배경으로 나오며, 다른 총알을 눌러 active unit 혹은 1칸거리의 주변 유닛에게 드래그 앤 드롭 할 경우 드래그앤 드롭의 대상이 된 unit은 탄창을 교체할 수 있으며 이 경우 공격 기회를 소모한다.
 
 ### 
 
@@ -1011,9 +1128,25 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 
 # **12.0. 소모품 사용 로직 (Consumable Logic)**
 
-### **12.1. 아이템 사용 규칙**
+### **12.1. 아이템 상세 목록 (Item List)**
 
-* **비용:** 소모품 사용은 행동 기회를 소모하지 않으나, 턴당 사용 횟수 제한(예: 1회)을 두어 무분별한 사용을 방지한다.
+모든 아이템은 공용 인벤토리(원정대 가방)에서 관리되며, 사용 시 효과는 다음과 같다.
+
+| 분류 | 아이템명 | 대상 | 효과 및 로직 | 비고 |
+| :---- | :---- | :---- | :---- | :---- |
+| **강화** | **스팀팩 (Stimpack)** | 아군 | • **\[Buff\]** 3턴간 Mobility \+2, Aim \+10. (중첩 시 지속시간 갱신) |  |
+| **치료** | **붕대 (Bandage)** | 아군 | • **\[Cure\]** Bleeding(출혈) 상태 제거 \+ HP 2 회복. |  |
+|  | **Mark-1 (해독제)** | 아군 | • **\[Cure/Immunity\]** Poison(중독) 제거. 미리 사용 시 3턴간 면역. |  |
+|  | **V4 (안정제)** | 아군 | • **\[Cure\]** Panic / Affliction 상태이상 제거. (NS 수치 회복 아님) | 상태이상만 해제 |
+| **탄약** | **Standard Ammo (T1)** | 자신 | • **\[AttackTier\]** 1\. (가장 기본 탄약) | 방어구 T1 상대로 효율 100% |
+|  | **High-Velocity (T2)** | 자신 | • **\[AttackTier\]** 2\. | 방어구 T2 상대로 효율 100% |
+|  | **Armor-Piercing (T3)** | 자신 | • **\[AttackTier\]** 3\. | 방어구 T3 상대로 효율 100% |
+|  | **... (T4\~T5)** | 자신 | • **\[AttackTier\]** 4\~5. | 고티어 적 대응용 |
+| **투척** | **파편 수류탄** | 적/지형 | • **\[Damage\]** 범위(Radius 2.5) 내 적에게 5-8 피해 \+ 엄폐물 파괴. | **Assault 전용** |
+|  | **화염병** | 지형 | • **\[ZoneDamage\]** 범위(Radius 1.5)에 3턴간 화염지대 생성. | **Sniper 전용** |
+|  | **스캔 수류탄** | 지형 | • **\[Scan\]** 범위(Radius 5.0) 내 시야 확보 및 은신 유닛 감지. | **Scout 전용** |
+
+### 
 
 # **13.0. 특수 게임플레이 시스템 (Special Gameplay Systems)**
 
@@ -1041,8 +1174,7 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 
 * 개요: 일부 적 유닛은 '지휘관' 속성을 가지며, 전장 내 다른 일반 유닛들의 행동 패턴에 영향을 준다  
 * 효과 :   
-  AI 강화 \- 지휘관이 생존해 있는 동안, 시야 내의 모든 일반 유닛 AI의 수준이 향상된다.  
-  지휘관 사망 시 사기에 막대한 불이익.
+  AI 강화 \- 엘리트/보스 유닛은 본인의 AI 수준과 별개로 주변 아군에게 `CommandAIBonus`를 부여하여 유동적인 AI 성능 향상을 유발함. (음수도 가능)
 
 **13.2.2. AI 아키타입 (Archetypes)** \> 1\. **Aggressive (돌격형):** 근접 거리 점수 가중치 높음. 산탄총 효율 극대화 지점 선호.
 
