@@ -61,9 +61,12 @@
 
 4\. 결과 및 결산 (Result)
 
-* 생존 대원 복귀 및 부상 처리.  
-* 사망 시 장비 및 스탯 영구 소실.  
-* 획득한 \*\*재료 아이템(Junk)\*\*을 기지 창고에 저장.
+* **생존 대원 복귀 및 부상 처리:** 의무실 배치시 회복이 빨라짐  
+* **사망 처리:** 사망 시 해당 대원이 장착했던 장비를 회수 하지 못했을 경우 영구 소실됨.  
+* **전리품 확보:** 획득한 **재료 아이템(Junk)** 및 희귀 부품을 기지 창고에 저장.  
+* 소모품 청산 (Supplies Liquidation):  
+  * 원정대 가방에 남은 \*\*모든 소모품(탄약, 치료제, 수류탄 등)\*\*은 기지로 복귀하는 즉시 **자동으로 판매** 처리된다.  
+  * **환불액:** 구매가의 \*\*30%\*\*에 해당하는 자금이 반환된다. (다키스트 던전 식 소모품 관리 방식 채택)
 
   #### 2.2. 마이크로 루프 (Micro Loop: 전투 턴 흐름)
 
@@ -125,7 +128,7 @@
 * ***HP (체력):** 0이 되면 사망(영구적 죽음).*  
 * ***Mobility (이동력):** 한 턴에 이동할 수 있는 타일 수.*  
 * ***Aim (명중률):** 공격 시 액티브 미니게임의 **\[성공 영역(녹색/노랑)\]** 크기를 결정.*  
-* ***Evasion (회피율):** 피격 시 발동하는 \*\*\[방어 QTE\]\*\*의 난이도(입력 시간/키 개수)를 결정.*  
+* ***Evasion (회피율):** 적의 명중률을 깎지 않는다. 대신 피격 시 발동하는 **\[방어 QTE\]의 성공 영역(Green Zone) 크기**를 결정한다. (회피율이 높을수록 방어 QTE가 쉬워짐).*  
 * ***Action/Move Count (내부 변수):** UI에는 표시되지 않으나, 시스템적으로 '이동 1회, 공격 1회'의 행동 기회를 제어하는 내부 변수.*
 
 ### **4.2. 병과 및 전용 무기 (Class & Weapon)**
@@ -446,16 +449,17 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
 * **PHit \= Attacker.Accuracy \- RCover**
 
-#### **3\. 시체 루팅 시스템 (Looting Logic)**
+#### **3\. 시체 루팅 및 파밍 시스템 (Looting Logic)**
 
-* **생성:** UnitManager가 적 사망 확인 → LootManager에게 사망 위치 전달 → LootManager가 해당 타일에 Corpse 프리팹 생성.  
-* **상호작용:**  
-  1. 플레이어 유닛이 시체 인접 타일 도착.  
-  2. InteractionManager가 '조사하기(Search)' 액션 활성화.  
-  3. 실행 시 ActionCount  소모 → LootManager가 LootTable을 굴려 아이템 생성 → InventoryManager로 즉시 지급.  
-  4. 시체 오브젝트는 '빈 시체' 상태로 변경 (재조사 불가).  
-  5. 전투 중 유닛이 시체를 조사하거나 상자를 열면 아이템이 나오며 이를 원정대 가방에 넣을 수 있음. 장비/티팩트는 전투 중 교환이 불가하지만 소모품은 전투 중 즉시 사용가능.  
-  6. 전투 승리/퇴각 후 결과 화면에서 해당 리스트가 세이브 데이터의 공용 창고(`InventoryManager`)로 일괄 전송
+* **드랍 생성:** 적 사망(`Unit.Die()`) 시 `LootTableSO`를 참조하여 확률적으로 아이템을 생성한다.  
+* **획득 방식 (Interaction):**  
+  1. 플레이어 유닛이 전리품(시체/상자) 인접 타일로 이동.  
+  2. **\[조사하기\]** 액션 실행 (행동력 소모 없음).  
+  3. 획득한 아이템은 즉시 \*\*\[원정대 가방\]\*\*으로 들어간다.  
+* **전투 종료 정산 :**  
+  1. 전투가 끝나면 원정대 가방의 내용물을 분류한다.  
+  2. **소모품(탄약/치료제):** 자동 판매(환불) 처리.  
+  3. **재료(Junk/Parts):** 기지 창고(Inventory)로 영구 보관.
 
 #### **4\. 이동 및 길찾기 (Movement & Pathfinding)**
 
@@ -560,7 +564,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | :---- | :---- | :---- |
 | **좌측 하단**  (Unit Status) | **유닛 정보 패널** | • **초상화:** 현재 턴 유닛의 얼굴. • **HP 바:** 현재 체력 / 최대 체력 (수치 포함). • **상태 아이콘:** 버프/디버프 (마우스 오버 시 툴팁). |
 | **우측 하단**  (Weapon Info) | **무기 패널** | • **무기 이미지:** 현재 장착 중인 주무기. • **기본 스펙:** 공격력 범위 (ex: 4-6), 치명타 확률. |
-| **하단 중앙**  (Skill Deck) | **원정대 창고 및 스킬 바 및** | 하단 중앙에 원정대 창고가 나오며 그 위에 작은 버튼으로 공격, 스킬, 턴종료, 카메라 초기화 등의 기능이 담긴 버튼을 배치. |
+| **하단 중앙**  (Main Deck) | **공용 인벤토리 및 스킬 패널** | • **1열(하단):** \[원정대 가방\] 슬롯. 보유 중인 탄약 및 소모품 리스트 표시 (Drag & Drop 지원). • **2열(상단):** 현재 유닛의 \[액티브 스킬\] 버튼 나열 (사격, 경계, 병과 스킬 등).  |
 | **타겟 상단**  (World Space) | **타겟 정보** | • **HP 바:** 적의 남은 체력. • **방어 상태:** 엄폐 아이콘 (방패 모양 \- 깨짐/반/완전). • **명중률:** 최종 계산된 Hit Chance (%). |
 | **화면 중앙**  (Overlay) | **QTE 패널** | • **공격 시:** 무기별 액티브 게이지 (Attack Phase에만 팝업). • **방어 시:** 위기 감지 경고 및 커맨드 입력창 (Defense Phase에만 팝업). |
 | **공격 활성화 유닛 주변**  | **공격 사거리 표시 원** | World Distance(반경, Radius)로 계산하며, 이를 시각적으로 보여주는 **Decal/Gizmo** 시스템이 필요함 |
@@ -706,7 +710,9 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | **4\. VFX** | MuzzleVFX | AssetReference | **\[Visual\]** 발사 순간 총구 화염 이펙트. |
 |  | TracerVFX | AssetReference | **\[Visual\]** 총알 궤적 이펙트 (Hitscan 표현용). |
 |  | ImpactVFX | AssetReference | **\[Visual\]** 탄착 지점 폭발/피격 이펙트. |
-| **5\. Logic** | ActionModule | AssetReference | **\[Logic\]** 공격 QTE 미니게임 로직 모듈. |
+| **5\. Action Logic** | **ConstraintType** | Enum | **행동 제약 유형.** (아래 설명 참조) • **Standard:** 이동 후 사격 가능. • **Heavy:** 이동 후 사격 불가 (고정 사격). |
+|  | **EndsTurn** | bool | **턴 강제 종료 여부.**  • **True:** 사격 시 즉시 턴 종료 (소총, 저격총). • **False:** 사격 후에도 잔여 AP로 행동 가능 (권총). |
+|  | **ActionModule** | AssetReference | **\[Logic\]** 공격 QTE 미니게임 로직 모듈. |
 
 ### **8.4. ArmorDataSO (방어구 데이터)**
 
@@ -726,28 +732,55 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 전투 중 사용하는 아이템 및 탄약. 캠프 구매/환불 데이터 포함.
 
-* **수정사항:** Ammo 타입 추가 및 AttackTier 필드 생성. ZoneDamage 타입 및 Duration 필드 추가.  
-* 인벤토리 및 아이템 루팅 : 인벤토리는 공용 인벤토리로 해당 인벤 토리에는 수류탄, 회복약, 
+#### **8.5.1 ItemDataSO (기본 아이템 정보) 모든 아이템의 공통 부모 클래스**
 
-| 필드명 | 타입 | 설명 |
+| 필드명 | 데이터 타입 | 설명 |
 | :---- | :---- | :---- |
-| **ItemID** | string | 아이템 ID |
-| **EffectType** | Enum | 효과 유형 정의 |
-| └ *Types:* | *List* | Ammo (탄약), Damage (수류탄), ZoneDamage (지역점령 화염), Scan (정찰), Heal (치료), ResetAttack (탄창), ResetMove (음료) |
-| **AttackTier** | int | **(Ammo 전용)** 공격 등급 (T1\~T5). 공방 공식의 핵심 변수. |
-| **EffectValue** | float | 효과 수치 (데미지량, 회복량 등) |
-| **Duration** | int | **(ZoneDamage 전용)** 효과 지속 턴 수 (0이면 즉시) |
-| **EffectRange** | int | 투척 사거리 |
-| **AreaRadius** | int | 효과 적용 반경 (1 \= 단일, 3 \= 3x3 범위) |
-| **PurchaseCost** | int | 구매 가격 |
-| **RefundCost** | int | 환불 가격 |
-| **VFX\_Ref** | AssetReference | 사용/폭발 이펙트 |
+| **ItemID** | string | 시스템 식별 ID (예: ITEM\_Ammo\_T1, ITEM\_MedKit\_S) |
+| **ItemName** | string | 인벤토리 및 툴팁에 표시될 이름 |
+| **ItemIcon** | Sprite | \[Hybrid\] UI 아이콘 이미지 |
+| **ItemType** | Enum | 아이템 대분류 (Ammo, Consumable, Resource) |
+| **Description** | string | 아이템 설명 텍스트 |
+| **Price\_Buy** | int | 상점 구매 가격 |
+| **Price\_Sell** | int | 상점 판매 가격 (기본값: 구매가의 30%) |
+| **MaxStack** | int | 한 슬롯에 겹칠 수 있는 최대 수량 (탄약/재료: 999, 장비: 1\) |
 
-### 
+#### **8.5.2 AmmoDataSO (탄약 데이터) `ItemDataSO`를 상속받음. 전투 효율(Efficiency) 공식의 핵심 변수를 포함한다.**
 
-### 
+| 필드명 | 데이터 타입 | 설명 |
+| :---- | :---- | :---- |
+| **AttackTier** | int | **공격 등급 (T1\~T5).** 방어구 등급(TDef)과의 격차 계산에 사용됨. |
+| **CompatibleWeapons** | List\<WeaponType\> | 이 탄약을 사용할 수 있는 무기군 (예: Rifle, Sniper) |
+| **DamageMod** | float | 데미지 보정 계수 (기본 1.0. 특수탄의 경우 1.2 등) |
+| **HitMod** | int | 명중률 보정값 (예: \+10, \-5) |
+| **CritMod** | float | 치명타 확률 보정값 |
 
-### **8.5. QTEActionModuleSO (액션 기믹 모듈)**
+#### **8.5.3 ConsumableDataSO (사용형 소모품 데이터) `ItemDataSO`를 상속받음. 액티브 스킬처럼 사용되는 아이템.**
+
+| 필드명 | 데이터 타입 | 설명 |
+| :---- | :---- | :---- |
+| **EffectType** | Enum | 발동 효과 정의 (Heal, Buff\_Stat, Cure\_Status, Zone\_Create, Scan) |
+| **EffectValue** | float | 효과의 강도 (회복량, 버프 수치 등) |
+| **Range** | int | 사용/투척 사거리 (0일 경우 즉시 자신에게 사용) |
+| **Radius** | int | 효과 범위 (0: 단일, 1 이상: 광역) |
+| **Duration** | int | 지속 턴 수 (즉발성 효과는 0\) |
+| **VFX\_Ref** | AssetReference | 사용 시 재생할 이펙트 |
+
+#### **8.5.4 ResourceDataSO (재료 및 자원 데이터)**
+
+전투 보상으로 획득하거나 필드에서 루팅하는 비소비성 아이템. 기지 업그레이드 및 제작 재료로 사용된다.
+
+| 필드명 | 데이터 타입 | 설명 |
+| :---- | :---- | :---- |
+| **ItemID** | string | 시스템 식별 ID (예: JUNK\_ScrapMetal, PART\_Circuit) |
+| **ItemName** | string | 인벤토리 및 툴팁에 표시될 이름 |
+| **ItemIcon** | Sprite | **\[Hybrid\]** UI 아이콘 이미지 |
+| **Description** | string | 아이템 설명 (플레이버 텍스트 포함) |
+| **Price\_Sell** | int | 상점 판매 가격 및 자동 환불 시 기준 가격 |
+| **MaxStack** | int | 한 슬롯에 보관 가능한 최대 수량 (기본 999\) |
+| **IsAutoSell** | bool | **자동 환불 여부.**  • **True:** 환금 아이템. 전투 종료 시 Price\_Sell 가격으로 즉시 판매. • **False:** 재료 아이템. 기지 창고(Inventory)로 이송되어 보관. |
+
+### **8.6. QTEActionModuleSO (액션 기믹 모듈)**
 
 무기별 미니게임 로직.
 
@@ -761,74 +794,38 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 ### 
 
-### **8.6. AbilityDataSO (어빌리티 데이터)**
+### **8.7. AbilityDataSO (어빌리티 및 스킬 데이터)**
 
-병과 스킬 정의.
+스킬과 아이템 효과를 정의하는 데이터 구조.
 
-| 필드명 | 타입 | 설명 |
+#### **8.7.1. EffectType (효과 유형 정의) 스킬이 발동되었을 때 실행할 로직의 종류를 결정한다.**
+
+| 타입명 (Enum) | 설명 및 로직 | 필요한 파라미터 예시 |
 | :---- | :---- | :---- |
-| **AbilityID** | string | 어빌리티 고유 ID |
-| **AbilityName** | string | UI 표시 이름 |
-| **AbilityIcon** | AssetReference | UI에 표시될 아이콘 |
-| **TargetType** | Enum | 자신, 적 단일, 범위, 경로 등 타겟팅 방식 |
-| **Cooldown** | int | 재사용 대기시간 (턴 단위)  |
-| **EndsTurn** | bool | 사용 시 턴 강제 종료 여부 |
-| **Effects** | List\<AbilityEffect\>  | 이 어빌리티가 발동시킬 효과 목록. |
-| **Costs** |  List\<ResourceCost\> | 어빌리티 사용 시 소모되는 자원 목록. |
+| Damage | 대상에게 직접 피해를 입힘 | Value(피해량), DamageType(물리/폭발) |
+| Heal | 대상의 HP를 회복시킴 | Value(회복량) |
+| Buff\_Stat | 대상의 스탯(이동력, 명중률 등)을 일시적으로 강화 | StatType, Value, Duration(지속턴) |
+| Debuff\_Stat | 대상의 스탯을 감소시킴 | StatType, Value, Duration |
+| Cure\_Status | 특정 상태이상(출혈, 중독 등)을 제거 | TargetStatus(제거할 상태) |
+| Apply\_Status | 대상에게 상태이상(출혈, 화상, 기절) 부여 | TargetStatus, Duration, Chance(확률) |
+| Zone\_Create | 지면에 장판(화염, 산성 등)을 생성 | ZoneID, Duration, Radius |
+| Scan\_Area | 지정 범위의 안개(FOW)를 제거하고 은신 유닛 감지 | Radius, Duration |
+| Reload | 탄약을 교체하거나 재장전함 | AmmoID (Optional) |
 
-### 
+#### 
 
-\`AbilityEffect\` 구조체 정의
+#### **8.7.2 AbilityEffect 구조체 (단일 효과 데이터) `AbilityDataSO`는 이 구조체의 리스트(`List<AbilityEffect>`)를 가져, 하나의 스킬이 여러 효과(예: 데미지 \+ 출혈)를 동시에 주도록 구성한다.**
 
-       \* AbilityDataSO의 Effects 리스트에 들어갈 단일 효과를 정의하는 구조체. ScriptableObject가 아닌 간단한 직렬화 클래스로 구성하여 복잡성을 낮춘다.
-
-public enum EffectType
-
-{
-
-    Damage,      // 피해
-
-    Heal,        // 회복
-
-    ApplyStatus  // 상태이상 적용
-
-    // 추후 디버프, 버프 등 추가 가능
-
-}
-
-\[System.Serializable\]
-
-public class AbilityEffect
-
-{
-
-    \[Tooltip("이 효과가 어떤 종류의 행동을 할지 결정합니다.")\]
-
-    public EffectType Type;
-
-    \[Tooltip("피해량, 회복량 등 효과의 수치 값입니다.")\]
-
-    public float Value;
-
-    \[Tooltip("상태이상 효과일 경우, 적용할 상태이상 SO를 지정합니다.")\]
-
-    public StatusEffectSO StatusEffect; // StatusEffectSO는 별도 정의 필요
-
-    \[Tooltip("상태이상의 지속 시간(턴)입니다.")\]
-
-    public int Duration;
-
-}
-
-\`ResourceCost\` 구조체 정의
-
-| ResourceType |  Enu | 소모될 자원의 종류 (Ammo, HP, Energy 등) |
+| 필드명 | 데이터 타입 | 설명 |
 | :---- | :---- | :---- |
-| **Amount**   | int  | 소모량 |
+| **Type** | EffectType | 위의 Enum 값 중 하나 선택 |
+| **Value** | float | 효과의 강도 (데미지, 회복량, 버프 수치) |
+| **Duration** | int | 지속 턴 수 (즉발 효과는 0\) |
+| **Radius** | int | 효과 범위 (0: 단일 타겟, 1 이상: 광역) |
+| **StatusRef** | StatusEffectSO | \[참조\] 적용하거나 해제할 상태이상 데이터 |
+| **ZoneRef** | ZoneDataSO | \[참조\] 생성할 장판 데이터 (화염병 등) |
 
-### 
-
-### **8.7. MapDataSO (맵/미션 데이터)**
+### **8.8. MapDataSO (맵/미션 데이터)**
 
 | 필드명 | 타입 | 설명 |
 | :---- | :---- | :---- |
@@ -839,7 +836,7 @@ public class AbilityEffect
 | **EnemyPool** | List\<UnitDataSO\> | 등장 적 유닛 리스트 |
 | **LootTable** | LootTableSO | 맵 드랍 테이블 |
 
-### **8.8. MapEditorSettingsSO (맵 에디터 공통 설정)**
+### **8.9. MapEditorSettingsSO (맵 에디터 공통 설정)**
 
 | 필드명 | 타입 | 설명 |
 | :---- | :---- | :---- |
@@ -847,6 +844,28 @@ public class AbilityEffect
 | **windowPrefab** | GameObject | 창문 모듈 프리팹 |
 | **doorPrefab** | GameObject | 문/출입구 모듈 프리팹 |
 | **pillarPrefab** | GameObject | 코너 기둥 구조물 프리팹 |
+
+### 
+
+### **8.10. StatusEffectSO**
+
+#### **1\. 분류 및 로직**
+
+* **Injury (부상):** 일반 탄약 피격 시 물리적 충격으로 발생. 자연 회복 불가.  
+* **Debuff (디버프):** 일시적 컨디션 저하.  
+* **System (시스템):** 기계적/신경학적 오류.
+
+#### **2\. 상태이상 목록 (Status List)**
+
+| 분류 | 상태명 (ID) | 효과 및 패널티 (Logic) | 치료/해제 (Cure) | 발생 원인 |
+| :---- | :---- | :---- | :---- | :---- |
+| **부상** | **출혈 (Bleeding)** | • 매 턴 종료 시 **HP 2** 피해.  | 붕대 (Bandage) | 일반 피격 |
+| **부상** | **과다출혈 (Heavy Bleed)** | • 매 턴 종료 시 **HP 2** 피해. • 이동 시 이동한 타일 \* 3만큼 피해. | 지혈대 (Tourniquet) | 출혈탄 일반 피격 |
+| **부상** | **팔 골절 (Fracture\_Arm)** | • **최종 명중률(Aim) \-30%**. • 수류탄 투척 사거리 반감. | 부목 (Splint) | 폭발 / 일반피격 |
+| **부상** | **다리 골절 (Fracture\_Leg)** | • **이동력 \-50%**. • **회피율(Evasion) 0%** 고정 (방어 QTE 불가). | 부목 (Splint) | 폭발 / 낙하 / 일반피격 |
+| **디버프** | **진통 (Pain)** | • **치명타 확률-10% 합연산** (집중력 상실). • 방어 QTE 난이도 상승 (Evasion \-10). | 진통제 (Painkillers) (사용시 x턴 동안 진통 효과 무효) | 종류 상관 없이 피격 |
+| **특수** | **화상 (Burn)** | • 매 턴 **HP 3** 피해.  | 화상 연고 / 물 | 화염수류탄 / 소이탄 |
+| **시스템** | 차단 주파수 초과 (Cutoff Freq Exceeded) | • **\[Signal Attenuation\]:** 신호 감쇠로 NS 회복 불가. • 매 턴 **NS \-10** (지속적 데이터 손실). | 위상 정류기 (Phase Rectifier) | 플라즈마탄 / 플라즈마폭탄 |
 
 # **9.0. 핵심 밸런싱 공식 (Core Balancing Formulas)**
 
@@ -1054,12 +1073,51 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
    2\. 유동적 슬롯 채우기: SlotPreference가 없거나, 해당 번호 슬롯이 이미 차 있는 어빌리티들은 2, 3, 6, 7번 등 비어있는 슬롯 중 앞 번호부터 순서대로 채워진다.  
    3\. 가변적 슬롯 개수: 유닛의 어빌리티 개수가 9개 미만일 경우, 사용하지 않는 슬롯은 UI 상에서 비활성화(Grayedout)되거나 숨김 처리한다.
 
-### **10.5. 탄약 시스템 연동 (Ammo System Integration)**
+### **10.5.  탄약 및 공용 인벤토리 시스템 (Ammo & Shared Inventory)**
 
-* 탄약은 이 게임의 핵심 자원이므로, 어빌리티 시스템과 아래와 같이 연동된다  
-* 탄약 인벤토리: UnitStatus는 유닛이 소지한 탄약의 종류와 수량을 Dictionary\<AmmoDataSO, int\> 형태로 관리한다. 또한, 현재 선택된 탄약이 무엇인지 currentSelectedAmmo 상태를 가진다.  
-* 유닛은 원정대 가방에서 총알을 자동으로 꺼내 사용하며, 게임 시작 시 원정대 가방에 여러 티어의 총알이 있다면 가장 낮은 레벨의 티어를 우선 장착한다.  
-* 원정대 가방에서 현재 active unit이 장착하고 있는 총알은 녹색 배경으로 나오며, 다른 총알을 눌러 active unit 혹은 1칸거리의 주변 유닛에게 드래그 앤 드롭 할 경우 드래그앤 드롭의 대상이 된 unit은 탄창을 교체할 수 있으며 이 경우 공격 기회를 소모한다.
+본 게임은 유닛 개개인이 탄약을 소지하지 않고, 부대 전체가 공유하는 **\[원정대 가방(Expedition Stash)\]** 시스템을 채택한다.
+
+#### **1\. 원정대 가방 (Expedition Stash)**
+
+* **개념:** 전투 중 화면 하단 중앙(Skill Deck 상단)에 위치하는 공용 보급고.  
+* **관리:** `InventoryManager`가 관리하며, 전투 시작 시 플레이어가 보유한 모든 소모품과 탄약이 이곳에 로드된다.
+
+#### **2\. 자동 장전 및 초기화 (Auto-Load Logic)**
+
+* **전투 진입 시:** 모든 대원은 자신의 주무기에 맞는 탄약 중 \*\*가장 낮은 등급(Lowest Tier)\*\*의 탄약을 원정대 가방에서 자동으로 찾아 장착 상태로 시작한다.  
+* **잔탄 부족:** 만약 가방에 호환되는 탄약이 하나도 없다면, 해당 대원은 '탄약 없음(No Ammo)' 상태가 되어 사격 관련 스킬이 비활성화된다.
+
+#### **3\. 탄약 교체 및 보급 (Interaction: Drag & Drop)**
+
+* **UI 조작:** 플레이어는 하단 UI의 탄약 아이콘을 드래그하여 전장의 유닛(자신 또는 인접한 아군)에게 드롭할 수 있다.  
+* **비용(Cost):** 비용(Cost \- Attack Opportunity):  
+  * 전투 중 탄약 교체는 \*\*'공격 행동(Attack Action)'\*\*과 동일하게 취급한다.  
+  * 교체 즉시 해당 턴의 **공격 기회(Attack Chance)를 소모**하며, `HasAttacked = true` 상태가 된다.  
+  * 따라서 \*\*'이동 후 교체'\*\*는 가능하지만, **'교체 후 이동'** 또는 \*\*'교체 후 사격'\*\*은 불가능하다 (턴 종료).  
+* **시각적 피드백:**  
+  * **장착 중(Equipped):** 현재 선택된 유닛이 사용 중인 탄약 아이콘은 녹색 테두리로 강조된다.  
+  * **호환 불가(Incompatible):** 유닛의 무기와 호환되지 않는 탄약은 드래그 시 붉은색으로 표시되거나 드롭이 불가능하다.
+
+### **10.6. 장비 내구도 시스템 (Equipment Durability)**
+
+고티어 장비의 무분별한 학살 파밍을 방지하고, 경제적 리스크를 부여하기 위한 시스템.
+
+**1\. 내구도 감소 규칙**
+
+* **무기:** 발사/공격 1회당 내구도 **1 감소**.  
+* **방어구:** 피격 1회당 내구도 **1 감소**.
+
+**2\. 성능 저하 (Malfunction)** 내구도가 **최대치의 50% 이하**로 떨어지면 '기능 고장' 상태가 되어 심각한 페널티를 받는다.
+
+| 장비 종류 | 페널티 효과 (50% 이하 시) |
+| :---- | :---- |
+| **무기** | **최종 명중률 \-20%** / **데미지 \-30%** / 치명타 불가 |
+| **방어구** | **방어 등급(Tier) 1단계 하락** / 이동력 \-1 |
+
+**3\. 파손 및 수리**
+
+* **0 도달 시:** 아이템이 **\[파손됨\]** 상태가 되어 장착 및 사용이 불가능해짐 (인벤토리 공간만 차지).  
+* **수리:** 기지의 \*\*\[수리공방\]\*\*에서 자원(Junk)과 자금을 소모하여 복구 가능. 티어가 높을수록 수리비가 기하급수적으로 비싸짐.
 
 ### 
 
@@ -1071,10 +1129,10 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 
 모든 유닛은 고유의 **TS(Turn Speed)** 수치를 가지며, 이 수치가 0에 먼저 도달하는 순서대로 턴을 획득한다.
 
-* **TS 산출 공식:** Final\_TS \= (Base\_Agility \* Random\_Weight) \+ Morale\_Bonus \- Action\_Penalty  
+* **TS 산출 공식:** Final\_TS \= (Base\_Agility \* Random\_Weight) \+ NS\_Bonus \- Action\_Penalty  
   * **Base\_Agility:** 유닛의 기본 민첩성.  
   * **Random\_Weight:** 0.8 \~ 1.2 사이의 난수 (턴 순서의 가변성 부여).  
-  * **Morale\_Bonus:** 사기(Morale)가 높을수록 가산점 부여.  
+  * **NS\_Bonus:** **뉴럴 싱크(Neural Sync)** 수치가 높을수록 턴 대기 시간이 짧아지는 보너스 부여.  
   * **Action\_Penalty:** 직전 턴에서 수행한 행동의 무게 (아래 11.2 참조).
 
 ## **11.2. 행동별 페널티 (Action Cost / Penalty)**
@@ -1099,20 +1157,19 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 3. **호출:** 가장 상단에 있는 유닛에게 조작 권한을 부여한다.  
    * 
 
-## **11.4. 병과별 행동 제약표 (Class Constraints)**
+## **11.4. 무기별 행동 제약 규칙 (Weapon Action Constraints)**
 
-| 병과 | 무기/스킬 | 시퀀스 (A → B) | 가능 여부 | 로직 설명 |
-| :---- | :---- | :---- | :---- | :---- |
-| **공통** | 주무기 | 이동→ 사격 | **O 가능** | 표준 플레이. 사격 후 턴 종료됨. |
-|  |  | 사격→ 이동 | **X 불가** | 주무기 사격 시 EndTurn() 호출됨. |
-| **저격병** | **저격총** | 이동 → 사격 | **X 불가** | 저격총은 Move 후 사용 불가 제약. 권총은 가능 |
-|  |  | 사격 → 이동 | **X 불가** | 사격 시 EndTurn() 호출됨. |
-|  | **권총** | 이동→ 사격 | **O 가능** | 권총은 이동 패널티 없음. |
-|  |  | 사격 → 이동 | **O 가능** | 권총은 EndTurn() 호출 안 함. (스카웃처럼 행동 가능) |
-| **정찰병** | 주무기 | 이동→ 사격 | **O 가능** |  |
-|  |  | 사격 → 이동 | **O 가능** | 정찰병 패시브: 사격이 EndTurn()을 호출하지 않음. |
+행동 제약은 유닛의 병과(Class)가 아닌, \*\*현재 들고 있는 무기의 데이터(`WeaponDataSO`)\*\*에 의해 결정된다.
+
+| 제약 유형 (Constraint) | 데이터 설정값 | 행동 규칙 (Sequence) | 해당 무기 예시 |
+| :---- | :---- | :---- | :---- |
+| **표준형 (Standard)** | Constraint: Standard  EndsTurn: True | • **이동 → 사격:** 가능 (턴 종료) • **사격 → 이동:** 불가 | 돌격소총(Rifle), 산탄총(Shotgun) |
+| **중화기형 (Heavy)** | Constraint: Heavy  EndsTurn: True | • **이동 → 사격:** **불가** (이동 시 사격 비활성) • **사격 → 이동:** 불가 | 저격총(Sniper), 중기관총(MG) |
+| **경량형 (Light)** | Constraint: Standard  EndsTurn: False | • **이동 → 사격:** 가능 • **사격 → 이동:** **가능** (잔여 AP/이동력 사용) | 권총(Pistol), SMG |
 
 ---
+
+**설계 의도:** 병과별 특성은 "해당 병과가 어떤 무기를 주로 장착하는가"로 자연스럽게 구현된다. 예를 들어, 저격병은 `Heavy` 속성의 저격총을 들기에 이동 후 사격이 불가능한 것이지, 저격병이라는 코드 때문에 불가능한 것이 아니다.
 
 ## **11.5. 타임라인 UI 및 피드백 (Timeline & Delay)**
 
@@ -1154,20 +1211,28 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 
 ## **13.1. \[13.1. Neural Sync & Survival System\]**
 
-* 개요: 모든 유닛(아군/적군)은 'NS' 수치를 가지며, 전투 상황에 따라 변동한다.  
+* 개요: 유닛의 정신적 동기화 수준을 나타내는 지표. **0 \~ 200**의 범위를 가지며 기본값은 100이다.  
 * 기존 '사기' 시스템을 '뉴럴 싱크'로 명칭 변경 및 데이터 통합.  
 * 변동 요인:  
   * 감소: 아군/동료 사망, 치명타 피격, 적 지휘관의 특수 기술 피격 시.  
   * 회복: 적 사살, 치명타 공격 성공, 아군 지휘관의 격려 기술 사용 시.  
-* 패닉 상태 (Panic State): 사기가 특정 임계점 50% 이하 도달 시 확률 주사위 (Virtue 10% / Affliction 90%).  
-* 50% 도달 후 Affiction 상태가 될 경우 명령 불능, 도주의 형태가 되며 30% 도달시 아군 오사의 확률이 생기며 0% 도달 시 자해를 시작하며 사기가 다시 회복되어 30%  이상이 될 때까지 매 턴마다 자해를 하고 턴을 마침.  
-* 사기에 따라 QTE 시스템의 난이도에 영향을 끼친다.  
-* 상태 이상 (Unit Condition):  
-  * **Normal:** 정상 상태.  
-  * **Incapacitated:** 행동 불능 (기절/부상 등으로 턴 상실).  
-  * **Fleeing:** 도주 (통제 불능 상태로 맵 밖으로 이동 시도).  
-  * **FriendlyFire:** 광란 (피아 식별 없이 가장 가까운 대상 공격).  
-  * **SelfHarm:** 자해 (자신의 턴에 스스로에게 데미지를 입히고 턴 종료).  
+* **상태 구간 (Sync Thresholds)** NS 수치에 따라 유닛의 상태(Condition)와 전투 효율이 실시간으로 변동한다.
+
+| 구간 (Range) | 상태명 (Condition) | 효과 (Effect) | 비고 |
+| :---- | :---- | :---- | :---- |
+| **180 \~ 200** | **희망 (Hopeful)** | **TS 20% 단축** / 생존율 x1.5 | 최상의 전투 효율 |
+| **150 \~ 179** | **고무 (Inspired)** | **TS 10% 단축** / 생존율 x1.2 | 보너스 구간 |
+| **50 \~ 149** | **정상 (Normal)** | 없음 | 기본 상태 |
+| **35 \~ 49** | **무력화 (Incapacitated)** | **행동 불가** / 생존율 x0.8 | 턴을 쉬며 회복 대기 |
+| **20 \~ 34** | **도주 (Fleeing)** | **통제 불능** / 생존율 x0.5 | 맵 밖으로 이동 시도 |
+| **5 \~ 19** | **광란 (FriendlyFire)** | **피아식별 불가** / 생존율 x0.2 | 가장 가까운 대상 공격 |
+| **0 \~ 4** | **자해 (SelfHarm)** | **자해 데미지** / 생존율 0 | 스스로 피해를 입힘 |
+
+* 싱크로 펄스 (Synchro Pulse \- Overclock)  
+  * **발동 조건:** NS가 50(Normal) 미만으로 떨어지는 순간 **전투당 1회** 자동 발동.  
+  * **기믹:** 성공 확률 5% \+ QTE 입력.  
+  * **성공 시 (Overclock):** NS 수치가 즉시 \*\*160(Inspired)\*\*으로 회복되며 위기를 기회로 전환.  
+  * **실패 시 (ClockLock):** 시스템이 잠기며 즉시 **무력화(Incapacitated)** 상태로 전환. 회복 불가.  
     
 
 ## **13.2. 지휘관 시스템 (Commander System)**

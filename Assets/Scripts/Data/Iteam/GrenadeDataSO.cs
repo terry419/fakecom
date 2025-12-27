@@ -3,13 +3,8 @@ using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewGrenade", menuName = "Data/Item/Grenade")]
-public class GrenadeDataSO : ScriptableObject
+public class GrenadeDataSO : ItemDataSO
 {
-    [Header("1. Identity")]
-    public string ItemID;
-    public string DisplayName;
-    public Sprite Icon;
-
     [Header("2. Throw Specs")]
     [Tooltip("이 수류탄을 사용할 수 있는 병과 (비어있으면 공용)")]
     public List<ClassType> AllowedClasses;
@@ -43,6 +38,8 @@ public class GrenadeDataSO : ScriptableObject
 
     [Header("6. Visuals")]
     public AssetReferenceGameObject ExplosionVFX;
+    private void OnEnable() => Type = ItemType.Grenade;
+
 }
 
 [System.Serializable]
@@ -56,4 +53,5 @@ public struct ZoneDataStruct
 
     [Tooltip("장판 진입/턴 시작 시 피해량")]
     public float DamagePerTurn;
+
 }

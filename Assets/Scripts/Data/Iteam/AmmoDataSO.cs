@@ -3,12 +3,8 @@ using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewAmmo", menuName = "Data/Item/Ammo")]
-public class AmmoDataSO : ScriptableObject
+public class AmmoDataSO : ItemDataSO // [변경] 상속 변경
 {
-    [Header("1. Identity")]
-    public string AmmoID;
-    public string AmmoName;
-    public Sprite Icon; // 인벤토리 표시용
 
     [Header("2. Combat Specs")]
     [Tooltip("공격 등급 (T1~T5). 방어구 등급과 비교하여 데미지 효율을 결정합니다.")]
@@ -27,4 +23,6 @@ public class AmmoDataSO : ScriptableObject
     [Header("5. Visuals")]
     [Tooltip("이 탄약 사용 시 덮어씌울 탄착/발사 이펙트 (Null이면 무기 기본값 사용)")]
     public AssetReferenceGameObject VFX_Override;
+
+    private void OnEnable() => Type = ItemType.Ammo;
 }
