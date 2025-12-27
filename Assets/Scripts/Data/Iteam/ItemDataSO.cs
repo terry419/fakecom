@@ -11,7 +11,8 @@ public abstract class ItemDataSO : ScriptableObject
     public string ItemID;           // 통합 ID (기존 AmmoID, WeaponID 대체)
     public string ItemName;         // 통합 이름 (기존 DisplayName, AmmoName 대체)
     public Sprite ItemIcon;         // 통합 아이콘 (기존 Icon, WeaponIcon 대체)
-    public ItemType Type;           // 아이템 타입 구분
+
+    public abstract ItemType Type { get; }
 
     [TextArea] public string Description; // 아이템 설명
 

@@ -8,6 +8,7 @@ public enum WeaponConstraint { Standard, Heavy, Light }
 [CreateAssetMenu(fileName = "NewWeapon", menuName = "Data/Item/Weapon")]
 public class WeaponDataSO : ItemDataSO
 {
+    public override ItemType Type => ItemType.Weapon;
 
     [Header("2. Specs")]
     public WeaponType WeaponType;
@@ -33,7 +34,7 @@ public class WeaponDataSO : ItemDataSO
 
     [Header("4. Durability")]
     [Tooltip("최대 내구도 (0이 되면 파손/수리 필요)")]
-    public int MaxDurability;
+    public float MaxDurability = 100f;
 
     [Header("5. Ballistics (Shared Data)")]
     [Tooltip("거리별 명중률/데미지 보정 그래프 (외부 파일 참조)")]
@@ -53,7 +54,6 @@ public class WeaponDataSO : ItemDataSO
 
     private void OnEnable()
     {
-        Type = ItemType.Weapon;
         MaxStack = 1; // 장비는 스택 불가
     }
 

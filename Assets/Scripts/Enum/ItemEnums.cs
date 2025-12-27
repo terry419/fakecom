@@ -1,17 +1,22 @@
 // 아이템(탄약, 수류탄, 소모품)이 발동하는 구체적인 효과 타입
-public enum ItemEffectType
+public enum GrenadeDamageType
 {
-    None,
-
-    // [Ammo & Grenade] 공격 계열
-    Ammo,           // 탄약 (공격 등급 및 상태이상 부여용)
     Damage,         // 물리/폭발 피해 (HP 감소)
     DamageNS,       // 멘탈/시스템 피해 (NS 감소 - 해커/EMP)
-    ZoneDamage,     // 장판 피해 (화염병 등)
+    Heal
+}
 
-    // [Grenade] 전술 계열
-    Scan,           // 시야 확보 및 은신 감지
+public enum ZoneType
+{
+    EMP,         
+    Burn,       
+    Heal,
+    Scan
+}
 
+
+public enum ConsumableEffectType
+{
     // [Consumable] 보조 계열
     Heal,           // 체력 회복
     RestoreNS,      // 멘탈(NS) 회복 (안정제)
@@ -24,6 +29,7 @@ public enum ItemEffectType
 public enum StatType
 {
     None,
+    HP,
     Mobility,       // 이동력
     Agility,        // 행동력(턴 속도)
     Aim,            // 명중률
@@ -31,16 +37,20 @@ public enum StatType
     Evasion         // 회피율
 }
 
+
 // 상태이상 종류 (치료, 면역, 확률적 부여 대상)
 public enum StatusType
 {
     None,
-    Bleeding,       // 출혈 (지속 HP 피해)
-    Poison,         // 중독 (지속 HP 피해)
-    Fracture,       // 골절 (이동력/명중률 감소)
-    Burn,           // 화상 (지속 HP 피해 + 패닉 유발)
-    Stun,           // 기절 (행동 불가)
-    Panic,          // 공포 (통제 불능)
-    SyncDebuff,     // NS 수치 저하
-    SystemError     // [Hacker] 기계유닛 전용 상태이상
+    // [부상 계열] - 치료제 필요
+    Bleeding,           // 출혈 (HP 2 피해)
+    HeavyBleed,         // 과다출혈 (이동 시 타일당 3 피해)
+    Fracture_Arm,       // 팔 골절 (명중률 -30, 투척 거리 반감)
+    Fracture_Leg,       // 다리 골절 (이동력 -50%, 회피 불가)
+    // [디버프 계열] - 시간 경과/약물 해제
+    Pain,               // 진통 (치명타 -10%, 방어 QTE 난이도 상승)
+    // [특수 계열]
+    Burn,               // 화상 (HP 3 피해)
+    // [시스템 계열]
+    Cutoff_Freq         // 차단 주파수 초과 (NS 회복 불가, 매 턴 NS -10)
 }

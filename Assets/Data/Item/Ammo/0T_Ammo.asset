@@ -9,19 +9,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 304e5f611e6de7946a8ae2a6cb5b159b, type: 3}
+  m_Script: {fileID: 11500000, guid: ffdf5c64a1f64104ea72b5c00550c1d6, type: 3}
   m_Name: 0T_Ammo
   m_EditorClassIdentifier: 
   ItemID: 0T_Ammo
-  DisplayName: 0T_Ammo
-  Icon: {fileID: 0}
-  EffectType: 1
-  EffectValue: 0
-  Duration: 0
-  TargetStatus: 0
-  TargetStat: 0
+  ItemName: 0T_Ammo
+  ItemIcon: {fileID: 0}
+  Description: 0T_Ammo
+  Price_Buy: 0
+  Price_Sell: 0
+  MaxStack: 99
   AttackTier: 0
-  UseVFX:
+  AllowedWeaponTypes: 
+  StatusEffects: []
+  VFX_Override:
     m_AssetGUID: 
     m_SubObjectName: 
     m_SubObjectType: 

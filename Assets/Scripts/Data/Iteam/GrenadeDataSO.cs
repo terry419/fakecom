@@ -3,8 +3,11 @@ using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewGrenade", menuName = "Data/Item/Grenade")]
+
 public class GrenadeDataSO : ItemDataSO
 {
+    public override ItemType Type => ItemType.Grenade;
+
     [Header("2. Throw Specs")]
     [Tooltip("이 수류탄을 사용할 수 있는 병과 (비어있으면 공용)")]
     public List<ClassType> AllowedClasses;
@@ -15,7 +18,8 @@ public class GrenadeDataSO : ItemDataSO
     [Tooltip("폭발 범위 반경 (1.5 = 3x3, 2.5 = 5x5)")]
     public float AreaRadius;
 
-    [Tooltip("공격 등급 (T1~T5). 방어구 효율 공식에 적용됨.")]
+    [Tooltip("공격 등급 (T0~T5). 방어구 효율 공식에 적용됨.")]
+    [Range(0, 5)]
     public int AttackTier;
 
     [Header("3. Direct Effect (즉발)")]
@@ -23,7 +27,7 @@ public class GrenadeDataSO : ItemDataSO
     public float DirectDamage;
 
     [Tooltip("피해 타입 (Damage:체력, DamageNS:멘탈)")]
-    public ItemEffectType DamageType;
+    public GrenadeDamageType DamageType;
 
     [Tooltip("폭발 적중 시 확률적 상태이상 (예: 기절 30%)")]
     public List<StatusChanceData> DirectStatusEffects;
@@ -38,7 +42,6 @@ public class GrenadeDataSO : ItemDataSO
 
     [Header("6. Visuals")]
     public AssetReferenceGameObject ExplosionVFX;
-    private void OnEnable() => Type = ItemType.Grenade;
 
 }
 
@@ -46,7 +49,7 @@ public class GrenadeDataSO : ItemDataSO
 public struct ZoneDataStruct
 {
     [Tooltip("장판 종류 (ZoneDamage: 화염병 등)")]
-    public ItemEffectType ZoneType;
+    public ZoneType ZoneType;
 
     [Tooltip("장판 지속 턴 수")]
     public int Duration;

@@ -10,24 +10,48 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c6341ad31064e8444b48de532eb02f7d, type: 3}
-  m_Name: Weapon_AssaultRifle
+  m_Name: Rifle
   m_EditorClassIdentifier: 
-  WeaponID: 
-  WeaponName: 
-  WeaponIcon: {fileID: 0}
-  Type: 0
-  AllowedClasses: 
+  ItemID: Rifle
+  ItemName: Rifle
+  ItemIcon: {fileID: 0}
+  Description: Rifle
+  Price_Buy: 0
+  Price_Sell: 0
+  MaxStack: 1
+  WeaponType: 1
+  AllowedClasses: 01000000
   Damage:
-    Min: 0
-    Max: 0
-  Range: 0
+    Min: 3
+    Max: 5
+  Range: 5
   CritBonus: 1.5
-  AccuracyCurve:
-    serializedVersion: 2
-    m_Curve: []
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  ConstraintType: 0
+  EndsTurn: 1
+  MaxDurability: 100
+  AccuracyCurveData: {fileID: 0}
+  OnHitStatusEffects:
+  - Type: 1
+    Chance: 5
+    Value: 5
+    Duration: 3
+  - Type: 3
+    Chance: 5
+    Value: 0
+    Duration: 3
+  - Type: 4
+    Chance: 5
+    Value: 0
+    Duration: 3
+  - Type: 5
+    Chance: 50
+    Value: 0
+    Duration: 3
+  ActionModule:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
   MuzzleVFX:
     m_AssetGUID: 
     m_SubObjectName: 
@@ -39,11 +63,6 @@ MonoBehaviour:
     m_SubObjectType: 
     m_EditorAssetChanged: 0
   ImpactVFX:
-    m_AssetGUID: 
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
-  ActionModule:
     m_AssetGUID: 
     m_SubObjectName: 
     m_SubObjectType: 

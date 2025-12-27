@@ -5,10 +5,11 @@ using System.Collections.Generic;
 [CreateAssetMenu(fileName = "NewAmmo", menuName = "Data/Item/Ammo")]
 public class AmmoDataSO : ItemDataSO // [변경] 상속 변경
 {
+    public override ItemType Type => ItemType.Ammo;
 
     [Header("2. Combat Specs")]
     [Tooltip("공격 등급 (T1~T5). 방어구 등급과 비교하여 데미지 효율을 결정합니다.")]
-    [Range(1, 5)]
+    [Range(0, 5)]
     public int AttackTier;
 
     [Header("3. Restrictions")]
@@ -24,5 +25,4 @@ public class AmmoDataSO : ItemDataSO // [변경] 상속 변경
     [Tooltip("이 탄약 사용 시 덮어씌울 탄착/발사 이펙트 (Null이면 무기 기본값 사용)")]
     public AssetReferenceGameObject VFX_Override;
 
-    private void OnEnable() => Type = ItemType.Ammo;
 }

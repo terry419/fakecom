@@ -4,11 +4,11 @@ using UnityEngine.AddressableAssets;
 [CreateAssetMenu(fileName = "NewConsumable", menuName = "Data/Item/Consumable")]
 public class ConsumableDataSO : ItemDataSO // [변경] 상속 변경
 {
-    // [삭제] ItemID, DisplayName, Icon -> 부모 필드 사용
+    public override ItemType Type => ItemType.Consumable;
 
     [Header("2. Effect Logic (Self/Team Only)")]
     [Tooltip("사용 용도 (Heal, BuffStat, CureStatus, GrantImmunity, RestoreNS)")]
-    public ItemEffectType EffectType;
+    public ConsumableEffectType EffectType;
 
     [Tooltip("회복량(Heal/RestoreNS) 혹은 강화량(BuffStat)")]
     public float Value;
@@ -27,5 +27,4 @@ public class ConsumableDataSO : ItemDataSO // [변경] 상속 변경
     [Tooltip("사용 시 이펙트")]
     public AssetReferenceGameObject UseVFX;
 
-    private void OnEnable() => Type = ItemType.Consumable; // 타입 자동 설정
 }

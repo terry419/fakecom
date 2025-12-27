@@ -10,10 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b0f362b252e8ae5489ea7a4532ca01a9, type: 3}
-  m_Name: Armor_Basic_Vest
+  m_Name: 0T_Armor
   m_EditorClassIdentifier: 
-  ArmorID: Armor_Basic_Vest
-  ArmorName: Armor_Basic_Vest
-  ArmorIcon: {fileID: 0}
-  DefenseTier: 1
+  ItemID: 0T_Armor
+  ItemName: 0T_Armor
+  ItemIcon: {fileID: 0}
+  Description: 0T_Armor
+  Price_Buy: 0
+  Price_Sell: 0
+  MaxStack: 1
+  DefenseTier: 0.5
   MobilityPenalty: 0
+  MaxDurability: 100

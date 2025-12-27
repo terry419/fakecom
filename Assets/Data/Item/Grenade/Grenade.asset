@@ -10,20 +10,27 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6087123078ac1764999ff37e21fd4def, type: 3}
-  m_Name: Normal_Grenade
+  m_Name: Grenade
   m_EditorClassIdentifier: 
-  ItemID: Item_Grenade
-  DisplayName: Item_Grenade
-  Icon: {fileID: 0}
-  Range: 0
-  AreaRadius: 0
-  BaseDamage: 0
+  ItemID: Grenade
+  ItemName: Grenade
+  ItemIcon: {fileID: 0}
+  Description: Grenade
+  Price_Buy: 0
+  Price_Sell: 0
+  MaxStack: 99
+  AllowedClasses: 01000000
+  Range: 5
+  AreaRadius: 2.5
+  AttackTier: 0
+  DirectDamage: 0
   DamageType: 0
-  StatusEffects:
-  - Type: 0
-    Chance: 0
-    Value: 0
+  DirectStatusEffects: []
+  ZoneEffect:
+    ZoneType: 0
     Duration: 0
+    DamagePerTurn: 0
+  IsScan: 0
   ExplosionVFX:
     m_AssetGUID: 
     m_SubObjectName: 

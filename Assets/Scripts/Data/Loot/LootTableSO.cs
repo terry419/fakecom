@@ -8,7 +8,7 @@ public class LootTableSO : ScriptableObject
     public struct LootEntry
     {
         [Tooltip("µå¶øÇÒ ¾ÆÀÌÅÛ (Ammo, Grenade, Consumable, Weapon µî)")]
-        public ScriptableObject ItemRef;
+        public ItemDataSO ItemRef;
 
         [Range(0, 100)]
         [Tooltip("°³º° È¹µæ È®·ü (µ¶¸³ ½ÃÇà). ¿¹: 30 = 30% È®·ü·Î È¹µæ.")]
