@@ -12,24 +12,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4dbebfd3e180bbc4c8d5ea37a5bc645b, type: 3}
   m_Name: AppConfig
   m_EditorClassIdentifier: 
-  _globalSettingsRef:
+  BootCanvasRef:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  GlobalSettingsRef:
     m_AssetGUID: 028a1a5d62a8c8d4580d950cfde6b25c
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  _inputManagerRef:
-    m_AssetGUID: 237891dd83035484c95dd3bbabfcb38c
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
-  _dataManagerRef:
-    m_AssetGUID: e9bda5dc5e1cb004ab454e41e2f9903e
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
-  _gameManagerRef:
+  GameManagerRef:
     m_AssetGUID: f0a08f7e386d680459127b2a1abded3f
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  _editorGlobalSettingsDebug: {fileID: 0}
+  DataManagerRef:
+    m_AssetGUID: e9bda5dc5e1cb004ab454e41e2f9903e
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  InputManagerRef:
+    m_AssetGUID: 237891dd83035484c95dd3bbabfcb38c
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  SaveManagerRef:
+    m_AssetGUID: 675ec267342fded43b7a3e7095ad5ba0
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0

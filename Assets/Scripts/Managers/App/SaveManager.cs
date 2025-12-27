@@ -1,12 +1,29 @@
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System.IO; // 파일 입출력용
 
-//  나중에 전역(Global)에서 파일의 저장/불러오기를 담당할 클래스
-public class SaveManager : MonoBehaviour
+public class SaveManager : MonoBehaviour, IInitializable
 {
-    /*
-     * [미래의 작업 내역]
-     * 1. Application.persistentDataPath에서 세이브 파일 리스트 스캔
-     * 2. JSON/Binary 직렬화 로직 구현
-     * 3. 특정 슬롯을 선택하면 데이터를 로드해서 SessionManager에게 전달
-     */
+    private string _savePath;
+
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Global);
+        Debug.Log($"[SaveManager] 등록 완료 (Global).");
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.Unregister<SaveManager>(ManagerScope.Global);
+    }
+
+    public async UniTask Initialize(InitializationContext context)
+    {
+        // 저장 경로 설정 (C:/Users/AppData/...)
+        _savePath = Application.persistentDataPath;
+        Debug.Log($"[SaveManager] 저장소 경로 확인: {_savePath}");
+
+        // 마지막 세이브 파일이 있는지 확인하는 로직 등이 여기에 들어갑니다.
+        await UniTask.CompletedTask;
+    }
 }

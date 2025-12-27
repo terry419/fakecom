@@ -1,137 +1,131 @@
 using System;
 using UnityEngine;
-using UnityEngine.AddressableAssets; // ¸®¼Ò½º ·Îµå¿ë
-using UnityEngine.ResourceManagement.AsyncOperations; // ·Îµù »óÅÂ È®ÀÎ¿ë
-using Cysharp.Threading.Tasks; // ºñµ¿±â ÀÛ¾÷¿ë
+using UnityEngine.AddressableAssets;
+using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text; // StringBuilder ì‚¬ìš©ì„ ìœ„í•´ ì¶”ê°€
 
-// MonoBehaviour¸¦ »ó¼Ó¹Ş¾Æ¼­ °ÔÀÓ ¿ÀºêÁ§Æ®·Î Á¸ÀçÇÏ°Ô ÇÕ´Ï´Ù.
+/// <summary>
+/// ê²Œì„ ì‹œì‘ ì‹œ ê°€ì¥ ë¨¼ì € ì‹¤í–‰ë˜ì–´, Global ìŠ¤ì½”í”„ì˜ ë§¤ë‹ˆì €ë“¤ì„ ìƒì„±í•˜ê³  ì´ˆê¸°í™”í•˜ëŠ” ë¶€íŠ¸ìŠ¤íŠ¸ë˜í¼ì…ë‹ˆë‹¤.
+/// </summary>
 public class AppInitializer : MonoBehaviour
 {
-    // [Áß¿ä] °ÔÀÓÀÌ ÄÑÁ³´ÂÁö È®ÀÎÇÏ´Â ±ê¹ß
     public static bool IsInitialized { get; private set; } = false;
 
-    // ÇöÀç ºÎÆÃ »óÅÂ (·Îµù ÁßÀÎÁö, ³¡³µ´ÂÁö)
-    public enum BootState { None, LoadingConfig, SpawningManagers, Initializing, Complete, Failed }
+    public enum BootState { None, InitializingAddressables, LoadingConfig, SpawningManagers, Initializing, Complete, Failed }
     public BootState CurrentState { get; private set; } = BootState.None;
 
-    // »ı¼ºµÈ ±Û·Î¹ú ¸Å´ÏÀúµéÀ» ´ã¾ÆµÑ ¸®½ºÆ® (³ªÁß¿¡ ÃÊ±âÈ­ ¸í·É ³»¸®·Á°í)
-    private List<IInitializable> _globalManagers = new List<IInitializable>();
-
-
-    // ==================================================================================
-    // 1. ¿£Áø ½Ãµ¿ (À¯´ÏÆ¼°¡ ½ÃÀÛµÇ¸é ¹«Á¶°Ç ½ÇÇàµÊ)
-    // ==================================================================================
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoStart()
     {
-        // ÀÌ¹Ì ÄÑÁ®ÀÖÀ¸¸é ¶Ç ÄÑÁö ¸¶¶ó
         if (IsInitialized) return;
 
-        // "AppInitializer"¶ó´Â ÀÌ¸§ÀÇ ºó °ÔÀÓ ¿ÀºêÁ§Æ®¸¦ ¸¸µé°í, ÀÌ ½ºÅ©¸³Æ®¸¦ ºÙÀÔ´Ï´Ù.
-        var initializerObject = new GameObject("AppInitializer");
-        var initializerInstance = initializerObject.AddComponent<AppInitializer>();
-
-        // ¾ÀÀÌ ¹Ù²î¾îµµ ÆÄ±«µÇÁö ¾Ê°Ô ¼³Á¤
-        DontDestroyOnLoad(initializerObject);
-
-        // ºñµ¿±â ½Ãµ¿ ½ÃÀÛ! (°á°ú¸¦ ±â´Ù¸®Áö ¾Ê°í ¹Ù·Î ½ÃÀÛ)
-        initializerInstance.InitializeAsync().Forget();
+        var go = new GameObject("AppInitializer");
+        var app = go.AddComponent<AppInitializer>();
+        DontDestroyOnLoad(go);
+        app.InitializeAsync().Forget();
     }
-
-
-    // ==================================================================================
-    // 2. ½ÇÁ¦ ½Ãµ¿ ·ÎÁ÷ (¼ø¼­´ë·Î ÁøÇà)
-    // ==================================================================================
-    private async UniTaskVoid InitializeAsync()
+    
+    public async UniTask InitializeAsync()
     {
-        Debug.Log("[AppInitializer] °ÔÀÓ ½Ãµ¿À» °Ì´Ï´Ù...");
+        if (IsInitialized) return;
         IsInitialized = true;
-        GameObject bootCanvas = null; // ·Îµù È­¸é
+
+        var sb = new StringBuilder(); // [ë³€ê²½] ë¡œê·¸ë¥¼ ëª¨ì„ StringBuilder ìƒì„±
+        sb.AppendLine("<b>[AppInitializer] ê²Œì„ ì‹œë™ì„ ê²ë‹ˆë‹¤...</b>");
+        
+        GameObject bootCanvas = null;
 
         try
         {
-            // -----------------------------------------------------------------
-            // ´Ü°è 0: ¾îµå·¹¼­ºí(¸®¼Ò½º ½Ã½ºÅÛ) ÃÊ±âÈ­
-            // -----------------------------------------------------------------
+            // ë‹¨ê³„ 0: ì–´ë“œë ˆì„œë¸” ì‹œìŠ¤í…œ ì´ˆê¸°í™”
+            CurrentState = BootState.InitializingAddressables;
             await Addressables.InitializeAsync();
+            sb.AppendLine(" - [0/5] ì–´ë“œë ˆì„œë¸” ì‹œìŠ¤í…œ ì´ˆê¸°í™” ì™„ë£Œ.");
 
-            // -----------------------------------------------------------------
-            // ´Ü°è 1: ¼³Á¤ ÆÄÀÏ(AppConfig) °¡Á®¿À±â
-            // -----------------------------------------------------------------
+            // ë‹¨ê³„ 1: ì„¤ì • íŒŒì¼(AppConfig) ë¡œë“œ
             CurrentState = BootState.LoadingConfig;
-
-            // "ÁÖ¼Ò·Ï"¿¡ ÀûÈù ÀÌ¸§À¸·Î ÆÄÀÏÀ» Ã£½À´Ï´Ù.
             var configHandle = Addressables.LoadAssetAsync<AppConfig>(ResourceKeys.AppConfig);
             AppConfig config = await configHandle;
 
             if (config == null)
-            {
-                throw new Exception("AppConfig ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù! ¾îµå·¹¼­ºí ¼³Á¤À» È®ÀÎÇÏ¼¼¿ä.");
-            }
+                throw new Exception("AppConfig íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤! ì–´ë“œë ˆì„œë¸” ì„¤ì •ì„ í™•ì¸í•˜ì„¸ìš”.");
+            
+            sb.AppendLine($" - [1/5] ì„¤ì • íŒŒì¼ ë¡œë“œ ì™„ë£Œ: {config.name}");
 
-            // -----------------------------------------------------------------
-            // ´Ü°è 2: ·Îµù È­¸é ¶ç¿ì±â
-            // -----------------------------------------------------------------
+            // ë‹¨ê³„ 2: ë¡œë”© í™”ë©´ ìƒì„±
             if (config.BootCanvasRef != null && config.BootCanvasRef.RuntimeKeyIsValid())
             {
                 var canvasHandle = config.BootCanvasRef.InstantiateAsync();
                 bootCanvas = await canvasHandle;
-                DontDestroyOnLoad(bootCanvas); // ·Îµù È­¸éµµ ¾À ÀüÈ¯ ¶§ ²¨Áö¸é ¾È µÊ
+                DontDestroyOnLoad(bootCanvas);
+                sb.AppendLine(" - [2/5] ë¡œë”© í™”ë©´ ì¤€ë¹„ ì™„ë£Œ.");
             }
 
-            // -----------------------------------------------------------------
-            // ´Ü°è 3: ¸Å´ÏÀúµé »ı¼ºÇÏ±â (¼îÇÎ ¸®½ºÆ®´ë·Î)
-            // -----------------------------------------------------------------
-            CurrentState = BootState.SpawningManagers;
+            if (config.GlobalSettingsRef != null && config.GlobalSettingsRef.RuntimeKeyIsValid())
+            {
+                // 1. ë©”ëª¨ë¦¬ì— ë¡œë“œ
+                var settingsHandle = config.GlobalSettingsRef.LoadAssetAsync();
+                GlobalSettingsSO settings = await settingsHandle;
 
-            // ¸Å´ÏÀúµéÀÌ ¸ğ¿©»ì 'GlobalManagers'¶ó´Â ºó ºÎ¸ğ ¿ÀºêÁ§Æ®¸¦ ¸¸µì´Ï´Ù.
+                if (settings != null)
+                {
+                    // 2. ServiceLocatorì— ì§ì ‘ ë“±ë¡
+                    ServiceLocator.Register(settings, ManagerScope.Global);
+                    sb.AppendLine($" - [3/5] GlobalSettingsSO ë¡œë“œ ë° ë“±ë¡ ì™„ë£Œ.");
+                }
+                else
+                {
+                    throw new Exception("GlobalSettingsSO íŒŒì¼ì´ ë¹„ì–´ìˆê±°ë‚˜ ë¡œë“œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
+                }
+            }
+            else
+            {
+                sb.AppendLine(" - <color=yellow>[ì£¼ì˜] GlobalSettingsRefê°€ ì„¤ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.</color>");
+            }
+
+
+            // ë‹¨ê³„ 3: ì „ì—­ ë§¤ë‹ˆì € ìƒì„±
+            CurrentState = BootState.SpawningManagers;
+            sb.AppendLine(" - [4/5] ì „ì—­ ë§¤ë‹ˆì € ìƒì„± ì‹œì‘...");
             Transform root = new GameObject("GlobalManagers").transform;
             DontDestroyOnLoad(root.gameObject);
+            
+            await SpawnManager(config.InputManagerRef, root, sb);
+            await SpawnManager(config.DataManagerRef, root, sb);
+            await SpawnManager(config.SaveManagerRef, root, sb);
+            await SpawnManager(config.GameManagerRef, root, sb);
 
-            // ÇÏ³ª¾¿ »ı¼ºÇÕ´Ï´Ù. (¼ø¼­ Áß¿ä!)
-            // »ı¼ºµÈ ¸Å´ÏÀúµéÀº ÀÚ±âµéÀÇ Awake()¿¡¼­ ServiceLocator¿¡ ½º½º·Î µî·ÏÇÕ´Ï´Ù.
-            await SpawnManager(config.GlobalSettingsRef, root);
-            await SpawnManager(config.InputManagerRef, root);
-            await SpawnManager(config.DataManagerRef, root);
-            await SpawnManager(config.SaveManagerRef, root);
-            await SpawnManager(config.GameManagerRef, root);
-
-
-            // -----------------------------------------------------------------
-            // ´Ü°è 4: ¸Å´ÏÀúµé ÃÊ±âÈ­ (ÀÏÇÒ ÁØºñ ½ÃÅ°±â)
-            // -----------------------------------------------------------------
+            // ë‹¨ê³„ 4: ì „ì—­ ë§¤ë‹ˆì € ì´ˆê¸°í™”
             CurrentState = BootState.Initializing;
-
-            // ServiceLocator¿¡¼­ "ÃÊ±âÈ­ ÇÊ¿äÇÑ ¾Öµé(IInitializable) ´Ù ³ª¿Í!" ÇÏ°í ºÎ¸¨´Ï´Ù.
-            // Global Ä­¿¡ ÀÖ´Â ¾Öµé¸¸ ºÎ¸¨´Ï´Ù.
-            // ÁÖÀÇ: ServiceLocator.GetByInterface´Â ¸ğµç Ä­À» ´Ù µÚÁöÁö¸¸, 
-            // Áö±İÀº ºÎÆÃ ½ÃÁ¡ÀÌ¶ó Global Ä­¹Û¿¡ ¾ø¾î¼­ »ó°ü¾ø½À´Ï´Ù.
+            sb.AppendLine(" - [5/5] ì „ì—­ ë§¤ë‹ˆì € ì´ˆê¸°í™” ì‹œì‘...");
             var managers = ServiceLocator.GetByInterface<IInitializable>();
-
-            // º¸±ŞÇ° °¡¹æ(Context)À» ½Ô´Ï´Ù.
             var context = new InitializationContext
             {
                 Scope = ManagerScope.Global,
-                // GlobalSettings´Â ÀÌ¹Ì ·ÎµåµÇ¾î¼­ ServiceLocator¿¡ µî·ÏµÇ¾î ÀÖÀ» °Ì´Ï´Ù.
                 GlobalSettings = ServiceLocator.Get<GlobalSettingsSO>()
             };
 
-            // ¸ğµç ¸Å´ÏÀú¿¡°Ô "ÁØºñÇØ!" ¸í·ÉÀ» ³»¸®°í ´Ù µÉ ¶§±îÁö ±â´Ù¸³´Ï´Ù.
             foreach (var manager in managers)
             {
-                await manager.Initialize(context);
-                Debug.Log($" - [¿Ï·á] {manager.GetType().Name} ÃÊ±âÈ­µÊ.");
+                // [ê°œì„ ] ì´ˆê¸°í™” ì‹¤íŒ¨ ì‹œ ì–´ë–¤ ë§¤ë‹ˆì €ì—ì„œ ì‹¤íŒ¨í–ˆëŠ”ì§€ ì•Œ ìˆ˜ ìˆë„ë¡ try-catch ì¶”ê°€
+                try
+                {
+                    await manager.Initialize(context);
+                    sb.AppendLine($"   - [ì´ˆê¸°í™” ì™„ë£Œ] {manager.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    // ë” êµ¬ì²´ì ì¸ ì—ëŸ¬ë¥¼ ìƒì„±í•˜ì—¬ throw
+                    throw new Exception($"'{manager.GetType().Name}' ì´ˆê¸°í™” ì¤‘ ì˜¤ë¥˜ ë°œìƒ!", ex);
+                }
             }
 
-
-            // -----------------------------------------------------------------
-            // ´Ü°è 5: ¿Ï·á!
-            // -----------------------------------------------------------------
+            // ë‹¨ê³„ 5: ì™„ë£Œ
             CurrentState = BootState.Complete;
-            Debug.Log("<color=green>[AppInitializer] ¸ğµç ½Ã½ºÅÛ ÁØºñ ¿Ï·á!</color>");
+            sb.AppendLine("\n<color=green><b>ëª¨ë“  ì‹œìŠ¤í…œ ì¤€ë¹„ ì™„ë£Œ!</b></color>");
+            Debug.Log(sb.ToString()); // [ë³€ê²½] ëª¨ì•„ë‘” ë¡œê·¸ë¥¼ í•œ ë²ˆì— ì¶œë ¥
 
-            // ·Îµù È­¸éÀÌ ÀÖ¾ú´Ù¸é ÀÌÁ¦ ²ü´Ï´Ù.
             if (bootCanvas != null)
             {
                 Destroy(bootCanvas);
@@ -139,28 +133,37 @@ public class AppInitializer : MonoBehaviour
         }
         catch (Exception ex)
         {
+            var failedState = CurrentState; // [ë³€ê²½] ì‹¤íŒ¨ ì§ì „ ìƒíƒœ ì €ì¥
             CurrentState = BootState.Failed;
-            Debug.LogError($"[AppInitializer] Ä¡¸íÀûÀÎ ¿À·ù ¹ß»ı! ½Ãµ¿ ½ÇÆĞ: {ex}");
-            // ½ÇÆĞÇßÀ» ¶§ ·Îµù È­¸é¿¡ "¿¡·¯ ¹ß»ı"ÀÌ¶ó°í ¶ç¿ì´Â Ã³¸®°¡ ³ªÁß¿¡ ÇÊ¿äÇÒ ¼ö ÀÖ½À´Ï´Ù.
+            
+            // [ë³€ê²½] ì‹¤íŒ¨ ì§€ì ê³¼ ì›ì¸ì„ ëª…í™•íˆ ë¡œê·¸ë¡œ ë‚¨ê¹€
+            Debug.LogError($"[AppInitializer] ì¹˜ëª…ì ì¸ ì˜¤ë¥˜ ë°œìƒ! ì‹œë™ ì‹¤íŒ¨.\n" +
+                           $" - ì‹¤íŒ¨ ì§€ì : {failedState}\n" +
+                           $" - ì˜¤ë¥˜ ë‚´ìš©: {ex}");
+            
+            // ì—¬ê¸°ì— ì‹¤íŒ¨ UIë¥¼ ë„ìš°ëŠ” ë¡œì§ ì¶”ê°€ ê°€ëŠ¥
         }
     }
 
-
-    // [µµ¿ì¹Ì] ¾îµå·¹¼­ºí·Î ¸Å´ÏÀú ÇÏ³ª »ı¼ºÇÏ´Â ÇÔ¼ö
-    private async UniTask SpawnManager(AssetReferenceGameObject refObj, Transform parent)
+    private async UniTask SpawnManager(AssetReferenceGameObject refObj, Transform parent, StringBuilder sb)
     {
-        // ¸®½ºÆ®¿¡ ¾ø°Å³ª Àß¸øµÈ °Å¸é ÆĞ½º
         if (refObj == null || !refObj.RuntimeKeyIsValid()) return;
 
-        // »ı¼º (ºñµ¿±â)
         var handle = refObj.InstantiateAsync(parent);
         GameObject obj = await handle;
 
         if (obj != null)
         {
-            // ÀÌ¸§ µÚ¿¡ (Clone) ºÙ´Â °Å º¸±â ½È¾î¼­ ¶Á´Ï´Ù.
             obj.name = obj.name.Replace("(Clone)", "");
-            Debug.Log($" - [»ı¼º] {obj.name}");
+            sb.AppendLine($"   - [ìƒì„±] {obj.name}");
+        }
+        else
+        {
+            // [ê°œì„ ] ìƒì„± ì‹¤íŒ¨ ì‹œ ì›ì¸ì´ ë˜ëŠ” ì—ì…‹ ì •ë³´ë¥¼ í¬í•¨í•˜ì—¬ ì—ëŸ¬ ë¡œê·¸ ê°•í™”
+            string assetKey = refObj.AssetGUID;
+            sb.AppendLine($"   - <color=red>[ìƒì„± ì‹¤íŒ¨]</color> ì—ì…‹ ì°¸ì¡°({{assetKey}})ë¥¼ ì¸ìŠ¤í„´ìŠ¤í™” í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
+            // í˜¹ì€ ì—¬ê¸°ì„œ ë°”ë¡œ Exceptionì„ throwí•˜ì—¬ ë¶€íŒ…ì„ ì¤‘ë‹¨ì‹œí‚¬ ìˆ˜ë„ ìˆìŠµë‹ˆë‹¤.
+            // throw new Exception($"Failed to instantiate asset with GUID {assetKey}");
         }
     }
 }

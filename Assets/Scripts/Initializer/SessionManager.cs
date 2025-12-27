@@ -10,13 +10,16 @@ public class SessionManager : MonoBehaviour, IInitializable
 
     private List<object> _pendingLoot = new List<object>();
 
-    public void Initialize()
+    public async UniTask Initialize(InitializationContext context)
     {
-        // 로그 제거됨 (SceneInitializer가 보고함)
         _pendingLoot.Clear();
-        ChangeState(SessionState.Boot);
-    }
 
+        // 아직 특별히 비동기 로딩할 게 없다면 바로 상태 변경
+        ChangeState(SessionState.Boot);
+
+        // 비동기 함수 규격을 맞추기 위해 완료 신호 보냄
+        await UniTask.CompletedTask;
+    }
     public void ChangeState(SessionState newState)
     {
         if (CurrentState == newState) return;

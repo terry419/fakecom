@@ -10,8 +10,8 @@ public class AppConfig : ScriptableObject
     public AssetReferenceGameObject BootCanvasRef;
 
     [Header("필수 매니저 (Global)")]
+    public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef;
     // 게임 끄기 전까지 절대 죽지 않는 매니저들
-    public AssetReferenceGameObject GlobalSettingsRef; // 소리 설정 등
     public AssetReferenceGameObject GameManagerRef;    // 게임 총괄
     public AssetReferenceGameObject DataManagerRef;    // 데이터 관리
     public AssetReferenceGameObject InputManagerRef;   // 입력(키보드/마우스) 관리

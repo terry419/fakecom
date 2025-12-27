@@ -2,74 +2,143 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Cysharp.Threading.Tasks;
 
 public class SceneInitializer : MonoBehaviour
 {
     private Stack<Action> _unregisterStack = new Stack<Action>();
     private StringBuilder sbLog = new StringBuilder();
-
-    // [추가된 부분] 초기화가 필요한 매니저들을 줄 세울 리스트
     private List<IInitializable> _initList = new List<IInitializable>();
 
+    // ==================================================================================
+    // 1. 등록 단계 (Awake)
+    // ==================================================================================
     private void Awake()
     {
         sbLog.Clear();
-        sbLog.AppendLine("[SceneInitializer] Start Initialization...");
+        sbLog.AppendLine("[SceneInitializer] 1. Manager Registration Started...");
 
         if (CheckDuplicateInitializer()) return;
+
         GameObject sceneRoot = GetOrCreateSceneRoot();
 
-        // 1. 매니저 등록 (여기서는 생성과 등록만 함)
         try
         {
-            // [System Layer]
+            // [Layer 1] System & Logic
             RegisterOrSpawn<TurnManager>(sceneRoot);
             RegisterOrSpawn<MapManager>(sceneRoot);
+            RegisterOrSpawn<SessionManager>(sceneRoot);
 
-            // [Logic Layer]
-            RegisterOrSpawn<SessionManager>(sceneRoot); // 세션 매니저 등록
+            // [Layer 2] Combat
             RegisterOrSpawn<CombatManager>(sceneRoot);
             RegisterOrSpawn<PlayerInputCoordinator>(sceneRoot);
             RegisterOrSpawn<QTEManager>(sceneRoot);
 
-            // [Visual/UI Layer]
+            // [Layer 3] Visual / UI
             RegisterOrSpawn<TargetUIManager>(sceneRoot);
             RegisterOrSpawn<DamageTextManager>(sceneRoot);
             RegisterOrSpawn<PathVisualizer>(sceneRoot);
             RegisterOrSpawn<CameraController>(sceneRoot);
 
-            // [Tool Layer]
+            // [Layer 4] Tool
             RegisterOrSpawn<TilemapGenerator>(sceneRoot);
 
-            // 2. [추가된 부분] 일괄 초기화 실행 (모든 매니저가 등록된 후 안전하게 실행)
-            InitializeAllManagers();
+            sbLog.AppendLine("[SceneInitializer] Registration Complete.");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SceneInitializer] Critical Error: {ex.Message}");
-            // 여기서 치명적 에러면 SessionManager를 Error 상태로 보내거나 게임 종료
+            Debug.LogError($"[SceneInitializer] Critical Registration Error: {ex.Message}");
         }
 
         Debug.Log(sbLog.ToString());
     }
 
+    // ==================================================================================
+    // 2. 초기화 단계 (Start - 비동기)
+    //    Awake에서 하지 않는 이유: 모든 매니저가 등록된 후 안전하게 참조하기 위함
+    // ==================================================================================
+    private void Start()
+    {
+        // 실제 비동기 로직을 호출합니다.
+        InitializeSceneSequenceAsync().Forget();
+    }
+
+    /// <summary>
+    /// 실제 비동기 초기화 시퀀스입니다.
+    /// </summary>
+    private async UniTaskVoid InitializeSceneSequenceAsync()
+    {
+        // [Bootstrap] Global 매니저가 없다면 AppInitializer가 완료될 때까지 대기
+        if (!ServiceLocator.IsRegistered<GameManager>())
+        {
+            Debug.LogWarning("[SceneInitializer] Global Managers missing. Trying to Bootstrap...");
+
+            // AppInitializer는 DontDestroyOnLoad이므로 어떤 씬에서든 찾을 수 있습니다.
+            var appInit = FindObjectOfType<AppInitializer>();
+            if (appInit != null)
+            {
+                // AppInitializer가 시동을 마칠 때까지 기다립니다.
+                await UniTask.WaitUntil(() => appInit.CurrentState == AppInitializer.BootState.Complete);
+            }
+            else
+            {
+                Debug.LogError("[SceneInitializer] CRITICAL: AppInitializer not found!");
+                return;
+            }
+        }
+
+        // 씬 내부의 모든 매니저를 비동기로 초기화합니다.
+        await InitializeAllManagersAsync();
+    }
+    private async UniTask InitializeAllManagersAsync()
+    {
+        sbLog.Clear();
+        sbLog.AppendLine("[SceneInitializer] 2. Async Initialization Started...");
+
+        var context = new InitializationContext
+        {
+            Scope = ManagerScope.Scene,
+            GlobalSettings = ServiceLocator.Get<GlobalSettingsSO>()
+        };
+
+        foreach (var manager in _initList)
+        {
+            try
+            {
+                await manager.Initialize(context);
+                sbLog.AppendLine($" - [Init] {manager.GetType().Name} Ready.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SceneInitializer] Error initializing {manager.GetType().Name}: {ex}");
+            }
+        }
+
+        sbLog.AppendLine("[SceneInitializer] All Systems Operational.");
+        Debug.Log(sbLog.ToString());
+
+        if (ServiceLocator.TryGet<SessionManager>(out var session))
+        {
+            session.ChangeState(SessionState.Setup);
+        }
+    }
+
     private void OnDestroy()
     {
         sbLog.Clear();
-        int count = 0;
         sbLog.AppendLine("[SceneInitializer] Cleanup sequence:");
 
+        int count = 0;
         while (_unregisterStack.Count > 0)
         {
-            Action unregisterAction = _unregisterStack.Pop();
-            unregisterAction?.Invoke();
+            _unregisterStack.Pop()?.Invoke();
             count++;
         }
 
-        // 리스트도 비워줌
         _initList.Clear();
+        ServiceLocator.ClearScopeAsync(ManagerScope.Scene).Forget();
 
-        sbLog.AppendLine($"[SceneInitializer] Cleaned up {count} managers.");
+        sbLog.AppendLine($"[SceneInitializer] Unregistered {count} managers.");
         Debug.Log(sbLog.ToString());
     }
 
@@ -77,25 +146,50 @@ public class SceneInitializer : MonoBehaviour
     // Helper Methods
     // =========================================================
 
-    private void InitializeAllManagers()
+    private void RegisterOrSpawn<T>(GameObject root) where T : MonoBehaviour
     {
-        sbLog.AppendLine(" --- Starting Manager Initialization ---");
+        string typeName = typeof(T).Name;
 
-        // 리스트에 담긴 순서대로 초기화 (등록 순서 = 초기화 순서)
-        foreach (var manager in _initList)
+        if (ServiceLocator.IsRegistered<T>())
         {
-            try
-            {
-                manager.Initialize();
-                sbLog.AppendLine($" - [Init] {manager.GetType().Name} Initialized.");
-            }
-            catch (Exception ex)
-            {
-                // 초기화 도중 에러가 나면 즉시 보고
-                Debug.LogError($"[SceneInitializer] Error initializing {manager.GetType().Name}: {ex.Message}");
-                throw; // 상위 catch로 던짐
-            }
+            sbLog.AppendLine($" - [Skip] {typeName} already registered.");
+            return;
         }
+
+        T[] existingInstances = FindObjectsOfType<T>(true);
+        if (existingInstances.Length > 1)
+            throw new InvalidOperationException($"[CRITICAL] Multiple {typeName} found in scene!");
+
+        T instance;
+        // [복구] 기존에 있던 건지, 새로 만든 건지 로그 분리
+        if (existingInstances.Length == 1)
+        {
+            instance = existingInstances[0];
+            sbLog.AppendLine($" - [Link] Found {typeName}."); // Found 로그 복구
+        }
+        else
+        {
+            instance = root.AddComponent<T>();
+            sbLog.AppendLine($" - [Create] Spawned {typeName}."); // Spawned 로그 복구
+        }
+
+        if (instance == null)
+        {
+            Debug.LogError($"Failed to instance {typeName}.");
+            return;
+        }
+
+        ServiceLocator.Register(instance, ManagerScope.Scene);
+
+        if (instance is IInitializable initializable)
+        {
+            _initList.Add(initializable);
+        }
+
+        _unregisterStack.Push(() =>
+        {
+            ServiceLocator.Unregister<T>(ManagerScope.Scene);
+        });
     }
 
     private bool CheckDuplicateInitializer()
@@ -116,55 +210,9 @@ public class SceneInitializer : MonoBehaviour
         if (root == null)
         {
             root = new GameObject("SceneManagers");
+            // [복구] 하이어라키 정리를 위해 Initializer 자식으로 넣음
             root.transform.SetParent(this.transform);
         }
         return root;
-    }
-
-    private void RegisterOrSpawn<T>(GameObject root) where T : MonoBehaviour
-    {
-        string typeName = typeof(T).Name;
-
-        if (ServiceLocator.IsRegistered<T>())
-        {
-            sbLog.AppendLine($" - [Skip] {typeName} already registered.");
-            return;
-        }
-
-        T[] existingInstances = FindObjectsOfType<T>(true);
-        if (existingInstances.Length > 1)
-            throw new InvalidOperationException($"[CRITICAL] Multiple {typeName} found!");
-
-        T instance = (existingInstances.Length == 1) ? existingInstances[0] : root.AddComponent<T>();
-
-        if (instance == null)
-        {
-            Debug.LogError($"Failed to instance {typeName}.");
-            return;
-        }
-        else if (existingInstances.Length == 0)
-        {
-            sbLog.AppendLine($" - [Create] Spawned {typeName}.");
-        }
-        else
-        {
-            sbLog.AppendLine($" - [Link] Found {typeName}.");
-        }
-
-        // ServiceLocator 등록
-        ServiceLocator.Register(instance);
-
-        // [핵심] IInitializable 인터페이스가 있다면 초기화 대기열(_initList)에 추가
-        if (instance is IInitializable initializable)
-        {
-            _initList.Add(initializable);
-        }
-
-        // 해제 예약
-        _unregisterStack.Push(() =>
-        {
-            ServiceLocator.Unregister<T>();
-            sbLog.AppendLine($"   - [Unregister] {typeName}");
-        });
     }
 }
