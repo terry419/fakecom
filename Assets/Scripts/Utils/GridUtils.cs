@@ -76,13 +76,11 @@ public static class GridUtils
     // [신규] 인접 타일 간 실제 이동 비용 (G값). 비평가 요청 반영.
     public static int GetAdjacentMovementCost(GridCoords from, GridCoords to)
     {
-        if (!IsAdjacent(from, to)) return -1; // 이동 불가
+        // 인접하지 않음 (층이 다르거나, 거리가 멀거나) -> 이동 불가
+        if (!IsAdjacent(from, to)) return -1;
 
-        int baseCost = 1; // 수평 이동 기본 비용
-        int levelDiff = Mathf.Abs(from.y - to.y);
-
-        // GDD 5.2: 층간 이동 시 높이 차이만큼 비용 추가 (순간이동 판정)
-        return baseCost + levelDiff;
+        // 같은 층 인접 타일 이동은 무조건 비용 1 (GDD 6.3.4 기본 원칙)
+        return 1;
     }
 
     // ==================================================================================
@@ -128,16 +126,13 @@ public static class GridUtils
     // [신규] 논리적 인접 여부 판단 (비평가 요청 반영)
     public static bool IsAdjacent(GridCoords from, GridCoords to)
     {
+        // 1. 층이 다르면 아예 이웃이 아님 (자동 길찾기 단절 -> 유저가 상호작용으로 이동)
+        if (from.y != to.y) return false;
+
+        // 2. 같은 층 내에서 상하좌우 1칸 차이인지 확인
         int dx = Mathf.Abs(from.x - to.x);
         int dz = Mathf.Abs(from.z - to.z);
-        int dy = Mathf.Abs(from.y - to.y);
 
-        // 수평 인접 (상하좌우 1칸) AND 같은 층
-        bool horizontal = (dx + dz == 1) && (dy == 0);
-
-        // 수직 인접 (제자리에서 층만 이동 - 엘리베이터/사다리 등)
-        bool vertical = (dx == 0 && dz == 0 && dy >= 1);
-
-        return horizontal || vertical;
+        return (dx + dz == 1);
     }
 }
