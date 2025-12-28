@@ -37,6 +37,7 @@ MonoBehaviour:
     editorMaterial: {fileID: 0}
   TileHighlightMaterial: {fileID: 2100000, guid: 6bfc2b92c847a7d44b06fc5a7655c755, type: 2}
   GridHighlightMaterial: {fileID: 2100000, guid: 0a3e26a08ed9801458853e766e2220b3, type: 2}
+  EdgeHighlightMaterial: {fileID: 2100000, guid: 2e732ba9eebc48f4ea469eaf84c4fe17, type: 2}
   ErrorMaterial: {fileID: 2100000, guid: f1124e82b3064d5429c8553f2af89eeb, type: 2}
   MapCellSize: 1
   MapLevelHeight: 2.5

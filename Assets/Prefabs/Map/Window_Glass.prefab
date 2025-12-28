@@ -122,7 +122,7 @@ MonoBehaviour:
     x: 0
     z: 0
     y: 0
-  Direction: 0
+  <Direction>k__BackingField: 0
   Type: 0
   DataType: 0
   Cover: 0
