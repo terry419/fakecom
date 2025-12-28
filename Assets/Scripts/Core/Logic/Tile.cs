@@ -226,5 +226,31 @@ public class Tile
         }
     }
 
+    /// <summary>
+    /// [비평가 반영] 저장된 데이터(SaveData)로부터 타일 상태를 복원
+    /// </summary>
+    public void LoadFromSaveData(TileSaveData saveData)
+    {
+        // 1. 기본 정보 복원
+        this.Coordinate = saveData.Coords;
+        this.FloorID = saveData.FloorID;
+        this.PillarID = saveData.PillarID;
+
+        // 2. 엣지(벽) 정보 복원
+        if (saveData.Edges != null && saveData.Edges.Length == 4)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                // SavedEdgeInfo -> EdgeInfo 변환 (DataType 포함됨)
+                _edges[i] = saveData.Edges[i].ToEdgeInfo();
+            }
+        }
+
+        // 3. 캐시 갱신
+        UpdateCache();
+    }
+
     public override string ToString() => $"Tile {Coordinate} [{FloorID}]";
+
+
 }

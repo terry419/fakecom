@@ -2,25 +2,25 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// [GDD 1.3, 5.1, 5.6, 6.3]   ƿƼ.
+/// [GDD 1.3, 5.1, 5.6, 6.3] 그리드 수학 및 유틸리티.
 /// </summary>
 public static class GridUtils
 {
     // ==================================================================================
-    // 1.  
+    // 1. 상수 정의 (GDD 5.1 Height Specs) - [전량 복구됨]
     // ==================================================================================
     public const float CELL_SIZE = 1.0f;
     public const float LEVEL_HEIGHT = 2.5f;
     public const float FLOOR_OFFSET = 0.2f;
-    public const float HALF_LEVEL_THRESHOLD = 1.25f;
 
-    public const float UNIT_HEIGHT = 2.0f;
-    public const float SHOOT_ORIGIN_HEIGHT = 1.8f;
-    public const float LOW_COVER_HEIGHT = 1.2f; 
-    public const float HIGH_COVER_HEIGHT = 2.5f;
+    public const float HALF_LEVEL_THRESHOLD = 1.25f; // 층간 구분 임계값
+    public const float UNIT_HEIGHT = 2.0f;           // 유닛 키
+    public const float SHOOT_ORIGIN_HEIGHT = 1.8f;   // 사격 원점 (눈 높이)
+    public const float LOW_COVER_HEIGHT = 1.2f;      // 반엄폐 높이
+    public const float HIGH_COVER_HEIGHT = 2.5f;     // 완전엄폐 높이
 
     // ==================================================================================
-    // 2. ǥ ȯ
+    // 2. 좌표 변환
     // ==================================================================================
     public static Vector3 GridToWorld(GridCoords coords)
     {
@@ -34,14 +34,12 @@ public static class GridUtils
     {
         int x = Mathf.RoundToInt(worldPos.x / CELL_SIZE);
         int z = Mathf.RoundToInt(worldPos.z / CELL_SIZE);
-
-        // 50% Threshold  (Mathf.RoundToInt .5 ¦ ݿøϹǷ κ  )
         float adjustedY = worldPos.y - FLOOR_OFFSET;
         int y = Mathf.RoundToInt(adjustedY / LEVEL_HEIGHT);
-
         return new GridCoords(x, z, y);
     }
 
+    // [복구됨] 엣지(벽)의 월드 좌표 반환 (비주얼/이펙트용)
     public static Vector3 GetEdgeWorldPosition(GridCoords coords, Direction dir)
     {
         Vector3 center = GridToWorld(coords);
@@ -57,35 +55,40 @@ public static class GridUtils
     }
 
     // ==================================================================================
-    // 3. 거리 계산 (GDD 6.3)
+    // 3. 거리 및 이동 비용 계산 (비평가 피드백 통합)
     // ==================================================================================
-    /// <summary>
-    /// [GDD 6.3] 유클리드 거리 기반 스킬 사거리 판정.
-    /// 두 GridCoords 간의 평면(X,Z) 거리가 주어진 사거리(range) 내에 있는지 확인.
-    /// 성능을 위해 제곱 거리로 비교하며, range는 타일 단위(float)로 받음.
-    /// </summary>
+
+    // [복구됨] 스킬 사거리 판정 (유클리드 거리 제곱 비교)
     public static bool IsInRange(GridCoords a, GridCoords b, float range)
     {
         float dx = a.x - b.x;
         float dz = a.z - b.z;
         float distanceSquared = (dx * dx) + (dz * dz);
-
-        float rangeSquared = range * range;
-        return distanceSquared <= rangeSquared;
+        return distanceSquared <= (range * range);
     }
 
-    // 길찾기 비용 (Y축 비용 1)
-    public static int GetManhattanDistance(GridCoords a, GridCoords b)
+    // [복구 & 수정] A* 휴리스틱용 맨해튼 거리 (기존 GetManhattanDistance와 동일 역할)
+    public static int GetHeuristicDistance(GridCoords from, GridCoords to)
     {
-        int dx = Mathf.Abs(a.x - b.x);
-        int dz = Mathf.Abs(a.z - b.z);
-        int dy = Mathf.Abs(a.y - b.y);
-        return dx + dz + dy;
+        return Mathf.Abs(from.x - to.x) + Mathf.Abs(from.z - to.z) + Mathf.Abs(from.y - to.y);
+    }
+
+    // [신규] 인접 타일 간 실제 이동 비용 (G값). 비평가 요청 반영.
+    public static int GetAdjacentMovementCost(GridCoords from, GridCoords to)
+    {
+        if (!IsAdjacent(from, to)) return -1; // 이동 불가
+
+        int baseCost = 1; // 수평 이동 기본 비용
+        int levelDiff = Mathf.Abs(from.y - to.y);
+
+        // GDD 5.2: 층간 이동 시 높이 차이만큼 비용 추가 (순간이동 판정)
+        return baseCost + levelDiff;
     }
 
     // ==================================================================================
-    // 4. 방향 및 동기화 유틸리티
+    // 4. 방향 및 인접성 유틸리티 - [전량 복구됨]
     // ==================================================================================
+
     public static GridCoords GetNeighbor(GridCoords coords, Direction dir)
     {
         switch (dir)
@@ -103,7 +106,6 @@ public static class GridUtils
         return (Direction)(((int)dir + 2) % 4);
     }
 
-    // [추가] 인접 타일 정보 반환 : (이웃 좌표, 반대 방향) 튜플 리턴
     public static (GridCoords neighbor, Direction oppositeDir) GetOppositeEdge(GridCoords coords, Direction dir)
     {
         GridCoords neighbor = GetNeighbor(coords, dir);
@@ -111,7 +113,6 @@ public static class GridUtils
         return (neighbor, opposite);
     }
 
-    // [추가] 방향 벡터 반환 (그리드 좌표 기준)
     public static GridCoords GetDirectionVector(Direction dir)
     {
         switch (dir)
@@ -122,5 +123,21 @@ public static class GridUtils
             case Direction.West: return new GridCoords(-1, 0, 0);
             default: return new GridCoords(0, 0, 0);
         }
+    }
+
+    // [신규] 논리적 인접 여부 판단 (비평가 요청 반영)
+    public static bool IsAdjacent(GridCoords from, GridCoords to)
+    {
+        int dx = Mathf.Abs(from.x - to.x);
+        int dz = Mathf.Abs(from.z - to.z);
+        int dy = Mathf.Abs(from.y - to.y);
+
+        // 수평 인접 (상하좌우 1칸) AND 같은 층
+        bool horizontal = (dx + dz == 1) && (dy == 0);
+
+        // 수직 인접 (제자리에서 층만 이동 - 엘리베이터/사다리 등)
+        bool vertical = (dx == 0 && dz == 0 && dy >= 1);
+
+        return horizontal || vertical;
     }
 }

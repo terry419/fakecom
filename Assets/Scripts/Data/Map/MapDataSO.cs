@@ -1,27 +1,36 @@
 using UnityEngine;
-using UnityEngine.AddressableAssets; // Addressables 패키지 필수
+using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewMapData", menuName = "Data/Map/MapData")]
 public class MapDataSO : ScriptableObject
 {
-    [Header("1. Identity")]
+    [Header("1. Map Identity")]
     public string MapID;
     public string DisplayName;
 
     [Header("2. Environment")]
-    // 맵의 최대 크기 (카메라 이동 제한 및 A* 경계용)
+    [Tooltip("맵 크기 (X: 너비, Z: 깊이)")]
     public Vector2Int GridSize;
-    // 실제 맵 프리팹 (Addressable로 비동기 로드)
-    public AssetReferenceGameObject MapPrefabRef;
 
-    [Header("3. Tactical Setup")]
-    // 아군 배치 구역 및 적군 초기 위치
-    public List<SpawnPointData> SpawnPoints;
+    [Tooltip("맵의 배경이 될 3D 환경 프리팹 (Visual Only)")]
+    public AssetReferenceGameObject MapPrefabRef; // [복구됨]
 
-    [Header("4. Enemies & Rewards")]
-    // 이 맵에서 증원(Reinforce) 등으로 추가 등장 가능한 적 유닛 풀
-    public List<EnemyUnitDataSO> EnemyPool;
-    // 맵 클리어 또는 상자 파밍 시 획득할 보상 테이블
-    public LootTableSO MapLootTable;
+    [Tooltip("층 높이 범위 (예: 0 ~ 5)")]
+    public int MinLevel = 0;
+    public int MaxLevel = 5;
+
+    [Header("3. Tile Data (Sparse)")]
+    [Tooltip("데이터가 존재하는 타일만 저장 (희소 배열)")]
+    public List<TileSaveData> Tiles = new List<TileSaveData>(); // [비평가 반영]
+
+    [Header("4. Tactical Setup")]
+    public List<SpawnPointData> SpawnPoints; // [복구됨] SpawnPointData 구조체 사용
+
+    [Header("5. Enemies & Rewards")]
+    [Tooltip("지원군이나 랜덤 인카운터에 사용될 적 풀")]
+    public List<EnemyUnitDataSO> EnemyPool; // [복구됨]
+
+    [Tooltip("맵 클리어 시 기본 보상")]
+    public LootTableSO MapLootTable; // [복구됨]
 }
