@@ -9,7 +9,6 @@ public class SaveManager : MonoBehaviour, IInitializable
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Global);
-        Debug.Log($"[SaveManager] 등록 완료 (Global).");
     }
 
     private void OnDestroy()
@@ -20,8 +19,6 @@ public class SaveManager : MonoBehaviour, IInitializable
     public async UniTask Initialize(InitializationContext context)
     {
         // 저장 경로 설정 (C:/Users/AppData/...)
-        _savePath = Application.persistentDataPath;
-        Debug.Log($"[SaveManager] 저장소 경로 확인: {_savePath}");
 
         // 마지막 세이브 파일이 있는지 확인하는 로직 등이 여기에 들어갑니다.
         await UniTask.CompletedTask;

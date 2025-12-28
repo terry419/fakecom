@@ -9,7 +9,6 @@ public class GameManager : MonoBehaviour, IInitializable
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Global);
-        Debug.Log($"[GameManager] 등록 완료 (Global).");
     }
 
     // 2. 죽을 때: 등록 해제
@@ -24,14 +23,12 @@ public class GameManager : MonoBehaviour, IInitializable
         // 예: 그래픽 설정 적용
         Application.targetFrameRate = context.GlobalSettings.TargetFrameRate;
 
-        Debug.Log("[GameManager] 초기화 중... 설정 적용 완료.");
         await UniTask.CompletedTask; // 특별히 기다릴 게 없으면 바로 완료 보고
     }
 
     // 게임 시작/정지 기능
     public void StartGame()
     {
-        Debug.Log("[GameManager] 게임 시작!");
         IsPaused = false;
         Time.timeScale = 1.0f;
     }

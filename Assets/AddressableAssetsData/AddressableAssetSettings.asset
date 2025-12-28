@@ -15,7 +15,7 @@ MonoBehaviour:
   m_DefaultGroup: cfa6d96333108bf41a202744f6c34c37
   m_currentHash:
     serializedVersion: 2
-    Hash: 00000000000000000000000000000000
+    Hash: 1524e91ffecdfeb104e5009f6f5d7e09
   m_OptimizeCatalogSize: 0
   m_BuildRemoteCatalog: 0
   m_BundleLocalCatalog: 0
@@ -46,8 +46,10 @@ MonoBehaviour:
   m_GroupAssets:
   - {fileID: 11400000, guid: 90e17c2770868e5419a93e2151ca7839, type: 2}
   - {fileID: 11400000, guid: ba97f8ee56adfdd489c4ddf4a18d4aac, type: 2}
+  - {fileID: 11400000, guid: c25dc6c632f7b314983bb4261a79cff1, type: 2}
   - {fileID: 11400000, guid: 67368c2b826af07449412ed0d6ffe783, type: 2}
   - {fileID: 11400000, guid: a2204e2e21ba04d4f8a2ef829a6eedbb, type: 2}
+  - {fileID: 11400000, guid: f3c11dcef9888a749a3bc15bd899a3ad, type: 2}
   m_BuildSettings:
     m_CompileScriptsInVirtualMode: 0
     m_CleanupStreamingAssetsAfterBuilds: 1
@@ -92,6 +94,8 @@ MonoBehaviour:
     - AppConfig
     - GlobalSettings
     - Manager
+    - EdgeData
+    - TileData
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 4fdb9d024e188e744aced5fc35e7fd35, type: 2}

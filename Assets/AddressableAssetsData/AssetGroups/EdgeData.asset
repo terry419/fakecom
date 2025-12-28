@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: EdgeData
+  m_EditorClassIdentifier: 
+  m_GroupName: EdgeData
+  m_Data:
+    m_SerializedData: []
+  m_GUID: d96f4d9cf3e841e44a0aa6ba860e34e9
+  m_SerializeEntries:
+  - m_GUID: 568e1951a64d6924a96920634cc848a4
+    m_Address: Wall_Concrete.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - EdgeData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6dc25a0354ca87c468b53006e11229ee
+    m_Address: Fence_Steel.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - EdgeData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99b6fcb007fb04d4c8eac64ee03c56ff
+    m_Address: Door.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - EdgeData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da8906187b21966499f36f1760405fdf
+    m_Address: Window_Glass.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - EdgeData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e46789121ac5537438a1619d1bd9e219
+    m_Address: Edge_Brick.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - EdgeData
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 6dab44de8aac0ed4199157ef46e50c4b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 8b06af26b9941014a8210eef54f4cb09, type: 2}
+    - {fileID: 11400000, guid: 735e833f71779ea4ba827beff9b48951, type: 2}

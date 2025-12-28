@@ -7,11 +7,16 @@ public class EnemyUnitDataSO : ScriptableObject
     [Header("1. Identity")]
     public string UnitID;
     public string UnitName;
-    public EnemyUnitType EnemyType; // 일반, 엘리트, 보스
+
+    [Tooltip("적의 등급 (Normal, Elite, Boss)")]
+    public EnemyUnitType EnemyType;
+
+    [Tooltip("적의 병과 (Sniper, Assault 등) - AI 행동 패턴 결정")]
+    public ClassType Role; // [추가] Role 누락 수정
 
     [Header("2. Visual")]
     public AssetReferenceGameObject ModelPrefab;
-    public AssetReferenceGameObject HitVFX; // 피격 시 발생하는 타격 이펙트 에셋
+    public AssetReferenceGameObject HitVFX;
 
     [Header("3. Base Stats")]
     public int MaxHP;
@@ -19,23 +24,29 @@ public class EnemyUnitDataSO : ScriptableObject
     public int Agility;
     public int Aim;
     public int Evasion;
+
+    [Range(0f, 100f)] // [추가] Player와 동일하게 Range 속성 적용
     public float CritChance = 0f;
 
-    [Header("4. AI Intelligence (Learning Data)")]
-    [Tooltip("기본 인공지능 레벨 (1~10). 레벨이 높을수록 전술적 판단 수치가 상승합니다.")]
+    [Header("4. Loadout")] // [추가] 장비 슬롯 신설
+    [Tooltip("적 주무기 (사거리/데미지 결정)")]
+    public WeaponDataSO MainWeapon;
+
+    [Tooltip("적 방어구 (방어 등급 결정)")]
+    public ArmorDataSO BodyArmor;
+
+    [Header("5. AI Intelligence")]
+    [Tooltip("AI 레벨 (1~10). 높을수록 정교한 전술 구사.")]
     public int BaseAILevel = 1;
 
-    [Tooltip("주변 아군에게 부여하는 지휘 보너스/페널티 수치입니다.")]
+    [Tooltip("주변 아군에게 부여하는 지휘 보너스.")]
     public int CommandAIBonus = 0;
 
-    [Header("5. Enemy Specific")]
+    [Header("6. Drops")]
     public LootTableSO DropTable;
 
-    [Header("6. Neural Sync")]
-    [Tooltip("기본 생존 확률 (기본값 0)")]
+    [Header("7. Neural Sync")]
     public float BaseSurvivalChance = 0f;
-    [Tooltip("초기 싱크로율 (기본 100)")]
     public float BaseNeuralSync = 100f;
-    [Tooltip("오버클럭 성공 기본 확률")]
     public float BaseOverclockChance = 0f;
 }

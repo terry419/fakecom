@@ -26,6 +26,8 @@ public class SceneInitializer : MonoBehaviour
         {
             // [Layer 1] System & Logic
             RegisterOrSpawn<TurnManager>(sceneRoot);
+            RegisterOrSpawn<EdgeDataManager>(sceneRoot);
+            RegisterOrSpawn<TileDataManager>(sceneRoot); 
             RegisterOrSpawn<MapManager>(sceneRoot);
             RegisterOrSpawn<SessionManager>(sceneRoot);
 

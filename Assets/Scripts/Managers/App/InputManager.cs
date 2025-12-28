@@ -8,7 +8,6 @@ public class InputManager : MonoBehaviour, IInitializable
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Global);
-        Debug.Log($"[InputManager] 등록 완료 (Global).");
     }
 
     private void OnDestroy()
@@ -20,7 +19,6 @@ public class InputManager : MonoBehaviour, IInitializable
     {
         // 입력 시스템 초기화
         EnableInput(true);
-        Debug.Log("[InputManager] 입력 시스템 준비 완료.");
         await UniTask.CompletedTask;
     }
 

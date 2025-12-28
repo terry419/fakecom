@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db6c19af8f069e84797c6f1632358af9, type: 3}
+  m_Name: 1_PlayerUnit
+  m_EditorClassIdentifier: 
+  UnitID: 1_PlayerUnit
+  UnitName: 1_PlayerUnit
+  Role: 1
+  ModelPrefab:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  MaxHP: 100
+  Mobility: 5
+  Agility: 5
+  Aim: 80
+  Evasion: 10
+  CritChance: 5
+  MainWeapon: {fileID: 11400000, guid: 762dfb9bee5f956438bcd4db8fc22bf7, type: 2}
+  BodyArmor: {fileID: 11400000, guid: d406acdf31c50a245ac88784f55831eb, type: 2}
+  BaseSurvivalChance: 5
+  BaseNeuralSync: 100
+  BaseOverclockChance: 5
