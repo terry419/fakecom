@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-// [GDD 5.6] ÆÄÀÏ¿¡ ÀúÀåµÇ´Â ¿§Áö(º®) Á¤º¸
+// [GDD 5.6] ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½
 [Serializable]
 public struct SavedEdgeInfo
 {
@@ -11,13 +11,42 @@ public struct SavedEdgeInfo
     public float CurrentHP;
     public EdgeDataType DataType; 
 
-    public SavedEdgeInfo(EdgeType type, CoverType cover, float maxHP, EdgeDataType dataType = EdgeDataType.None)
+    private SavedEdgeInfo(EdgeType type, CoverType cover, float maxHP, float currentHP, EdgeDataType dataType)
     {
         Type = type;
         Cover = cover;
         MaxHP = maxHP;
-        CurrentHP = maxHP;
+        CurrentHP = currentHP;
         DataType = dataType;
+    }
+
+    public static SavedEdgeInfo CreateOpen()
+    {
+        // An open edge has no HP, no cover, and no material data
+        return new SavedEdgeInfo(EdgeType.Open, CoverType.None, 0, 0, EdgeDataType.None);
+    }
+
+    public static SavedEdgeInfo CreateWall(EdgeDataType wallMaterial, float maxHP = 100f, CoverType cover = CoverType.High)
+    {
+        // A wall must have a material type, and defaults to High cover and some HP
+        if (wallMaterial == EdgeDataType.None)
+        {
+            Debug.LogWarning("Creating a wall without a specific EdgeDataType. Defaulting to ConcreteWall.");
+            wallMaterial = EdgeDataType.Concrete; // Fallback
+        }
+        return new SavedEdgeInfo(EdgeType.Wall, cover, maxHP, maxHP, wallMaterial);
+    }
+    
+    public static SavedEdgeInfo CreateWindow(EdgeDataType windowMaterial = EdgeDataType.Glass, float maxHP = 30f, CoverType cover = CoverType.Low)
+    {
+        if (windowMaterial == EdgeDataType.None) windowMaterial = EdgeDataType.Glass;
+        return new SavedEdgeInfo(EdgeType.Window, cover, maxHP, maxHP, windowMaterial);
+    }
+
+    public static SavedEdgeInfo CreateDoor(EdgeDataType doorMaterial = EdgeDataType.Wood, float maxHP = 50f, CoverType cover = CoverType.None)
+    {
+        if (doorMaterial == EdgeDataType.None) doorMaterial = EdgeDataType.Wood;
+        return new SavedEdgeInfo(EdgeType.Door, cover, maxHP, maxHP, doorMaterial);
     }
 
     public EdgeInfo ToEdgeInfo()
@@ -28,12 +57,12 @@ public struct SavedEdgeInfo
             Cover = Cover,
             MaxHP = MaxHP,
             CurrentHP = CurrentHP,
-            DataType = DataType // ÀúÀåµÈ ÀçÁú º¹¿ø
+            DataType = DataType // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         };
     }
 }
 
-// [GDD 5.6] Å¸ÀÏ ÀúÀå µ¥ÀÌÅÍ (Èñ¼Ò ¹è¿­¿ë)
+// [GDD 5.6] Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ ï¿½è¿­ï¿½ï¿½)
 [Serializable]
 public struct TileSaveData
 {
@@ -51,12 +80,12 @@ public struct TileSaveData
     }
 }
 
-// [¼öÁ¤µÊ] TeamType Enum »ç¿ë
+// [ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½] TeamType Enum ï¿½ï¿½ï¿½
 [Serializable]
 public struct SpawnPointData
 {
     public Vector3 Position;
-    public TeamType Team;    // 0, 1 ´ë½Å ¸íÈ®ÇÑ Enum »ç¿ë
+    public TeamType Team;    // 0, 1 ï¿½ï¿½ï¿½ ï¿½ï¿½È®ï¿½ï¿½ Enum ï¿½ï¿½ï¿½
     [Range(0f, 360f)]
     public float YRotation;
 }

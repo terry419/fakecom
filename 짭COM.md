@@ -302,39 +302,70 @@
 
 ### **5.6. 맵 데이터 구조 (Map Data Structure)**
 
-맵의 최소 단위인 '그리드 셀(Grid Cell)'은 하나의 덩어리가 아니라, \*\*바닥(Center), 벽(Edge), 기둥(Corner)\*\*으로 구성된 조립 데이터이다.
+맵의 최소 단위인 '그리드 셀(Grid Cell)'은 단순한 데이터 덩어리가 아니라, \*\*바닥(Center), 벽(Edge), 기둥(Pillar)\*\*의 역할이 명확히 구분된 조립 데이터이다. 대규모 맵(130x130)의 모바일 구동을 위해 **메모리 최적화 구조**를 따른다.
 
-* **좌표계:** (Col, Row, Level)의 3차원 정수 좌표.  
+#### **1\. 기본 좌표 및 규격 (Coordinates & Specs)**
+
+* **좌표계:** (Col, Row, Level)의 3차원 정수 좌표. (GridCoords 구조체 사용)  
 * **좌표계 원점:** 논리적 (0, 0, 0)은 월드 좌표 (0, 0, 0)에 매핑되는 절대 좌표계.  
 * **그리드 피벗:** 타일의 중앙(Center)을 기준으로 함.  
-* 바닥셀  
-1. 센센터 (Center):  
-   1. **FloorID:** 바닥재 정보. **\[예외 처리\]**  값이 `Null`이거나 `None`일 경우, 해당 좌표는 물리적으로 뚫려있는 구멍으로 간주하며, 유닛 진입 시 추락(Fall) 판정이 발생한다.  
-   2. 천장재. (상층의 바닥과 별개로 렌더링되거나 공유됨)  
-   3. **Object:** 타일 중앙에 놓인 엄폐물(상자, 드럼통 등).  
-2. 엣지 (Edge \- North/East/South/West):  
-   1. 타일의 사방 경계에 종속되는 데이터.  
-   2. **유형:** `Wall`(통벽), `Window`(창문), `Door`(문), `None`(개방).  
-   3. *데이터 최적화:* 인접 타일과 벽을 공유하므로, 저장 시에는 **4방향 고정 배열(Fixed Array) 구조**를 사용하여 인접 타일과 즉각적으로 데이터를 대조한다  
-   4. 데이터 무결성 (Data Integrity \- Sync Rule):  
-      1. 엣지 데이터는 인접한 두 타일이 공유하는 물리적 벽면이므로, **반드시 양방향 동기화**되어야 한다.  
-      2. **규칙:** 좌표 (C, R)의 North 벽을 생성/파괴할 경우, 인접한 (C, R+1) 좌표의 South 벽 데이터도 동일한 값으로 갱신해야 한다. MapManager는 이를 강제하는 메서드(SyncEdge)를 통해 데이터를 조작한다.  
-* 기둥 셀 (Pillar Cell) : 타일 한 칸 전체를 차지하는 독립적인 구조물 타일이다.  
-1. **PillarID:** 기둥의 외형 및 내구도 정보.  
-2. 특성:  
-   1. 엣지(Edge) 데이터를 가지지 않으며, 좌표 전체를 물리적으로 점유함.  
-   2. 유닛 진입 불가(Impassable).  
-   3. 지지력(S=5)의 원천이 되어 상층 타일을 지탱함.  
-* 따라서 그리드 (x, z) 타일의 월드 좌표X, Z는 x × CELLSIZE 및 z × CELLSIZE 임.  
-* 축 매핑 (Axis Mapping):  
-  * **North (Index 0):**  \+Z 방향  
+* **월드 좌표 변환:** 그리드 (x, z) 타일의 월드 좌표 X, Z는 x × CELL\_SIZE 및 z × CELL\_SIZE이다.
+
+#### **2\. 기술적 구현 사양 (Technical Implementation) \- *최적화 적용***
+
+* **런타임 (In-Game):**  
+  * **Pure Class: 메모리 최적화를 위해 Tile은 `MonoBehaviour`가 아닌 순수 C\# 클래스로 정의한다.**  
+  * **희소 배열 (Sparse Array): 데이터가 없는 좌표는 `null`로 유지하여 모바일 메모리 한계를 극복한다.**  
+* **에디터 (Map Editor):**  
+  * **Scene-First: 편집 중에는 `EditorTile` (MonoBehaviour) 프리팹을 씬에 직접 배치하여 Unity의 기본 툴(이동, 회전, Undo)을 활용한다.**  
+  * **Baking: 저장(Save) 시점에만 씬의 `EditorTile` 객체들을 순회하여 `MapDataSO`의 순수 데이터로 직렬화(Serialize)한다.**
+
+#### **3\. 구성 요소 (Cell Composition)**
+
+(1) 바닥 셀 (Floor Cell)
+
+유닛이 이동하고 전투를 벌이는 기본 타일이다. 성능 향상을 위해 점유 슬롯을 명시적으로 분리한다.
+
+* **센터 (Center):**  
+  * **FloorID (Enum):** 바닥재 재질. **\[예외 처리\]** 이 값이 None이거나 Null일 경우, 해당 좌표는 물리적으로 뚫려있는 구멍으로 간주하며, 유닛 진입 시 추락(Fall) 판정이 발생한다.  
+  * **CeilingID (Enum):** 천장재 정보. (상층의 바닥과 별개로 렌더링되거나 공유됨)  
+  * **점유 슬롯 (Occupancy Slots) \- *변수 분리*:**  
+    * **PrimaryUnit (Unit):** 타일을 점유 중인 유닛 혹은 파괴 가능한 장애물(Object). 이동 불가 판정의 기준이 되며 **단 하나만 존재**한다.  
+    * **LootItems (List\<Item\>):** 바닥에 떨어진 아이템 목록. (이동 가능, 겹치기 가능).  
+  * **캐싱 (Caching):** 매번 리스트를 검사하지 않고, PrimaryUnit의 상태에 따라 IsWalkable 프로퍼티를 자동 갱신하여 길찾기 연산 속도를 보장한다.  
+* **엣지 (Edge \- North/East/South/West):**  
+  * 타일의 사방 경계에 종속되는 데이터.  
+  * **유형:** Wall(통벽), Window(창문), Door(문), None(개방).  
+  * **데이터 최적화:** 런타임에는 가벼운 `EdgeInfo` 구조체를 사용하여 물리 연산을 처리한다.  
+  * 데이터 저장 (Persistence):  
+    * 파일 저장 시에는 **`SavedEdgeInfo`** 구조체를 사용하여 데이터 손실을 방지한다.  
+    * **저장 항목:** `EdgeType` (벽/창문), `CoverType`, `MaxHP`, **`CurrentHP` (파괴 상태 보존)**, **`EdgeDataType` (재질: Concrete, Brick 등)**.  
+    * **목적:** 로드 시 파괴된 벽이 복구되거나, 콘크리트 벽이 투명 벽으로 변하는 데이터 무결성 오류를 원천 차단함.  
+  * **데이터 무결성 (Data Integrity \- Sync Rule):**  
+    * 엣지 데이터는 인접한 두 타일이 공유하는 물리적 벽면이므로, **반드시 양방향 동기화**되어야 한다.  
+    * **규칙:** 좌표 (C, R)의 **North** 벽을 생성/파괴할 경우, 인접한 (C, R+1) 좌표의 **South** 벽 데이터도 동일한 값으로 갱신해야 한다. MapManager는 이를 강제하는 메서드(SyncEdge 혹은 SetEdge)를 통해 데이터를 조작한다.
+
+(2) 기둥 셀 (Pillar Cell)
+
+타일 한 칸 전체를 차지하는 독립적인 구조물 타일이다.
+
+* **PillarID (Enum):** 기둥의 외형 및 내구도 정보.  
+* **특성:**  
+  * 엣지(Edge) 데이터를 가지지 않으며, 좌표 전체를 물리적으로 점유함.  
+  * 유닛 진입 불가(Impassable).  
+  * 지지력($S=5$)의 원천이 되어 상층 타일을 지탱함.
+
+    #### **4\. 규격 및 매핑 (Specs & Mapping)**
+
+* **축 매핑 (Axis Mapping):**  
+  * **North (Index 0):** \+Z 방향  
   * **East (Index 1):** \+X 방향  
   * **South (Index 2):** \-Z 방향  
   * **West (Index 3):** \-X 방향  
-* 수직 규격 (Vertical Spec):  
-  * **층고 (**LEVELHEIGHT**:** 2.5  
-  * **임계값 (Threshold):** 50% 반올림 방식을 사용하여, 현재 높이가 ±1.25 범위를 넘을 시 층간 이동으로 간주함.  
-  * **바닥 오프셋 (**FLOOROFFSET**):** 바닥 오브젝트의 두께를 고려하여 유닛의 실제 서 있는 높이를 보정함.
+* **수직 규격 (Vertical Spec):**  
+  * **층고 (LEVEL\_HEIGHT):** **2.5m**  
+  * **임계값 (Threshold):** 50% 반올림 방식을 사용하여, 현재 높이가 **±1.25m** 범위를 넘을 시 층간 이동으로 간주함.  
+  * **바닥 오프셋 (FLOOR\_OFFSET):** 0.2m (바닥 오브젝트의 두께를 고려하여 유닛의 실제 서 있는 높이를 보정함).
 
 ### **5.7. 모듈형 건축 시스템 (Modular Construction System)**
 
@@ -365,7 +396,10 @@
    *  **1단계 (등록 \- Awake): 모든 매니저는 Awake()에서 ServiceLocator에 등록하는 작업 외에는 아무것도 하지 않는다. 다른 매니저를 참조하거나 사용하는 코드는 절대 금지한다.**  
    * **2단계 (의존성 주입 및 초기화 \- Initialize): 모든 매니저가 등록된 후, Initializer(AppInitializer 또는 SceneInitializer)가 각  매니저의 Initialize(context) 메서드를 호출한다. 이 단계에서 비로소 ServiceLocator.Get\<T\>()을 통해 다른 매니저를 안전하게 참조하고 필요한 로직을 초기화한다.**  
 4. **인터페이스 기반 비동기 초기화:** 초기화가 필요한 모든 매니저는 `IInitializable`을 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 메인 스레드 블로킹(`WaitForCompletion`)은 어떠한 경우에도 금지한다.  
-5. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.
+5. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.  
+6. 대규모 맵 로딩 전략 (Loading Strategy):  
+   * **시간 할당제 스트리밍 (Time-Sliced Streaming):** 130x130 이상의 대규모 맵 로딩 시, 타일 생성 루프가 메인 스레드를 독점하여 화면이 멈추는(Freezing) 현상을 방지한다. 타일 생성 시 '개수' 기준이 아닌 \*\*"프레임당 16ms(0.016초) 제한"\*\*을 두어, 시간이 초과되면 작업을 일시 중단(`await UniTask.Yield`)하고 제어권을 OS에 넘긴다. 이를 통해 로딩 중에도 UI 애니메이션과 터치 반응성을 유지한다.  
+   * **온디맨드 생성 (On-Demand Generation):** 초기화 시 `new Tile()`을 맵 전체에 수행하지 않는다. `MapData`에 유효한 정보가 존재하는 좌표에 대해서만 객체를 생성하여 런타임 메모리 스파이크를 방지한다.
 
 ---
 
@@ -482,18 +516,31 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
 #### **4\. 이동 및 길찾기 (Movement & Pathfinding)**
 
-* **기술:** A\* 알고리즘의 $H(n)$ 계산 시 **맨해튼 거리(Manhattan Distance)** 사용.  
-* D \= | x1 \- x2 | \+ | z1 \- z2 | \+ (| y1 \- y2 × 1 |  
-* 층간 이동(Y축 변화)은 물리적 이동이 아닌 '순간이동(Teleport)' 상호작용이므로, 높이 차이당 **Cost 1**을 부과하여 경로 비용에 반영한다.  
-* **비용 계산: 길찾기는 각 타일의 '이동 비용(Cost)'을 고려하여 최단 경로가 아닌 '최소 비용' 경로를 탐색한다.**  
-* 이동 제약 조건:  길찾기 시 다음 조건들을 모두 만족해야 한다.  
-  1\. 이웃 타일이 맵 범위 안에 있는가?  
-  2\. 이웃 타일이 다른 오브젝트에 의해 '점유'되어 이동 불가능 상태가 아닌가?  
-  3\. 현재 타일과 이웃 타일 사이의 '경계'가 완전 엄폐(Full Cover)로 막혀있지 않은가?  
-  4\. 이동 제약 조건:  
-* 기본적으로 동일 높이(Level) 내에서만 인접 타일로 이동 가능하다.  
-* **연결 이동 (Teleport):** 현재 타일이 \*\*'연결 오브젝트(Connector)'\*\*의 노드일 경우, 물리적 거리를 무시하고 연결된 목적지 타일로 이동 경로를 확장한다.  
-* **기둥 타일 (Pillar Cell):** 기둥은 $1 \\times 1$ 타일을 완전히 점유하므로, 해당 좌표는 절대 이동 불가(Impassable) 영역으로 처리한다.
+* **1\) 알고리즘 및 휴리스틱 (Algorithm & Heuristic)**  
+  * **기술: 경로 탐색은 *A 알고리즘*\*을 사용하며, H(n) 남은 거리 추정) 계산 시 맨해튼 거리(Manhattan Distance) 공식을 사용한다.**  
+  * D \= | x1 \- x2 | \+ | z1 \- z2 |  
+* 2\) 이동 비용 산출 (Cost Formula)  
+  * **기본 원칙:** 길찾기는 최단 거리(Shortest Distance)가 아닌 **'최소 비용(Minimum Cost)'** 경로를 탐색한다.  
+  * **수평 이동 (Move):** 동일 층 내 인접 타일(동/서/남/북)로 이동 시 \*\*기본 비용 1 (Base Cost 1)\*\*을 소모한다.  
+  * **수직 이동 (Interaction):** 층간 이동은 이동 비용 공식에 포함되지 않으며, 별도의 \*\*'상호작용(Interaction)'\*\*으로 처리한다. (거리/높이 무관 **고정 비용 1**).  
+* **3\) 단층 길찾기 원칙 (Single-Layer Navigation)**  
+  *  **범위: 시스템의 자동 경로 탐색은 현재 유닛이 위치한 층(Current Y-Level) 내에서만 수행한다. 다른 층으로의 경로는 자동 계산하지 않는다.**  
+  * **플레이어의 역할: 층간 이동이 필요한 경우, 플레이어가 직접 유닛을 순간이동기(Teleporter) 타일로 이동시킨 후 상호작용해야 한다**  
+* 4\) 이동 제약 조건 (Constraints)  
+  * 길찾기 및 이동 시 다음 조건을 모두 만족해야 한다.
+
+  1\. 이웃 타일이 맵 범위 안에 있는가?
+
+  2\. 이웃 타일이 다른 유닛이나 장애물(Pillar 등)에 의해 \*\*'점유(Occupied)'\*\*되어
+
+      있지 않은가?
+
+  3\. 현재 타일과 이웃 타일 사이의 '경계'가 \*\*완전 엄폐(Full Wall)\*\*로 막혀있지
+
+    않은가?
+
+* **시각적 피드백:** 층간 이동이 가능한 타일(순간이동기)은 전술 뷰에서 식별 가능한 색상(예: 노란색)으로 하이라이트한다.
+
 
 #### **5\. 유닛-컨트롤러 아키텍처 (Unit-Controller Architecture)**
 
@@ -850,23 +897,23 @@ Enum 관리 원칙: '1 Enum, 1 File'
 
 ### **8.8. MapDataSO (맵/미션 데이터)**
 
-| 필드명 | 타입 | 설명 |
+| 필드명 (Field Name) | 데이터 타입 (Data Type) | 설명 (Description) |
 | :---- | :---- | :---- |
-| **MapID** | string | 맵 ID |
-| **MapPrefab** | AssetReference | 3D 지형 프리팹 |
-| **GridSize** | Vector2Int | 맵 크기 |
-| **SpawnPoints** | List\<Vector3\> | 아군/적군 시작 좌표 |
-| **EnemyPool** | List\<UnitDataSO\> | 등장 적 유닛 리스트 |
-| **LootTable** | LootTableSO | 맵 드랍 테이블 |
+| **MapID** | string | 맵을 시스템 내부에서 식별하는 고유 ID. |
+| **DisplayName** | string | 플레이어에게 UI 상으로 노출되는 맵의 이름. |
+| **GridSize** | Vector2Int | 맵의 가로(X)와 세로(Z) 크기. |
+| **Min/MaxLevel** | int | 맵의 유효한 층수 범위 (Y축). |
+| **MapPrefabRef** | AssetReference | 맵의 배경이 되는 3D 환경 모델 프리팹 (Visual Only). |
+| **Tiles** | List\<TileSaveData\> | **\[희소 배열\]** 실제 데이터(바닥, 벽, 기둥)가 존재하는 타일 정보 리스트. |
 
 ### **8.9. MapEditorSettingsSO (맵 에디터 공통 설정)**
 
-| 필드명 | 타입 | 설명 |
+| 필드명 | 데이터 타입 | 설명 |
 | :---- | :---- | :---- |
-| **solidWallPrefab** | GameObject | 맵의 기본 벽체 프리팹 |
-| **windowPrefab** | GameObject | 창문 모듈 프리팹 |
-| **doorPrefab** | GameObject | 문/출입구 모듈 프리팹 |
-| **pillarPrefab** | GameObject | 코너 기둥 구조물 프리팹 |
+| **FloorTable** | List\<FloorMapping\> | 바닥 재질(FloorType) $\\leftrightarrow$ 프리팹 매핑 리스트. |
+| **PillarTable** | List\<PillarMapping\> | 기둥 종류(PillarType) $\\leftrightarrow$ 프리팹 매핑 리스트. |
+| **WallTable** | List\<WallMapping\> | 벽 종류(EdgeType) $\\leftrightarrow$ 프리팹 매핑 리스트. |
+| **EditorMaterials** | Material\[\] | 에디터 전용 시각화 재질 (선택된 타일 하이라이트, 층별 반투명 처리용). |
 
 ### 
 
@@ -1271,3 +1318,43 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 3\. **Sniper (저격형):** 원거리 및 고지대(HeightFactor) 가중치 높음.
 
 **13.2.3. 의사결정 방식:** 초기 단계에서는 Utility AI를 사용하여 행동별 점수를 산출하며, 추후 딥러닝을 통해 최적 가중치 산출 예정.
+
+# **14.0.맵 에디터 시스템 (Map Editor System)**
+
+본 챕터는 개발 생산성을 위해 Unity 에디터 상에서 동작하는 \*\*레벨 디자인 툴(Level Design Tool)\*\*의 사양을 정의한다.
+
+### **14.1. 개발 범위 및 편집 단위 (Scope)**
+
+* **목표:** XCOM 2 수준의 전술 맵 제작을 위한 **최소 기능 단위(MVP)** 구현.  
+* **필수 편집 대상:**  
+  1. **Tile (Floor):** 유닛이 밟는 바닥.  
+  2. **Pillar (Column):** 구조적 지지 및 시야 차단 기둥.  
+  3. **Edge (Wall/Window/Door):** **\[핵심\]** 엄폐(Cover) 및 이동 경로를 결정하는 벽면 데이터.  
+* **제외 대상 (Phase 2):** 복잡한 컷신 트리거, 적 AI 순찰 경로 디테일 설정 등은 추후 구현한다.
+
+### **14.2. 편집 워크플로우 (Workflow: Scene-First)**
+
+데이터를 직접 수정하는 것이 아니라, \*\*'눈에 보이는 객체'\*\*를 조작하고 \*\*'데이터'\*\*로 굽는 방식을 채택한다.
+
+1. **배치 (Place):** 팔레트에서 타일/벽을 선택하여 씬(Scene)에 `EditorTile` 프리팹을 생성.  
+2. **조작 (Manipulate):** Unity 기본 툴(Move/Rotate) 및 `Undo/Redo` 기능을 그대로 사용.  
+3. **검증 (Validate):** '유효성 검사' 버튼을 통해 맵 밖으로 나간 타일이나 겹친 벽을 감지.  
+4. **저장 (Bake):** 저장 버튼 클릭 시, 씬의 모든 `EditorTile` 정보를 긁어모아 `MapDataSO`로 변환(Overwrite).
+
+### **14.3. UX 및 조작 (Interaction)**
+
+* **층별 격리 (Layer Slicing):**  
+  * 현재 편집 중인 층(Y Level)을 제외한 다른 층은 **반투명(Ghost)** 처리하거나 숨김.  
+  * 마우스 클릭 레이캐스트는 오직 **현재 층의 그리드**에만 반응 (오클릭 방지).  
+* **그리드 스냅 (Grid Snap):**  
+  * 모든 객체는 `GridUtils`에 정의된 좌표계(`1.0m` 간격, `2.5m` 높이)에 자동으로 스냅됨.  
+* **툴 모드 (Tool Modes):**  
+  * `Draw Mode`: 마우스 드래그로 바닥을 붓칠하듯 배치.  
+  * `Object Mode`: 벽, 기둥, 스폰 포인트를 개별 클릭으로 배치 및 회전.
+
+### **14.4. 코드 및 데이터 정책**
+
+* **공유 로직:** 좌표 변환(`GridUtils`) 및 저장 구조체(`MapDataStructures`)는 런타임과 공유한다.  
+* **분리 로직:** 맵 로딩(`MapManager`) 등의 무거운 런타임 코드는 에디터에서 실행하지 않으며, 에디터 전용의 경량화된 로더를 사용한다.  
+* **참조 방식:** 에디터는 프리팹을 직접 저장하지 않고, `MapEditorSettingsSO`에 정의된 **Enum ID(String Key)** 만을 저장하여 데이터 무결성을 유지한다.
+

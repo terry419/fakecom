@@ -1,55 +1,55 @@
-// °æ·Î: Assets/Scripts/Enum/TileEnums.cs
+// ï¿½ï¿½ï¿½: Assets/Scripts/Enum/TileEnums.cs
 
 public enum FloorType
 {
-    None = 0,       // µ¥ÀÌÅÍ ¾øÀ½/¿À·ù
-    Void,           // Çã°ø (Ãß¶ô ÆÇÁ¤)
-    Concrete,       // ÄÜÅ©¸®Æ® ¹Ù´Ú
-    Dirt,           // ÁøÈë
-    Metal,          // ±Ý¼Ó
+    None = 0,       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½
+    Void,           // ï¿½ï¿½ï¿½ (ï¿½ß¶ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    Concrete,       // ï¿½ï¿½Å©ï¿½ï¿½Æ® ï¿½Ù´ï¿½
+    Dirt,           // ï¿½ï¿½ï¿½ï¿½
+    Metal,          // ï¿½Ý¼ï¿½
     Grass           // Ç®
 }
 
 public enum PillarType
 {
-    None = 0,       // µ¥ÀÌÅÍ ¾øÀ½
-    Empty,          // ±âµÕ ¾øÀ½
-    Concrete,       // ÄÜÅ©¸®Æ® ±âµÕ
-    Steel,          // Ã¶°ñ ±âµÕ
-    Marble          // Àå½Ä¿ë ±âµÕ
+    None = 0,       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    Empty,          // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    Concrete,       // ï¿½ï¿½Å©ï¿½ï¿½Æ® ï¿½ï¿½ï¿½
+    Steel,          // Ã¶ï¿½ï¿½ ï¿½ï¿½ï¿½
+    Marble          // ï¿½ï¿½Ä¿ï¿½ ï¿½ï¿½ï¿½
 }
 
 public enum EdgeType
 {
-    Unknown = 0,    // ÃÊ±âÈ­ ¾ÈµÊ
-    Open,           // ¿ÏÀüÈ÷ °³¹æµÊ (ÀÌµ¿ °¡´É)
-    Wall,           // º® (ÀÌµ¿/½Ã¾ß Â÷´Ü)
-    Window,         // Ã¢¹® (½Ã¾ß Åõ°ú, ÀÌµ¿ ºÒ°¡)
-    Door            // ¹® (»óÈ£ÀÛ¿ë °¡´É)
+    Unknown = 0,    // ï¿½Ê±ï¿½È­ ï¿½Èµï¿½
+    Open,           // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½)
+    Wall,           // ï¿½ï¿½ (ï¿½Ìµï¿½/ï¿½Ã¾ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    Window,         // Ã¢ï¿½ï¿½ (ï¿½Ã¾ï¿½ ï¿½ï¿½ï¿½ï¿½, ï¿½Ìµï¿½ ï¿½Ò°ï¿½)
+    Door            // ï¿½ï¿½ (ï¿½ï¿½È£ï¿½Û¿ï¿½ ï¿½ï¿½ï¿½ï¿½)
 }
 
 public enum CoverType
 {
-    None = 0,       // ¾öÆó ¾øÀ½ (0%)
-    Low,            // ¹Ý¾öÆó (20% ~)
-    High            // ¿ÏÀü¾öÆó (40% ~)
+    None = 0,       // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (0%)
+    Low,            // ï¿½Ý¾ï¿½ï¿½ï¿½ (20% ~)
+    High            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (40% ~)
 }
 
 public enum EdgeDataType
 {
     None = 0,
-    ConcreteWall,
-    BrickWall,
-    SteelFence,
-    GlassWindow,
-    WoodDoor
+    Concrete,
+    Brick,
+    Steel,
+    Glass,
+    Wood
 }
 
-// [¼öÁ¤] None(0) Á¦°Å. ¸ðµç ITileOccupant´Â ¹Ýµå½Ã À¯È¿ÇÑ Å¸ÀÔÀ» °¡Á®¾ß ÇÔ.
+// [ï¿½ï¿½ï¿½ï¿½] None(0) ï¿½ï¿½ï¿½ï¿½. ï¿½ï¿½ï¿½ ITileOccupantï¿½ï¿½ ï¿½Ýµï¿½ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½.
 public enum OccupantType
 {
-    Unit = 1,       // À¯´Ö (Primary Occupant)
-    Item = 2,       // ¾ÆÀÌÅÛ
-    Obstacle = 3,   // Àå¾Ö¹°
-    Trap = 4        // ÇÔÁ¤
+    Unit = 1,       // ï¿½ï¿½ï¿½ï¿½ (Primary Occupant)
+    Item = 2,       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Obstacle = 3,   // ï¿½ï¿½Ö¹ï¿½
+    Trap = 4        // ï¿½ï¿½ï¿½ï¿½
 }

@@ -1,0 +1,433 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 540b354b3d66cbc45bfb19523995a983, type: 3}
+  m_Name: State1
+  m_EditorClassIdentifier: 
+  MapID: 123
+  DisplayName: 123
+  GridSize: {x: 3, y: 5}
+  MapPrefabRef:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  MinLevel: 0
+  MaxLevel: 0
+  Tiles:
+  - Coords:
+      x: -1
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 0
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 0
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -1
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -2
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -2
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -2
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -1
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 0
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 0
+      z: 2
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 0
+      z: 1
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -1
+      z: 1
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -1
+      z: 2
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -2
+      z: 2
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: -2
+      z: 1
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  SpawnPoints: []
+  EnemyPool: []
+  MapLootTable: {fileID: 0}
