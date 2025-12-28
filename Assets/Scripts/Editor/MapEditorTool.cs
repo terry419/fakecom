@@ -167,30 +167,61 @@ public class MapEditorTool : EditorWindow
         return (tileCoords, dir, edgePos, true);
     }
 
+    // (전반부 생략 - OnGUI, OnSceneGUI 등 기존 코드 유지)
+    // ModifyEdge 메서드를 아래와 같이 통째로 교체하십시오.
+
     private void ModifyEdge((GridCoords tileCoords, Direction edgeDir, Vector3 worldPos, bool isValid) edge)
     {
-        // First, find and destroy any existing visual wall object at this exact position.
-        // The OnDestroy method of EditorWall will handle cleaning up the data on adjacent tiles.
+        // ---------------------------------------------------------------------
+        // 1. [데이터 선주입] 비주얼 변경 전, 양쪽 타일의 데이터를 강제로 갱신 (Bug B Fix)
+        // ---------------------------------------------------------------------
+        SavedEdgeInfo newEdgeData = CreateEdgeDataFromSelection();
+
+        // Target Tile (클릭된 타일)
+        EditorTile tile = GetEditorTileAt(edge.tileCoords);
+        if (tile != null)
+        {
+            Undo.RecordObject(tile, "Modify Edge Data");
+            tile.Edges[(int)edge.edgeDir] = newEdgeData;
+            EditorUtility.SetDirty(tile);
+        }
+
+        // Neighbor Tile (맞은편 타일)
+        var (neighborCoords, oppositeDir) = GridUtils.GetOppositeEdge(edge.tileCoords, edge.edgeDir);
+        EditorTile neighborTile = GetEditorTileAt(neighborCoords);
+        if (neighborTile != null)
+        {
+            Undo.RecordObject(neighborTile, "Modify Neighbor Edge Data");
+            neighborTile.Edges[(int)oppositeDir] = newEdgeData;
+            EditorUtility.SetDirty(neighborTile);
+        }
+
+        // ---------------------------------------------------------------------
+        // 2. [비주얼 교체] 기존 벽 파괴 -> 새 벽 생성
+        // ---------------------------------------------------------------------
+
+        // 기존 벽 제거 (위치와 방향이 일치하는 모든 EditorWall 검색)
         EditorWall[] allWalls = FindObjectsOfType<EditorWall>();
         foreach (var wall in allWalls)
         {
-            var (neighborCoords, oppositeDir) = GridUtils.GetOppositeEdge(edge.tileCoords, edge.edgeDir);
+            // 내 쪽 벽이거나, 반대편에서 나를 막고 있는 벽이면 제거 대상
             bool isTargetWall = (wall.Coordinate == edge.tileCoords && wall.Direction == edge.edgeDir) ||
                                 (wall.Coordinate == neighborCoords && wall.Direction == oppositeDir);
+
             if (isTargetWall)
             {
                 Undo.DestroyObjectImmediate(wall.gameObject);
             }
         }
 
-        // If we're just erasing, we're done.
+        // '지우개(Open)' 모드라면 여기서 끝
         if (selectedEdgeType == EdgeType.Open)
         {
-            Debug.Log($"Erased edge at {edge.tileCoords}-{edge.edgeDir}");
+            Debug.Log($"[MapEditorTool] Erased edge at {edge.tileCoords}-{edge.edgeDir}");
             return;
         }
 
-        // --- Create new wall ---
+        // 새 벽 오브젝트 생성
         GameObject prefabToUse = GetPrefabForEdgeType(selectedEdgeType);
         if (prefabToUse == null)
         {
@@ -199,21 +230,19 @@ public class MapEditorTool : EditorWindow
         }
 
         Transform edgeParent = GetOrCreateEdgeParent();
-        SavedEdgeInfo newEdgeData = CreateEdgeDataFromSelection();
-
         GameObject newWallObj = (GameObject)PrefabUtility.InstantiatePrefab(prefabToUse, edgeParent);
         Undo.RegisterCreatedObjectUndo(newWallObj, "Create " + selectedEdgeType);
 
+        // 위치 및 회전 설정
         newWallObj.transform.position = edge.worldPos + new Vector3(0, GridUtils.LEVEL_HEIGHT / 2.0f, 0);
         newWallObj.transform.rotation = (edge.edgeDir == Direction.North || edge.edgeDir == Direction.South)
                                          ? Quaternion.identity
                                          : Quaternion.Euler(0, 90, 0);
 
+        // 컴포넌트 초기화 (이제 데이터 동기화는 안 하고, 자기 정보만 가짐)
         var editorWall = newWallObj.GetComponent<EditorWall>();
         if (editorWall != null)
         {
-            // Initializing the new wall will trigger its OnEnable/OnValidate,
-            // which handles updating the neighboring tiles' data automatically.
             editorWall.Initialize(edge.tileCoords, edge.edgeDir, newEdgeData);
         }
 
