@@ -5,12 +5,17 @@ public class EditorTile : MonoBehaviour
     [Header("Data")]
     public GridCoords Coordinate;
     public FloorType FloorID;
+
+    // [New] 기둥 데이터를 저장하기 위해 필드 추가
+    public PillarType PillarID;
+
     public SavedEdgeInfo[] Edges = new SavedEdgeInfo[4];
 
     public void Initialize(GridCoords coords)
     {
         Coordinate = coords;
         FloorID = FloorType.Concrete;
+        PillarID = PillarType.None; // [New] 초기화
 
         // 1. 초기화: 일단 모두 Open으로 설정
         if (Edges == null || Edges.Length != 4) Edges = new SavedEdgeInfo[4];

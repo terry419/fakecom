@@ -229,6 +229,7 @@ MonoBehaviour:
     z: 0
     y: 0
   FloorID: 2
+  PillarID: 0
   Edges:
   - Type: 0
     Cover: 0

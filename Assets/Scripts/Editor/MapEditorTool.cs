@@ -1,21 +1,12 @@
 using UnityEditor;
 using UnityEngine;
-using UnityEditor.EditorTools;
-using System.Collections.Generic;
-using static UnityEditor.Handles;
 
 public class MapEditorTool : EditorWindow
 {
-    private int currentLevel = 0;
-    private MapEditorSettingsSO settings;
-    private MapDataSO targetMapData;
-    private GridCoords mouseGridCoords;
-    private bool mouseOverGrid;
-    private Transform tileParent;
-    private EdgeType selectedEdgeType = EdgeType.Wall;
-    private EdgeDataType selectedEdgeDataType = EdgeDataType.Concrete;
-
-    private (GridCoords tileCoords, Direction edgeDir, Vector3 worldPos, bool isValid) highlightedEdge;
+    private MapEditorContext _context;
+    private MapEditorSceneInput _sceneInput;
+    private MapEditorAction _action;
+    private MapEditorIO _io;
 
     [MenuItem("YCOM/Map Editor Tool")]
     public static void ShowWindow()
@@ -25,467 +16,78 @@ public class MapEditorTool : EditorWindow
 
     private void OnEnable()
     {
+        if (_context == null) _context = new MapEditorContext();
+
+        _sceneInput = new MapEditorSceneInput(_context);
+        _action = new MapEditorAction(_context);
+        _io = new MapEditorIO(_context);
+
+        // 이벤트 연결
+        _sceneInput.OnCreateTileRequested += _action.HandleCreateTile;
+        _sceneInput.OnModifyEdgeRequested += _action.HandleModifyEdge;
+        _sceneInput.OnCreatePillarRequested += _action.HandleCreatePillar; // [Fix] 연결
+        _sceneInput.OnEraseTileRequested += _action.HandleEraseTile;
+
         SceneView.duringSceneGui += OnSceneGUI;
-        FindOrCreateTileParent();
     }
 
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        if (_sceneInput != null)
+        {
+            _sceneInput.OnCreateTileRequested -= _action.HandleCreateTile;
+            _sceneInput.OnModifyEdgeRequested -= _action.HandleModifyEdge;
+            _sceneInput.OnCreatePillarRequested -= _action.HandleCreatePillar;
+            _sceneInput.OnEraseTileRequested -= _action.HandleEraseTile;
+        }
     }
 
     private void OnGUI()
     {
         GUILayout.Label("Construction Settings", EditorStyles.boldLabel);
 
-        GUILayout.BeginHorizontal();
-        currentLevel = EditorGUILayout.IntField("Current Level (Y)", currentLevel);
-        if (GUILayout.Button("-", GUILayout.Width(30))) currentLevel--;
-        if (GUILayout.Button("+", GUILayout.Width(30))) currentLevel++;
-        GUILayout.EndHorizontal();
-        if (currentLevel < 0) currentLevel = 0;
+        _context.Settings = (MapEditorSettingsSO)EditorGUILayout.ObjectField("Settings", _context.Settings, typeof(MapEditorSettingsSO), false);
 
-        EditorGUILayout.Space();
-        settings = (MapEditorSettingsSO)EditorGUILayout.ObjectField("Settings Profile", settings, typeof(MapEditorSettingsSO), false);
+        // [Fix] ToolMode UI
+        _context.CurrentToolMode = (MapEditorContext.ToolMode)EditorGUILayout.EnumPopup("Mode", _context.CurrentToolMode);
 
-        if (settings == null)
+        // Edge Mode UI
+        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
         {
-            EditorGUILayout.HelpBox("먼저 'MapEditorSettings' 에셋을 생성하고 할당해주세요!", MessageType.Warning);
-            return;
+            _context.SelectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Edge Type", _context.SelectedEdgeType);
+            _context.SelectedEdgeDataType = (EdgeDataType)EditorGUILayout.EnumPopup("Edge Material", _context.SelectedEdgeDataType);
+        }
+        // [Fix] Pillar Mode UI
+        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Pillar)
+        {
+            _context.SelectedPillarType = (PillarType)EditorGUILayout.EnumPopup("Pillar Type", _context.SelectedPillarType);
         }
 
         EditorGUILayout.Space();
-        GUILayout.Label("Bake/Load Settings", EditorStyles.boldLabel);
-        targetMapData = (MapDataSO)EditorGUILayout.ObjectField("Target Map Data", targetMapData, typeof(MapDataSO), false);
+        GUILayout.Label("File IO", EditorStyles.boldLabel);
 
+        _context.TargetMapData = (MapDataSO)EditorGUILayout.ObjectField("Map Data", _context.TargetMapData, typeof(MapDataSO), false);
+
+        // Load / Save Buttons
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Save Map to SO")) SaveMap();
-        if (GUILayout.Button("Load Map from SO")) LoadMap();
+        if (GUILayout.Button("Load Map"))
+        {
+            MapDataSO data = _io.LoadMapData();
+            if (data != null) _action.LoadMapFromData(data);
+        }
+
+        // [Fix] Save Map 버튼 (파일 없으면 생성됨)
+        if (GUILayout.Button("Save Map"))
+        {
+            _io.SaveMap();
+        }
         GUILayout.EndHorizontal();
-
-        EditorGUILayout.Space();
-        GUILayout.Label("Edge Construction", EditorStyles.boldLabel);
-        selectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Edge Type", selectedEdgeType);
-        selectedEdgeDataType = (EdgeDataType)EditorGUILayout.EnumPopup("Edge Material", selectedEdgeDataType);
-
-        EditorGUILayout.Space();
-        if (mouseOverGrid) EditorGUILayout.LabelField("Mouse Grid:", mouseGridCoords.ToString());
-        if (highlightedEdge.isValid) EditorGUILayout.LabelField("Highlighted Edge:", $"{highlightedEdge.tileCoords}-{highlightedEdge.edgeDir}");
     }
 
     private void OnSceneGUI(SceneView sceneView)
     {
-        if (settings == null) return;
-
-        Event guiEvent = Event.current;
-        int controlID = GUIUtility.GetControlID(FocusType.Passive);
-        HandleUtility.AddDefaultControl(controlID);
-
-        Ray mouseRay = HandleUtility.GUIPointToWorldRay(guiEvent.mousePosition);
-        Plane gridPlane = new Plane(Vector3.up, new Vector3(0, currentLevel * GridUtils.LEVEL_HEIGHT, 0));
-
-        if (gridPlane.Raycast(mouseRay, out float distance))
-        {
-            Vector3 worldPos = mouseRay.GetPoint(distance);
-            mouseGridCoords = GridUtils.WorldToGrid(worldPos);
-            mouseGridCoords.y = currentLevel;
-            mouseOverGrid = true;
-
-            Color tileHighlightColor = settings.GridHighlightMaterial != null ? settings.GridHighlightMaterial.color : Color.cyan;
-            DrawTileHighlight(mouseGridCoords, tileHighlightColor);
-
-            highlightedEdge = GetMouseOverEdge(worldPos);
-            if (highlightedEdge.isValid)
-            {
-                Color edgeHighlightColor = settings.EdgeHighlightMaterial != null ? settings.EdgeHighlightMaterial.color : Color.magenta;
-                DrawEdgeHighlight(highlightedEdge.worldPos, highlightedEdge.edgeDir, edgeHighlightColor);
-            }
-
-            if (guiEvent.type == EventType.MouseDown && guiEvent.button == 0)
-            {
-                if (highlightedEdge.isValid)
-                {
-                    ModifyEdge(highlightedEdge);
-                }
-                else
-                {
-                    CreateTile(mouseGridCoords);
-                }
-                guiEvent.Use();
-            }
-
-            sceneView.Repaint();
-            Repaint();
-        }
-        else
-        {
-            mouseOverGrid = false;
-            highlightedEdge.isValid = false;
-        }
-    }
-
-    private void DrawTileHighlight(GridCoords coords, Color color)
-    {
-        Color oldColor = UnityEditor.Handles.color;
-        UnityEditor.Handles.color = color;
-        DrawWireCube(GridUtils.GridToWorld(coords), new Vector3(GridUtils.CELL_SIZE, 0.1f, GridUtils.CELL_SIZE));
-        UnityEditor.Handles.color = oldColor;
-    }
-
-    private void DrawEdgeHighlight(Vector3 center, Direction dir, Color color)
-    {
-        float thickness = GridUtils.CELL_SIZE * 0.1f;
-        Vector3 size = (dir == Direction.North || dir == Direction.South)
-            ? new Vector3(GridUtils.CELL_SIZE, 0.2f, thickness)
-            : new Vector3(thickness, 0.2f, GridUtils.CELL_SIZE);
-
-        Color oldColor = UnityEditor.Handles.color;
-        UnityEditor.Handles.color = color;
-        DrawWireCube(center, size);
-        UnityEditor.Handles.color = oldColor;
-    }
-
-    private (GridCoords, Direction, Vector3, bool) GetMouseOverEdge(Vector3 mouseWorldPos)
-    {
-        GridCoords tileCoords = GridUtils.WorldToGrid(mouseWorldPos);
-        tileCoords.y = currentLevel;
-        Vector3 tileCenter = GridUtils.GridToWorld(tileCoords);
-        Vector3 offset = mouseWorldPos - tileCenter;
-
-        float threshold = GridUtils.CELL_SIZE * 0.35f;
-        float absX = Mathf.Abs(offset.x);
-        float absZ = Mathf.Abs(offset.z);
-
-        if (absX < threshold && absZ < threshold)
-            return (tileCoords, Direction.None, Vector3.zero, false);
-
-        Direction dir = (absX > absZ)
-            ? (offset.x > 0 ? Direction.East : Direction.West)
-            : (offset.z > 0 ? Direction.North : Direction.South);
-
-        Vector3 edgePos = GridUtils.GetEdgeWorldPosition(tileCoords, dir);
-        return (tileCoords, dir, edgePos, true);
-    }
-
-    // (전반부 생략 - OnGUI, OnSceneGUI 등 기존 코드 유지)
-    // ModifyEdge 메서드를 아래와 같이 통째로 교체하십시오.
-
-    private void ModifyEdge((GridCoords tileCoords, Direction edgeDir, Vector3 worldPos, bool isValid) edge)
-    {
-        // ---------------------------------------------------------------------
-        // 1. [데이터 선주입] 비주얼 변경 전, 양쪽 타일의 데이터를 강제로 갱신 (Bug B Fix)
-        // ---------------------------------------------------------------------
-        SavedEdgeInfo newEdgeData = CreateEdgeDataFromSelection();
-
-        // Target Tile (클릭된 타일)
-        EditorTile tile = GetEditorTileAt(edge.tileCoords);
-        if (tile != null)
-        {
-            Undo.RecordObject(tile, "Modify Edge Data");
-            tile.Edges[(int)edge.edgeDir] = newEdgeData;
-            EditorUtility.SetDirty(tile);
-        }
-
-        // Neighbor Tile (맞은편 타일)
-        var (neighborCoords, oppositeDir) = GridUtils.GetOppositeEdge(edge.tileCoords, edge.edgeDir);
-        EditorTile neighborTile = GetEditorTileAt(neighborCoords);
-        if (neighborTile != null)
-        {
-            Undo.RecordObject(neighborTile, "Modify Neighbor Edge Data");
-            neighborTile.Edges[(int)oppositeDir] = newEdgeData;
-            EditorUtility.SetDirty(neighborTile);
-        }
-
-        // ---------------------------------------------------------------------
-        // 2. [비주얼 교체] 기존 벽 파괴 -> 새 벽 생성
-        // ---------------------------------------------------------------------
-
-        // 기존 벽 제거 (위치와 방향이 일치하는 모든 EditorWall 검색)
-        EditorWall[] allWalls = FindObjectsOfType<EditorWall>();
-        foreach (var wall in allWalls)
-        {
-            // 내 쪽 벽이거나, 반대편에서 나를 막고 있는 벽이면 제거 대상
-            bool isTargetWall = (wall.Coordinate == edge.tileCoords && wall.Direction == edge.edgeDir) ||
-                                (wall.Coordinate == neighborCoords && wall.Direction == oppositeDir);
-
-            if (isTargetWall)
-            {
-                Undo.DestroyObjectImmediate(wall.gameObject);
-            }
-        }
-
-        // '지우개(Open)' 모드라면 여기서 끝
-        if (selectedEdgeType == EdgeType.Open)
-        {
-            Debug.Log($"[MapEditorTool] Erased edge at {edge.tileCoords}-{edge.edgeDir}");
-            return;
-        }
-
-        // 새 벽 오브젝트 생성
-        GameObject prefabToUse = GetPrefabForEdgeType(selectedEdgeType);
-        if (prefabToUse == null)
-        {
-            Debug.LogError($"[MapEditorTool] Prefab for {selectedEdgeType} is not set!");
-            return;
-        }
-
-        Transform edgeParent = GetOrCreateEdgeParent();
-        GameObject newWallObj = (GameObject)PrefabUtility.InstantiatePrefab(prefabToUse, edgeParent);
-        Undo.RegisterCreatedObjectUndo(newWallObj, "Create " + selectedEdgeType);
-
-        // 위치 및 회전 설정
-        newWallObj.transform.position = edge.worldPos + new Vector3(0, GridUtils.LEVEL_HEIGHT / 2.0f, 0);
-        newWallObj.transform.rotation = (edge.edgeDir == Direction.North || edge.edgeDir == Direction.South)
-                                         ? Quaternion.identity
-                                         : Quaternion.Euler(0, 90, 0);
-
-        // 컴포넌트 초기화 (이제 데이터 동기화는 안 하고, 자기 정보만 가짐)
-        var editorWall = newWallObj.GetComponent<EditorWall>();
-        if (editorWall != null)
-        {
-            editorWall.Initialize(edge.tileCoords, edge.edgeDir, newEdgeData);
-        }
-
-        Debug.Log($"[MapEditorTool] Created {selectedEdgeType} at {edge.tileCoords}-{edge.edgeDir}");
-    }
-
-    private SavedEdgeInfo CreateEdgeDataFromSelection()
-    {
-        switch (selectedEdgeType)
-        {
-            case EdgeType.Wall:
-                return SavedEdgeInfo.CreateWall(selectedEdgeDataType);
-            case EdgeType.Window:
-                return SavedEdgeInfo.CreateWindow(selectedEdgeDataType);
-            case EdgeType.Door:
-                return SavedEdgeInfo.CreateDoor(selectedEdgeDataType);
-            default:
-                return SavedEdgeInfo.CreateOpen();
-        }
-    }
-
-    private GameObject GetPrefabForEdgeType(EdgeType type)
-    {
-        switch (type)
-        {
-            case EdgeType.Wall: return settings.DefaultWallPrefab;
-            case EdgeType.Window: return settings.DefaultWindowPrefab;
-            case EdgeType.Door: return settings.DefaultDoorPrefab;
-            default: return null;
-        }
-    }
-
-    private EditorTile GetEditorTileAt(GridCoords coords)
-    {
-        if (tileParent == null) return null;
-        string tileName = $"Tile_{coords.x}_{coords.z}_{coords.y}";
-        Transform tileTransform = tileParent.Find(tileName);
-        return tileTransform?.GetComponent<EditorTile>();
-    }
-
-    private Transform GetOrCreateEdgeParent()
-    {
-        FindOrCreateTileParent();
-        Transform edgeParent = tileParent.Find("--- EDGES ---");
-        if (edgeParent == null)
-        {
-            var edgeParentObj = new GameObject("--- EDGES ---");
-            edgeParentObj.transform.SetParent(tileParent);
-            edgeParent = edgeParentObj.transform;
-        }
-        return edgeParent;
-    }
-
-    private void FindOrCreateTileParent()
-    {
-        if (tileParent == null)
-        {
-            GameObject parentObj = GameObject.Find("--- MAP_ROOT ---");
-            if (parentObj == null)
-            {
-                parentObj = new GameObject("--- MAP_ROOT ---");
-            }
-            tileParent = parentObj.transform;
-        }
-    }
-
-    private void CreateTile(GridCoords coords)
-    {
-        if (settings.DefaultTilePrefab == null)
-        {
-            Debug.LogError("DefaultTilePrefab is not set in Settings!");
-            return;
-        }
-
-        if (GetEditorTileAt(coords) != null) return;
-
-        FindOrCreateTileParent();
-        GameObject newTileObj = (GameObject)PrefabUtility.InstantiatePrefab(settings.DefaultTilePrefab, tileParent);
-        Undo.RegisterCreatedObjectUndo(newTileObj, "Create Tile");
-
-        newTileObj.transform.position = GridUtils.GridToWorld(coords);
-
-        var editorTile = newTileObj.GetComponent<EditorTile>();
-        if (editorTile != null)
-        {
-            editorTile.Initialize(coords);
-        }
-        else
-        {
-            newTileObj.name = $"Tile_{coords.x}_{coords.z}_{coords.y}";
-            Debug.LogWarning($"The default tile prefab is missing an 'EditorTile' component.");
-        }
-
-        Debug.Log($"Created tile at {coords}");
-    }
-
-    private void ClearMap()
-    {
-        FindOrCreateTileParent();
-
-        while (tileParent.childCount > 0)
-        {
-            Undo.DestroyObjectImmediate(tileParent.GetChild(0).gameObject);
-        }
-    }
-
-    private void LoadMap()
-    {
-        string path = EditorUtility.OpenFilePanel("Load Map Data", "Assets", "asset");
-        if (string.IsNullOrEmpty(path)) return;
-
-        path = "Assets" + path.Substring(Application.dataPath.Length);
-        MapDataSO loadedData = AssetDatabase.LoadAssetAtPath<MapDataSO>(path);
-
-        if (loadedData == null)
-        {
-            EditorUtility.DisplayDialog("Error", "Failed to load MapDataSO from path: " + path, "OK");
-            return;
-        }
-
-        ClearMap();
-
-        if (settings.DefaultTilePrefab != null)
-        {
-            foreach (var tileData in loadedData.Tiles)
-            {
-                if (tileData.FloorID != FloorType.None)
-                {
-                    CreateTile(tileData.Coords);
-                    EditorTile tile = GetEditorTileAt(tileData.Coords);
-                    if (tile != null)
-                    {
-                        Undo.RecordObject(tile, "Load Tile Data");
-                        tile.FloorID = tileData.FloorID;
-                        tile.Edges = tileData.Edges;
-                        EditorUtility.SetDirty(tile);
-                    }
-                }
-            }
-        }
-
-        if (settings.DefaultWallPrefab != null)
-        {
-            foreach (var tileData in loadedData.Tiles)
-            {
-                for (int i = 0; i < tileData.Edges.Length; i++)
-                {
-                    SavedEdgeInfo edgeInfo = tileData.Edges[i];
-                    if (edgeInfo.Type != EdgeType.Open && edgeInfo.Type != EdgeType.Unknown)
-                    {
-                        var (neighbor, opposite) = GridUtils.GetOppositeEdge(tileData.Coords, (Direction)i);
-                        if (tileData.Coords.CompareTo(neighbor) < 0)
-                        {
-                            var edge = (tileData.Coords, (Direction)i, GridUtils.GetEdgeWorldPosition(tileData.Coords, (Direction)i), true);
-
-                            selectedEdgeType = edgeInfo.Type;
-                            selectedEdgeDataType = edgeInfo.DataType;
-
-                            ModifyEdge(edge);
-                        }
-                    }
-                }
-            }
-        }
-
-        targetMapData = loadedData;
-        Debug.Log($"Map '{loadedData.name}' loaded with {loadedData.Tiles.Count} tiles.");
-    }
-
-    private void SaveMap()
-    {
-        if (targetMapData == null)
-        {
-            EditorUtility.DisplayDialog("Error", "Target Map Data SO is not assigned.", "OK");
-            return;
-        }
-
-        var tileDataDict = new Dictionary<GridCoords, TileSaveData>();
-
-        EditorTile[] tilesInScene = FindObjectsOfType<EditorTile>();
-        foreach (var editorTile in tilesInScene)
-        {
-            var saveData = new TileSaveData();
-            saveData.InitializeEdges();
-            saveData.Coords = editorTile.Coordinate;
-            saveData.FloorID = editorTile.FloorID;
-            saveData.Edges = editorTile.Edges;
-            tileDataDict[editorTile.Coordinate] = saveData;
-        }
-
-        EditorPillar[] pillarsInScene = FindObjectsOfType<EditorPillar>();
-        foreach (var editorPillar in pillarsInScene)
-        {
-            if (!tileDataDict.ContainsKey(editorPillar.Coordinate))
-            {
-                var newSaveData = new TileSaveData();
-                newSaveData.InitializeEdges();
-                tileDataDict[editorPillar.Coordinate] = newSaveData;
-            }
-
-            var saveData = tileDataDict[editorPillar.Coordinate];
-            saveData.Coords = editorPillar.Coordinate;
-            saveData.PillarID = editorPillar.PillarID;
-            tileDataDict[editorPillar.Coordinate] = saveData;
-        }
-
-        if (tileDataDict.Count == 0)
-        {
-            Debug.LogWarning("No tiles or pillars with editor components found. Clearing map data.");
-            targetMapData.Tiles.Clear();
-            EditorUtility.SetDirty(targetMapData);
-            AssetDatabase.SaveAssets();
-            return;
-        }
-
-        Undo.RecordObject(targetMapData, "Save Map Data");
-
-        int minX = int.MaxValue, maxX = int.MinValue;
-        int minZ = int.MaxValue, maxZ = int.MinValue;
-        int minY = int.MaxValue, maxY = int.MinValue;
-
-        foreach (GridCoords coords in tileDataDict.Keys)
-        {
-            if (coords.x < minX) minX = coords.x;
-            if (coords.x > maxX) maxX = coords.x;
-            if (coords.z < minZ) minZ = coords.z;
-            if (coords.z > maxZ) maxZ = coords.z;
-            if (coords.y < minY) minY = coords.y;
-            if (coords.y > maxY) maxY = coords.y;
-        }
-
-        targetMapData.GridSize = new Vector2Int(maxX - minX + 1, maxZ - minZ + 1);
-        targetMapData.MinLevel = minY;
-        targetMapData.MaxLevel = maxY;
-
-        targetMapData.Tiles.Clear();
-        foreach (var saveData in tileDataDict.Values)
-        {
-            targetMapData.Tiles.Add(saveData);
-        }
-
-        EditorUtility.SetDirty(targetMapData);
-        AssetDatabase.SaveAssets();
-        Debug.Log($"Map saved to '{targetMapData.name}' with {targetMapData.Tiles.Count} data points.");
+        _sceneInput?.HandleSceneGUI(sceneView);
+        sceneView.Repaint();
     }
 }
