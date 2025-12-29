@@ -7,9 +7,7 @@ using System;
 
 public class EdgeDataManager : MonoBehaviour, IInitializable
 {
-    // [수정] SO 파일 구조에 맞춰 EdgeDataType(재질)을 Key로 사용
     private Dictionary<EdgeDataType, EdgeDataSO> _edgeDataMap;
-
     private List<AsyncOperationHandle> _handles = new List<AsyncOperationHandle>();
     private bool _isInitialized = false;
 
@@ -18,8 +16,6 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
     private void OnDestroy()
     {
         ServiceLocator.Unregister<EdgeDataManager>(ManagerScope.Global);
-
-        // [리팩토링 3] 핸들 해제
         foreach (var handle in _handles)
         {
             if (handle.IsValid()) Addressables.Release(handle);
@@ -34,21 +30,18 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
 
         try
         {
-            // 라벨 "EdgeData"로 로드
             var loadHandle = Addressables.LoadAssetsAsync<EdgeDataSO>("EdgeData", null);
             _handles.Add(loadHandle);
 
             IList<EdgeDataSO> results = await loadHandle.ToUniTask();
 
-            // [리팩토링 6] 필수 데이터 검증
-            if (loadHandle.Status != AsyncOperationStatus.Succeeded || results == null || results.Count == 0)
+            if (loadHandle.Status != AsyncOperationStatus.Succeeded || results == null)
             {
                 throw new Exception("[EdgeDataManager] EdgeData 로드 실패.");
             }
 
             foreach (var edgeData in results)
             {
-                // [Fix] SO에 없는 Type 필드는 쓰지 않고, DataType만으로 매핑
                 if (edgeData.DataType == EdgeDataType.None) continue;
 
                 if (_edgeDataMap.ContainsKey(edgeData.DataType))
@@ -58,6 +51,9 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
                 }
                 _edgeDataMap.Add(edgeData.DataType, edgeData);
             }
+
+            // [1단계 적용됨] 필수 데이터 누락 검증 (Fail-Fast)
+            ValidateRequiredData();
 
             _isInitialized = true;
             Debug.Log($"[EdgeDataManager] {_edgeDataMap.Count} Edge Data Loaded.");
@@ -69,12 +65,31 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
         }
     }
 
-    // [중요] 런타임에 구조(Type)와 데이터(SO)를 조합하여 반환
+    // [Fail-Fast] Enum에 정의된 모든 타입에 대한 데이터가 있는지 확인
+    private void ValidateRequiredData()
+    {
+        var missingTypes = new List<string>();
+
+        foreach (EdgeDataType type in Enum.GetValues(typeof(EdgeDataType)))
+        {
+            if (type == EdgeDataType.None) continue;
+            if (!_edgeDataMap.ContainsKey(type))
+            {
+                missingTypes.Add(type.ToString());
+            }
+        }
+
+        if (missingTypes.Count > 0)
+        {
+            string missingList = string.Join(", ", missingTypes);
+            throw new InvalidOperationException($"[EdgeDataManager] Critical Error: 다음 재질(EdgeDataType)에 대한 데이터(SO)가 누락되었습니다 -> [{missingList}]");
+        }
+    }
+
     public EdgeInfo GetEdgeInfo(EdgeType type, EdgeDataType dataType)
     {
         if (!_isInitialized) return EdgeInfo.Open;
 
-        // 재질 데이터가 있으면 가져오고, 없으면 null
         EdgeDataSO data = null;
         if (_edgeDataMap.TryGetValue(dataType, out var foundData))
         {
@@ -82,10 +97,9 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
         }
         else if (dataType != EdgeDataType.None)
         {
-            Debug.LogWarning($"[EdgeDataManager] EdgeData missing for: {dataType}");
+            Debug.LogWarning($"[EdgeDataManager] Unexpected missing data: {dataType}");
         }
 
-        // EdgeInfo.Create 팩토리 메서드를 통해 구조체 생성 (기존 코드 호환)
         return EdgeInfo.Create(type, dataType, data);
     }
 }

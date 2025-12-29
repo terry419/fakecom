@@ -7,11 +7,9 @@ using System;
 
 public class TileDataManager : MonoBehaviour, IInitializable
 {
-    // [수정] id 문자열 대신, 기존 Enum을 키값으로 사용하는 딕셔너리 2개로 분리
     private Dictionary<FloorType, TileDataSO> _floorLibrary;
     private Dictionary<PillarType, TileDataSO> _pillarLibrary;
 
-    // 메모리 해제 핸들
     private AsyncOperationHandle<IList<TileDataSO>> _loadHandle;
     private bool _isInitialized = false;
 
@@ -20,7 +18,6 @@ public class TileDataManager : MonoBehaviour, IInitializable
     private void OnDestroy()
     {
         ServiceLocator.Unregister<TileDataManager>(ManagerScope.Global);
-        // [리팩토링 3] 메모리 누수 방지
         if (_loadHandle.IsValid()) Addressables.Release(_loadHandle);
     }
 
@@ -31,11 +28,9 @@ public class TileDataManager : MonoBehaviour, IInitializable
 
         try
         {
-            // 라벨 "TileData"로 로드
             _loadHandle = Addressables.LoadAssetsAsync<TileDataSO>("TileData", null);
             IList<TileDataSO> results = await _loadHandle.ToUniTask();
 
-            // [리팩토링 10] 로드 상태 검증
             if (_loadHandle.Status != AsyncOperationStatus.Succeeded || results == null)
             {
                 throw new Exception("TileData 로드 실패 (Addressables Load Failed)");
@@ -45,7 +40,6 @@ public class TileDataManager : MonoBehaviour, IInitializable
             {
                 if (so == null) continue;
 
-                // [Fix] SO 파일을 건드리지 않고, 기존 필드(IsPillarData)로 분기 처리
                 if (so.IsPillarData)
                 {
                     if (!_pillarLibrary.ContainsKey(so.PillarType))
@@ -58,9 +52,10 @@ public class TileDataManager : MonoBehaviour, IInitializable
                 }
             }
 
+            // [유지] 맵이 없는 초기 단계이므로, 데이터가 없어도 경고만 띄우고 넘어갑니다.
             if (_floorLibrary.Count == 0 && _pillarLibrary.Count == 0)
             {
-                Debug.LogWarning("[TileDataManager] 로드된 타일 데이터가 없습니다.");
+                Debug.LogWarning("[TileDataManager] 로드된 타일 데이터가 없습니다. (초기 개발 단계 확인용)");
             }
 
             _isInitialized = true;

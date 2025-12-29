@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-// [GDD 5.6] ���Ͽ� ����Ǵ� ����(��) ����
+// [GDD 5.6] 맵 파일에 저장되는 엣지(벽) 데이터
 [Serializable]
 public struct SavedEdgeInfo
 {
@@ -9,9 +9,9 @@ public struct SavedEdgeInfo
     public CoverType Cover;    // None, Low, High
     public float MaxHP;
     public float CurrentHP;
-    public EdgeDataType DataType; 
+    public EdgeDataType DataType;
 
-    private SavedEdgeInfo(EdgeType type, CoverType cover, float maxHP, float currentHP, EdgeDataType dataType)
+    public SavedEdgeInfo(EdgeType type, CoverType cover, float maxHP, float currentHP, EdgeDataType dataType)
     {
         Type = type;
         Cover = cover;
@@ -20,34 +20,36 @@ public struct SavedEdgeInfo
         DataType = dataType;
     }
 
+    // ========================================================================
+    // [Fix] EditorTile 등 기존 툴 호환을 위한 래퍼(Wrapper) 메서드 복구
+    // * 기본값은 EdgeFactory의 상수를 참조하여 일관성 유지 *
+    // ========================================================================
+
     public static SavedEdgeInfo CreateOpen()
     {
-        // An open edge has no HP, no cover, and no material data
-        return new SavedEdgeInfo(EdgeType.Open, CoverType.None, 0, 0, EdgeDataType.None);
+        return EdgeFactory.CreateOpen();
     }
 
-    public static SavedEdgeInfo CreateWall(EdgeDataType wallMaterial, float maxHP = 100f, CoverType cover = CoverType.High)
+    // EditorTile에서 (DataType, MaxHP, Cover)를 인자로 넘기므로 이를 받아주는 메서드가 필요합니다.
+    public static SavedEdgeInfo CreateWall(EdgeDataType material, float maxHP = EdgeFactory.HP_WALL, CoverType cover = EdgeFactory.COVER_WALL)
     {
-        // A wall must have a material type, and defaults to High cover and some HP
-        if (wallMaterial == EdgeDataType.None)
-        {
-            Debug.LogWarning("Creating a wall without a specific EdgeDataType. Defaulting to ConcreteWall.");
-            wallMaterial = EdgeDataType.Concrete; // Fallback
-        }
-        return new SavedEdgeInfo(EdgeType.Wall, cover, maxHP, maxHP, wallMaterial);
-    }
-    
-    public static SavedEdgeInfo CreateWindow(EdgeDataType windowMaterial = EdgeDataType.Glass, float maxHP = 30f, CoverType cover = CoverType.Low)
-    {
-        if (windowMaterial == EdgeDataType.None) windowMaterial = EdgeDataType.Glass;
-        return new SavedEdgeInfo(EdgeType.Window, cover, maxHP, maxHP, windowMaterial);
+        if (material == EdgeDataType.None) material = EdgeDataType.Concrete;
+        return new SavedEdgeInfo(EdgeType.Wall, cover, maxHP, maxHP, material);
     }
 
-    public static SavedEdgeInfo CreateDoor(EdgeDataType doorMaterial = EdgeDataType.Wood, float maxHP = 50f, CoverType cover = CoverType.None)
+    public static SavedEdgeInfo CreateWindow(EdgeDataType material, float maxHP = EdgeFactory.HP_WINDOW, CoverType cover = EdgeFactory.COVER_WINDOW)
     {
-        if (doorMaterial == EdgeDataType.None) doorMaterial = EdgeDataType.Wood;
-        return new SavedEdgeInfo(EdgeType.Door, cover, maxHP, maxHP, doorMaterial);
+        if (material == EdgeDataType.None) material = EdgeDataType.Glass;
+        return new SavedEdgeInfo(EdgeType.Window, cover, maxHP, maxHP, material);
     }
+
+    public static SavedEdgeInfo CreateDoor(EdgeDataType material, float maxHP = EdgeFactory.HP_DOOR, CoverType cover = EdgeFactory.COVER_DOOR)
+    {
+        if (material == EdgeDataType.None) material = EdgeDataType.Wood;
+        return new SavedEdgeInfo(EdgeType.Door, cover, maxHP, maxHP, material);
+    }
+
+    // ========================================================================
 
     public EdgeInfo ToEdgeInfo()
     {
@@ -57,12 +59,12 @@ public struct SavedEdgeInfo
             Cover = Cover,
             MaxHP = MaxHP,
             CurrentHP = CurrentHP,
-            DataType = DataType // ����� ���� ����
+            DataType = DataType
         };
     }
 }
 
-// [GDD 5.6] Ÿ�� ���� ������ (��� �迭��)
+// [GDD 5.6] 타일 저장 데이터
 [Serializable]
 public struct TileSaveData
 {
@@ -80,12 +82,12 @@ public struct TileSaveData
     }
 }
 
-// [������] TeamType Enum ���
+// 스폰 포인트 데이터
 [Serializable]
 public struct SpawnPointData
 {
     public Vector3 Position;
-    public TeamType Team;    // 0, 1 ��� ��Ȯ�� Enum ���
+    public TeamType Team;
     [Range(0f, 360f)]
     public float YRotation;
 }
