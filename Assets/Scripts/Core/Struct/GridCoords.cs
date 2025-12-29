@@ -2,17 +2,29 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// [GDD 5.6] 3D 정수 좌표계.
-/// 순서: X(Col), Z(Row), Y(Level).
+/// [GDD 5.6] 3D 정수 좌표계 구조체.
 /// </summary>
 [Serializable]
 public struct GridCoords : IEquatable<GridCoords>, IComparable<GridCoords>
 {
-    public int x; // Column (East/West)
-    public int z; // Row (North/South)
-    public int y; // Level (Height)
+    // [리팩토링 4] 좌표계 의미 명확화
 
-    // 생성자 순서 통일: (x, z, y)
+    /// <summary>
+    /// Column (East/West). 2D 그리드의 가로축, 3D 월드의 X축입니다.
+    /// </summary>
+    public int x;
+
+    /// <summary>
+    /// Row (North/South). 2D 그리드의 세로축, 3D 월드의 Z축(Depth)입니다.
+    /// </summary>
+    public int z;
+
+    /// <summary>
+    /// Level (Height). 층수를 나타내며, 3D 월드의 Y축입니다.
+    /// 로직에서는 주로 'levelIndex' 등으로 변환되어 사용됩니다.
+    /// </summary>
+    public int y;
+
     public GridCoords(int x, int z, int y)
     {
         this.x = x;
@@ -20,16 +32,13 @@ public struct GridCoords : IEquatable<GridCoords>, IComparable<GridCoords>
         this.y = y;
     }
 
-    // Unity 호환 생성자 (Vector3Int의 y를 높이로 인식)
     public GridCoords(Vector3Int vec) : this(vec.x, vec.z, vec.y) { }
 
-    // 연산자 오버로딩
     public static GridCoords operator +(GridCoords a, GridCoords b) => new GridCoords(a.x + b.x, a.z + b.z, a.y + b.y);
     public static GridCoords operator -(GridCoords a, GridCoords b) => new GridCoords(a.x - b.x, a.z - b.z, a.y - b.y);
     public static bool operator ==(GridCoords a, GridCoords b) => a.x == b.x && a.z == b.z && a.y == b.y;
     public static bool operator !=(GridCoords a, GridCoords b) => !(a == b);
 
-    // Dictionary Key 필수 구현
     public override bool Equals(object obj) => obj is GridCoords other && Equals(other);
     public bool Equals(GridCoords other) => x == other.x && z == other.z && y == other.y;
 
@@ -45,15 +54,13 @@ public struct GridCoords : IEquatable<GridCoords>, IComparable<GridCoords>
         }
     }
 
-    // [수정] 필드 순서(x, z, y)와 일치하는 출력 포맷
     public override string ToString() => $"({x}, {z}, {y})";
 
-    // [수정] 데이터 손상 방지를 위해 순서 일치 (x, z, y)
     public Vector3Int ToVector3Int() => new Vector3Int(x, z, y);
 
-    // [추가] 정렬/비교용 구현 (Level -> Row -> Col 순 우선순위)
     public int CompareTo(GridCoords other)
     {
+        // 정렬 우선순위: 층(Y) -> 행(Z) -> 열(X)
         if (y != other.y) return y.CompareTo(other.y);
         if (z != other.z) return z.CompareTo(other.z);
         return x.CompareTo(other.x);

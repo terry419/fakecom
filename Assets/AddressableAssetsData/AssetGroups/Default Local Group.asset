@@ -22,6 +22,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7202c9ecd599c9a4abd52ea4331469a9
+    m_Address: Assets/Prefabs/Manager/TileDataManager.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7943a248cbfbd484f9a61f64b5a86da6
+    m_Address: Assets/Prefabs/Manager/EdgeManager.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 6dab44de8aac0ed4199157ef46e50c4b, type: 2}
   m_SchemaSet:

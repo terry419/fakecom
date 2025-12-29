@@ -30,7 +30,7 @@ MonoBehaviour:
     - Manager
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2c538f2dadb0a534b8e2b3061620e517
-    m_Address: AppConfig.asset
+    m_Address: AppConfig
     m_ReadOnly: 0
     m_SerializedLabels:
     - AppConfig

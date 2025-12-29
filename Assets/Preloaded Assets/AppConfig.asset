@@ -42,3 +42,13 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
+  EdgeDataManagerRef:
+    m_AssetGUID: 7943a248cbfbd484f9a61f64b5a86da6
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  TileDataManagerRef:
+    m_AssetGUID: 7202c9ecd599c9a4abd52ea4331469a9
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0

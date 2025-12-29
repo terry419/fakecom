@@ -2,6 +2,7 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using UnityEngine.AddressableAssets;
 using System;
+using System.Text; // StringBuilder 사용
 
 public static class AppBootstrapper
 {
@@ -15,76 +16,97 @@ public static class AppBootstrapper
             return;
         }
 
-        // 1. AppConfig 로드 시도
+        // 성공 내역을 기록할 변수
+        StringBuilder globalLog = new StringBuilder();
+        globalLog.AppendLine("[Global Systems Initialization Log]");
+
+        // 1. AppConfig 로드
         AppConfig config;
         try
         {
             config = await Addressables.LoadAssetAsync<AppConfig>("AppConfig").ToUniTask();
+            globalLog.AppendLine("- AppConfig Load OK");
         }
         catch (Exception ex)
         {
-            throw new Exception($"[AppBootstrapper] 'AppConfig' 로드 실패! Addressables 빌드를 확인하세요. (Error: {ex.Message})");
+            throw new Exception($"[AppBootstrapper] AppConfig 로드 실패: {ex.Message}");
         }
 
-        if (config == null)
-            throw new NullReferenceException("[AppBootstrapper] 'AppConfig' 에셋을 찾았으나 내용이 비어있습니다(Null).");
+        if (config == null) throw new NullReferenceException("AppConfig Asset is Null");
 
-        // 2. 각 매니저 생성 (이름을 달아서 추적 가능하게 함)
-        var context = new InitializationContext { GlobalSettings = null };
+        // 2. GlobalSettings 로드
+        GlobalSettingsSO globalSettings = null;
+        if (config.GlobalSettingsRef != null && config.GlobalSettingsRef.RuntimeKeyIsValid())
+        {
+            try
+            {
+                globalSettings = await config.GlobalSettingsRef.LoadAssetAsync().ToUniTask();
+                globalLog.AppendLine("- GlobalSettingsSO Load OK");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"GlobalSettingsSO 로드 실패: {ex.Message}");
+            }
+        }
 
-        await SpawnAndInit(config.GameManagerRef, "GameManager", context);
-        await SpawnAndInit(config.InputManagerRef, "InputManager", context);
-        await SpawnAndInit(config.SaveManagerRef, "SaveManager", context);
-        await SpawnAndInit(config.DataManagerRef, "DataManager", context);
-        await SpawnAndInit(config.EdgeDataManagerRef, "EdgeDataManager", context);
-        await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context);
+        var context = new InitializationContext
+        {
+            GlobalSettings = globalSettings,
+            Scope = ManagerScope.Global
+        };
 
+        // 3. 부모 오브젝트 생성
+        GameObject rootParams = new GameObject("GlobalSystems");
+        GameObject.DontDestroyOnLoad(rootParams);
+
+        // 4. 매니저 생성 및 로그 기록 (logBuilder 전달)
+        // 에러 발생 시 여기서 Exception이 던져지므로 catch로 넘어감
+        await SpawnAndInit(config.GameManagerRef, "GameManager", context, rootParams.transform, globalLog);
+        await SpawnAndInit(config.InputManagerRef, "InputManager", context, rootParams.transform, globalLog);
+        await SpawnAndInit(config.SaveManagerRef, "SaveManager", context, rootParams.transform, globalLog);
+        await SpawnAndInit(config.DataManagerRef, "DataManager", context, rootParams.transform, globalLog);
+        await SpawnAndInit(config.EdgeDataManagerRef, "EdgeDataManager", context, rootParams.transform, globalLog);
+        await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context, rootParams.transform, globalLog);
+
+        // 여기까지 왔다면 모두 성공
+        Debug.Log(globalLog.ToString()); // 전체 성공 내역 출력
         _isGlobalInitialized = true;
     }
 
-    private static async UniTask SpawnAndInit(AssetReferenceGameObject refObj, string managerName, InitializationContext context)
+    private static async UniTask SpawnAndInit(AssetReferenceGameObject refObj, string managerName, InitializationContext context, Transform parent, StringBuilder logBuilder)
     {
-        // [범인 색출 1] AppConfig에 슬롯이 비어있는 경우
-        if (refObj == null)
-        {
-            Debug.LogError($"<color=red>[AppBootstrapper] '{managerName}'의 프리팹이 AppConfig에 연결되지 않았습니다!</color>");
-            return; // 에러 로그 띄우고 패스 (일단 게임은 켜지게)
-        }
-
-        // [범인 색출 2] Addressables 키가 깨진 경우
-        if (!refObj.RuntimeKeyIsValid())
-        {
-            Debug.LogError($"<color=red>[AppBootstrapper] '{managerName}'의 Addressable Key가 유효하지 않습니다. (Rebuild 필요)</color>");
-            return;
-        }
+        if (refObj == null || !refObj.RuntimeKeyIsValid())
+            throw new Exception($"[AppBootstrapper] '{managerName}' Reference Missing/Invalid");
 
         GameObject obj = null;
         try
         {
-            obj = await refObj.InstantiateAsync().ToUniTask();
+            obj = await refObj.InstantiateAsync(parent).ToUniTask();
         }
         catch (Exception ex)
         {
-            // [범인 색출 3] 생성 도중 에러 (프리팹 내부 문제 등)
-            throw new Exception($"[AppBootstrapper] '{managerName}' 프리팹 생성(Instantiate) 중 오류 발생! 프리팹을 확인하세요.\n{ex.Message}");
+            throw new Exception($"[Spawn Failed] {managerName}: {ex.Message}");
         }
 
-        // [범인 색출 4] 생성은 했는데 결과가 Null인 경우 (매우 드묾)
-        if (obj == null)
-        {
-            throw new Exception($"[AppBootstrapper] '{managerName}' 생성 결과가 NULL입니다.");
-        }
-
-        obj.name = managerName; // 이름 깔끔하게 정리
-        GameObject.DontDestroyOnLoad(obj);
+        obj.name = managerName;
 
         if (obj.TryGetComponent(out IInitializable manager))
         {
-            await manager.Initialize(context);
+            try
+            {
+                await manager.Initialize(context);
+                // [성공 시 로그 추가]
+                logBuilder.AppendLine($"- {managerName} Initialized OK");
+            }
+            catch (Exception ex)
+            {
+                // 실패 시 로그 추가 안 함 (어차피 Exception 던짐)
+                throw new Exception($"[Init Failed] {managerName}: {ex.Message}");
+            }
         }
         else
         {
-            Debug.LogError($"[AppBootstrapper] '{managerName}' 프리팹에 'IInitializable' 스크립트가 없습니다!");
+            throw new Exception($"[AppBootstrapper] '{managerName}' has no IInitializable.");
         }
     }
 }

@@ -1,14 +1,14 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
-using System.Text;
+using System.Text; // StringBuilder 사용
 
 public class BootManager : MonoBehaviour
 {
     public static event Action<bool> OnBootComplete;
 
-    // 에러 발생 시 경로 추적용 로그
-    private StringBuilder _trackLog = new StringBuilder();
+    // 성공 내역을 쌓을 변수
+    private StringBuilder _bootLog = new StringBuilder();
 
     private async void Start()
     {
@@ -17,18 +17,22 @@ public class BootManager : MonoBehaviour
 
     public async UniTask<bool> BootAsync()
     {
-        _trackLog.Clear();
-        _trackLog.AppendLine("Boot Start");
+        // 로그 초기화
+        _bootLog.Clear();
+        _bootLog.AppendLine("[Boot Sequence Log]");
 
         try
         {
-            // 1. Global (여기서 에러나면 AppBootstrapper가 상세 내용을 뱉음)
+            // 1. Global (AppBootstrapper 내부에서도 별도 로그를 찍지만, 여기도 한 줄 추가)
             await AppBootstrapper.EnsureGlobalSystems();
-            _trackLog.AppendLine(" -> Global OK");
+            _bootLog.AppendLine("1. Global Systems Check OK");
 
             // 2. Scene Managers
+            // 필수 매니저들
             await InitMan<MapManager>();
             await InitMan<TilemapGenerator>();
+
+            // 선택적 매니저들
             await InitManOptional<CameraController>();
             await InitManOptional<TurnManager>();
             await InitManOptional<CombatManager>();
@@ -38,44 +42,52 @@ public class BootManager : MonoBehaviour
             await InitManOptional<QTEManager>();
             await InitManOptional<DamageTextManager>();
 
-            // 성공 시 딱 한 줄만 출력
-            Debug.Log("<color=green>[BootManager] System Ready (All Systems Initialized)</color>");
+            // 전부 성공 시
+            _bootLog.AppendLine("<color=green>ALL SYSTEMS READY.</color>");
+            Debug.Log(_bootLog.ToString()); // 최종 성공 로그 한 번에 출력
+
             OnBootComplete?.Invoke(true);
             return true;
         }
         catch (Exception ex)
         {
-            // 실패 시: 추적 로그 + 범인 지목
-            Debug.LogError($"\n<color=red><b>[BOOT FAILED]</b></color>\n" +
-                           $"Last Success: {_trackLog}\n" +
-                           $"<b>Error Cause: {ex.Message}</b>");
+            // 실패 시: 지금까지 쌓인 성공 로그 + 에러 메시지 출력
+            Debug.LogError($"<color=red>[BOOT FAILED]</color>\n" +
+                           $"{_bootLog}\n" + // 어디까지 성공했는지 확인 가능
+                           $"--------------------------------\n" +
+                           $"<b>[Error Cause]:</b> {ex.Message}");
 
             OnBootComplete?.Invoke(false);
             return false;
         }
     }
 
-    // 필수 매니저 초기화 헬퍼
     private async UniTask InitMan<T>() where T : IInitializable
     {
-        var name = typeof(T).Name;
-        var manager = ServiceLocator.Get<T>();
-
-        if (manager == null)
-            throw new Exception($"<b>'{name}'</b>가 ServiceLocator에 없습니다! 씬에 배치되었는지 확인하세요.");
+        if (!ServiceLocator.TryGet<T>(out var manager))
+        {
+            throw new Exception($"[Missing] 필수 매니저 '{typeof(T).Name}' 없음.");
+        }
 
         await manager.Initialize(new InitializationContext());
-        _trackLog.Append($" -> {name}");
+
+        // [성공 로그 Append]
+        _bootLog.AppendLine($"- [Scene] {typeof(T).Name} OK");
     }
 
-    // 선택적 매니저 초기화 헬퍼
     private async UniTask InitManOptional<T>() where T : IInitializable
     {
-        var manager = ServiceLocator.Get<T>();
-        if (manager != null)
+        if (ServiceLocator.TryGet<T>(out var manager))
         {
             await manager.Initialize(new InitializationContext());
-            _trackLog.Append($" -> {typeof(T).Name}");
+
+            // [성공 로그 Append]
+            _bootLog.AppendLine($"- [Scene] {typeof(T).Name} (Opt) OK");
+        }
+        else
+        {
+            // 없어도 에러 아님, 로그에만 (Skip) 남김
+            // _bootLog.AppendLine($"- [Scene] {typeof(T).Name} Skipped (Not Found)");
         }
     }
 }
