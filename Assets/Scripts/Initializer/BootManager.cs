@@ -31,6 +31,7 @@ public class BootManager : MonoBehaviour
             // 필수 매니저들
             await InitMan<MapManager>();
             await InitMan<TilemapGenerator>();
+            await InitMan<SessionManager>();
 
             // 선택적 매니저들
             await InitManOptional<CameraController>();

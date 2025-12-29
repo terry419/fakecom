@@ -1,148 +1,167 @@
-using UnityEngine;
 using System;
-using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
-// [Refactoring Phase 1.5] BootManager¿Í ¿¬µ¿ÇÏ¿© °ÔÀÓ Èå¸§(FSM) Á¦¾î
+// FSMì˜ ì´ê´„ ê´€ë¦¬ì
 public class SessionManager : MonoBehaviour, IInitializable
 {
-    // ========================================================================
-    // 1. ±âÁ¸ FSM ¹× µ¥ÀÌÅÍ ·ÎÁ÷ (º¹±¸µÊ)
-    // ========================================================================
+    public SessionState CurrentStateID { get; private set; } = SessionState.None;
     public event Action<SessionState, SessionState> OnStateChanged;
-    public SessionState CurrentState { get; private set; } = SessionState.None;
 
-    private List<object> _pendingLoot = new List<object>();
+    private SessionStateBase _currentLogicState;
+    private SessionStateFactory _stateFactory;
+    private CancellationTokenSource _cts;
+    private bool _isTransitioning = false;
+    
+    // (ì„ì‹œ) ì‹¤ì œ UIManager êµ¬í˜„ ì „ê¹Œì§€ ì‚¬ìš©í•  Mock ê°ì²´
+    private class UIManagerMock : IUIManager
+    {
+        public event Action OnStartButtonClick;
+        public void ShowStartButton() => Debug.Log("[UIManagerMock] ì „íˆ¬ ì‹œì‘ ë²„íŠ¼ í‘œì‹œ");
+        public void HideStartButton() => Debug.Log("[UIManagerMock] ì „íˆ¬ ì‹œì‘ ë²„íŠ¼ ìˆ¨ê¹€");
+        
+        // SetupStateì˜ ìë™ ì§„í–‰ì„ ìœ„í•´ 1.5ì´ˆ ë’¤ ê°•ì œë¡œ ì´ë²¤íŠ¸ í˜¸ì¶œ (í…ŒìŠ¤íŠ¸ìš©)
+        public void AutoTriggerStartConfirmation()
+        {
+            UniTask.Delay(1500).ContinueWith(() => OnStartButtonClick?.Invoke()).Forget();
+        }
+    }
+    private UIManagerMock _uiManagerMock;
 
-    // ========================================================================
-    // 2. ÀÎÇÁ¶ó ¹× ÃÊ±âÈ­ (ServiceLocator & BootManager ¿¬µ¿)
-    // ========================================================================
+
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Scene);
+        _cts = new CancellationTokenSource();
     }
 
     private void OnDestroy()
     {
+        _cts.Cancel();
+        // OnDestroyëŠ” ë™ê¸° ì»¨í…ìŠ¤íŠ¸ì´ë¯€ë¡œ, Exitì˜ ë¹„ë™ê¸° ì™„ë£Œë¥¼ ê¸°ë‹¤ë¦´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
+        // Forget()ìœ¼ë¡œ í˜¸ì¶œí•˜ì—¬ ë§ˆì§€ë§‰ ì •ë¦¬ ì‘ì—…ì„ ì‹œë„í•˜ê²Œ í•©ë‹ˆë‹¤.
+        _currentLogicState?.Exit(_cts.Token).Forget();
+        _cts.Dispose();
+        
         ServiceLocator.Unregister<SessionManager>(ManagerScope.Scene);
-        // ÀÌº¥Æ® ±¸µ¶ ÇØÁ¦ (¸Ş¸ğ¸® ´©¼ö ¹æÁö)
         BootManager.OnBootComplete -= OnSystemBootFinished;
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
-        // SessionManager ÀÚÃ¼ÀÇ µ¥ÀÌÅÍ ·ÎµùÀÌ ÇÊ¿äÇÏ´Ù¸é ¿©±â¼­ ¼öÇà
-        // ÇöÀç´Â BootManager°¡ ¿Ï·á ½ÅÈ£¸¦ ÁÙ ¶§±îÁö ´ë±âÇÏ´Â ±¸Á¶ÀÌ¹Ç·Î ºñ¿öµÒ
-        _pendingLoot.Clear();
+        try
+        {
+            // í•„ìˆ˜ ë§¤ë‹ˆì € ê²€ì¦ (Fail-Fast)
+            if (!ServiceLocator.TryGet(out MapManager mapManager))
+                throw new Exception("MapManagerê°€ ë“±ë¡ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤!");
+            
+            if (!ServiceLocator.TryGet(out TurnManager turnManager))
+                throw new Exception("TurnManagerê°€ ë“±ë¡ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤!");
+            
+            // ì„ì‹œ UIManager Mock ìƒì„± ë° Contextì— ì „ë‹¬
+            _uiManagerMock = new UIManagerMock();
+            // ì‹¤ì œ UIManager ì‚¬ìš© ì‹œ: ServiceLocator.Register<IUIManager>(_uiManagerMock, ManagerScope.Scene);
+
+            // ì˜ì¡´ì„± ì»¨í…Œì´ë„ˆ(SessionContext) ìƒì„± ë° íŒ©í† ë¦¬ ì´ˆê¸°í™”
+            var sessionContext = new SessionContext(mapManager, turnManager, _uiManagerMock);
+            _stateFactory = new SessionStateFactory(sessionContext);
+            
+            BootManager.OnBootComplete += OnSystemBootFinished;
+        }
+        catch (Exception ex)
+        {
+            // ì´ˆê¸°í™” ì‹¤íŒ¨ ì‹œ ì¦‰ì‹œ ErrorStateë¡œ ì „í™˜
+            Debug.LogError($"[SessionManager] ì´ˆê¸°í™” ì‹¤íŒ¨: {ex.Message}");
+            CurrentStateID = SessionState.Error;
+            // _stateFactoryê°€ ì—†ì„ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ErrorStateë¥¼ ì§ì ‘ ìƒì„±
+            _currentLogicState = new ErrorState(null);
+            _currentLogicState.Enter(new ErrorPayload(ex), _cts.Token).Forget();
+        }
         await UniTask.CompletedTask;
     }
 
-    private void Start()
-    {
-        // [ÇÙ½É º¯°æÁ¡] ½º½º·Î ½ÃÀÛÇÏÁö ¾Ê°í, BootManager°¡ "¸ğµç ¸Å´ÏÀú ÁØºñ ³¡!" ÇÒ ¶§±îÁö ±â´Ù¸²
-        BootManager.OnBootComplete += OnSystemBootFinished;
-    }
-
-    // BootManager°¡ ÃÊ±âÈ­°¡ ³¡³µ´Ù°í ¾Ë·ÁÁÖ¸é ½ÇÇàµÇ´Â ÇÔ¼ö
     private void OnSystemBootFinished(bool isSuccess)
     {
-        if (!isSuccess)
+        // ì´ˆê¸°í™” ë‹¨ê³„ì—ì„œ ì´ë¯¸ ErrorStateë¡œ ì „í™˜ë˜ì—ˆë‹¤ë©´ ë¬´ì‹œ
+        if (CurrentStateID == SessionState.Error) return;
+
+        if (!isSuccess || _stateFactory == null)
         {
-            Debug.LogError("[SessionManager] ºÎÆÃ ½ÇÆĞ·Î ÀÎÇØ °ÔÀÓÀ» ½ÃÀÛÇÒ ¼ö ¾ø½À´Ï´Ù. (State: Error)");
-            ChangeState(SessionState.Error);
+            HandleTransitionRequest(SessionState.Error, new ErrorPayload(new Exception("Boot failed or StateFactory not ready.")));
             return;
         }
-
-        Debug.Log("[SessionManager] ½Ã½ºÅÛ ºÎÆÃ ¿Ï·á. °ÔÀÓ ·çÇÁ(FSM)¸¦ °¡µ¿ÇÕ´Ï´Ù.");
-
-        // [ÁøÀÔÁ¡] ÃÊ±â »óÅÂÀÎ SetupÀ¸·Î ÁøÀÔÇÏ¿© °ÔÀÓ ½ÃÀÛ
-        ChangeState(SessionState.Setup);
+        
+        Debug.Log("[SessionManager] ì‹œìŠ¤í…œ ë¶€íŒ… ì™„ë£Œ. Setup ìƒíƒœ ì§„ì… ìš”ì²­.");
+        
+        // (ì„ì‹œ) Mock UIê°€ ë²„íŠ¼ì„ ìë™ìœ¼ë¡œ ëˆ„ë¥´ë„ë¡ í•˜ì—¬ í…ŒìŠ¤íŠ¸ ì§„í–‰
+        _uiManagerMock.AutoTriggerStartConfirmation();
+        
+        HandleTransitionRequest(SessionState.Setup, null);
     }
 
-    // ========================================================================
-    // 3. »óÅÂ °ü¸® ·ÎÁ÷ (±âÁ¸ ÄÚµå À¯Áö)
-    // ========================================================================
-    public void ChangeState(SessionState newState)
+    private void HandleTransitionRequest(SessionState nextStateID, StatePayload payload)
     {
-        if (CurrentState == newState) return;
+        TransitionAsync(nextStateID, payload).Forget();
+    }
 
-        if (CurrentState == SessionState.Saving && newState != SessionState.Error)
+    private async UniTaskVoid TransitionAsync(SessionState nextStateID, StatePayload payload)
+    {
+        if (_isTransitioning) 
         {
-            Debug.LogWarning($"[SessionManager] Cannot change state to {newState} while SAVING.");
+            Debug.LogWarning($"[SessionManager] ì „í™˜ ì¤‘ ì¤‘ë³µ ìš”ì²­ ë¬´ì‹œë¨: {nextStateID}");
             return;
         }
+        _isTransitioning = true;
 
-        SessionState oldState = CurrentState;
-        CurrentState = newState;
-
-        Debug.Log($"[SessionManager] State Change: {oldState} -> {newState}");
-
-        HandleStateEntry(newState).Forget();
-        OnStateChanged?.Invoke(oldState, newState);
-    }
-
-    private async UniTaskVoid HandleStateEntry(SessionState state)
-    {
-        switch (state)
+        try
         {
-            case SessionState.Boot:
-                // BootManager°¡ ÀÌ¹Ì Ã³¸®ÇßÀ¸¹Ç·Î ¿©±â¼­´Â ÆĞ½ºÇÏ°Å³ª ´ë±â
-                break;
+            if (_currentLogicState != null)
+            {
+                _currentLogicState.OnRequestTransition -= HandleTransitionRequest;
+                await _currentLogicState.Exit(_cts.Token);
+            }
 
-            case SessionState.Setup:
-                ResumeGameTime();
-                Debug.Log("[SessionManager] 1. ¸Ê »ı¼º ¿äÃ»...");
-                // TODO: await MapManager.Generate(); ¿Í °°ÀÌ ½ÇÁ¦ ¿¬°á
+            var oldID = CurrentStateID;
+            _currentLogicState = _stateFactory.GetOrCreate(nextStateID);
+            CurrentStateID = _currentLogicState.StateID;
 
-                Debug.Log("[SessionManager] 2. À¯´Ö ¹èÄ¡...");
-                // TODO: await UnitManager.SpawnUnits();
-
-                Debug.Log("[SessionManager] Setup Complete. Auto-transition to TurnWaiting.");
-                ChangeState(SessionState.TurnWaiting);
-                break;
-
-            case SessionState.TurnWaiting:
-                ResumeGameTime();
-                // TODO: TurnManager.StartTurn();
-                Debug.Log("[SessionManager] ÅÏ ´ë±â Áß...");
-                break;
-
-            case SessionState.SystemOption:
-                PauseGameTime();
-                break;
-
-            case SessionState.Resolution:
-                PauseGameTime();
-                Debug.Log($"[SessionManager] Battle Result. Pending Loot Count: {_pendingLoot.Count}");
-                break;
-
-            case SessionState.Retry:
-                await UniTask.Yield();
-                ChangeState(SessionState.Setup);
-                break;
-
-            case SessionState.Error:
-                PauseGameTime();
-                Debug.LogError("[SessionManager] Critical Session Error Occurred.");
-                break;
+            Debug.Log($"[SessionManager] State Change: {oldID} -> {CurrentStateID}");
+            OnStateChanged?.Invoke(oldID, CurrentStateID);
+            
+            _currentLogicState.OnRequestTransition += HandleTransitionRequest;
+            await _currentLogicState.Enter(payload, _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.Log("[SessionManager] ìƒíƒœ ì „í™˜ ì¤‘ ì·¨ì†Œë¨ (ê²Œì„ ì¢…ë£Œ ë“±)");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SessionManager] ìƒíƒœ ì „í™˜ ì¤‘ ì¹˜ëª…ì  ì˜¤ë¥˜ ë°œìƒ. ErrorStateë¡œ ì „í™˜í•©ë‹ˆë‹¤.");
+            // í˜„ì¬ ì „í™˜ ë¡œì§ì´ ì‹¤íŒ¨í–ˆìœ¼ë¯€ë¡œ, ë‹¤ì‹œ ì´ ë©”ì„œë“œë¥¼ í˜¸ì¶œí•˜ì§€ ì•Šê³  ì§ì ‘ ErrorStateë¡œ ì§„ì…
+            CurrentStateID = SessionState.Error;
+            _currentLogicState = _stateFactory.GetOrCreate(SessionState.Error);
+            _currentLogicState.Enter(new ErrorPayload(ex), _cts.Token).Forget();
+        }
+        finally
+        {
+            _isTransitioning = false;
         }
     }
 
-    // ========================================================================
-    // 4. À¯Æ¿¸®Æ¼ (±âÁ¸ ÄÚµå À¯Áö)
-    // ========================================================================
-    private void PauseGameTime()
+    private void Update()
     {
-        Time.timeScale = 0f;
-    }
-
-    private void ResumeGameTime()
-    {
-        Time.timeScale = 1f;
-    }
-
-    public void AddLoot(object item)
-    {
-        _pendingLoot.Add(item);
+        if (_isTransitioning || _currentLogicState == null) return;
+        
+        try
+        {
+            _currentLogicState.Update();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SessionManager] '{CurrentStateID}' ìƒíƒœ Update ì¤‘ ì˜¤ë¥˜ ë°œìƒ. ErrorStateë¡œ ì „í™˜í•©ë‹ˆë‹¤.");
+            HandleTransitionRequest(SessionState.Error, new ErrorPayload(ex));
+        }
     }
 }
