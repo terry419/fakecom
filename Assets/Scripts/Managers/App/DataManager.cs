@@ -1,5 +1,6 @@
-using UnityEngine;
 using Cysharp.Threading.Tasks;
+using System;
+using UnityEngine;
 
 public class DataManager : MonoBehaviour, IInitializable
 {
@@ -15,10 +16,15 @@ public class DataManager : MonoBehaviour, IInitializable
 
     public async UniTask Initialize(InitializationContext context)
     {
-
-        // 나중에 여기서 무기 데이터, 적 데이터를 로드하는 데 1~2초 걸린다고 가정
-        // await LoadAllGameDataAsync(); 
-
-        await UniTask.CompletedTask;
+        try
+        {
+            // TODO: 세이브 파일 로드 등
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[DataManager] Error: {ex.Message}");
+            throw;
+        }
     }
 }

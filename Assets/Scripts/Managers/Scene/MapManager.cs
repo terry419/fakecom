@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
-using UnityEngine;
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class MapManager : MonoBehaviour, IInitializable
 {
@@ -9,10 +10,21 @@ public class MapManager : MonoBehaviour, IInitializable
     private Vector3Int _mapDimensions;
     private int _minLevel;
 
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<MapManager>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 초기화 시점에는 아직 맵 데이터가 없을 수 있음
-        await UniTask.CompletedTask;
+        try
+        {
+            // TODO: 맵 생성 준비 로직
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[MapManager] Error: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>

@@ -1,18 +1,24 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System;
 
 public class QTEManager : MonoBehaviour, IInitializable
 {
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<QTEManager>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 지금은 할 일이 없으니 바로 완료 보고
-        await UniTask.CompletedTask;
+        try
+        {
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[QTEManager] Error: {ex.Message}");
+            throw;
+        }
     }
 
-    public void Initialize() { }
-    // QTE 시작 요청 및 결과 반환 로직이 들어올 공간입니다.
-    public void StartQTE()
-    {
-        Debug.Log("[QTEManager] QTE 시스템 가동.");
-    }
+    public void StartQTE() { }
 }

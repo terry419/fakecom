@@ -1,8 +1,8 @@
-using Cysharp.Threading.Tasks; // 비동기(UniTask) 사용
+using Cysharp.Threading.Tasks;
 
+// [Refactoring Phase 1] P0: 인터페이스 설계 중복 제거
+// 동기식 void Initialize()를 제거하고, 비동기 초기화만 강제합니다.
 public interface IInitializable
 {
-    // "보급품 가방(context) 줄 테니까 일할 준비 해!"
-    // 준비가 끝날 때까지 기다려줄게 (UniTask)
     UniTask Initialize(InitializationContext context);
 }

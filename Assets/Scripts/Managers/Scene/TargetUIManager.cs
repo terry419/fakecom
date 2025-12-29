@@ -1,17 +1,24 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System;
 
 public class TargetUIManager : MonoBehaviour, IInitializable
 {
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<TargetUIManager>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 지금은 할 일이 없으니 바로 완료 보고
-        await UniTask.CompletedTask;
+        try
+        {
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[TargetUIManager] Error: {ex.Message}");
+            throw;
+        }
     }
-    public void Initialize() { }
-    // 타겟 정보 UI 표시 및 풀링을 담당합니다.
-    public void ShowTargetInfo()
-    {
-        Debug.Log("[TargetUIManager] 타겟 UI 표시.");
-    }
+
+    public void ShowTargetInfo() { }
 }

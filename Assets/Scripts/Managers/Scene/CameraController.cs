@@ -1,17 +1,24 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System;
 
 public class CameraController : MonoBehaviour, IInitializable
 {
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<CameraController>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 지금은 할 일이 없으니 바로 완료 보고
-        await UniTask.CompletedTask;
+        try
+        {
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CameraController] Error: {ex.Message}");
+            throw;
+        }
     }
-    public void Initialize() { }
-    // 카메라 리센터, 액션뷰 전환, 쉐이크 효과 등을 관리합니다.
-    public void SetTarget()
-    {
-        Debug.Log("[CameraController] 카메라 타겟 설정.");
-    }
+
+    public void SetTarget() { }
 }

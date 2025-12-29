@@ -1,17 +1,24 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System;
 
 public class PlayerInputCoordinator : MonoBehaviour, IInitializable
 {
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<PlayerInputCoordinator>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 지금은 할 일이 없으니 바로 완료 보고
-        await UniTask.CompletedTask;
+        try
+        {
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PlayerInputCoordinator] Error: {ex.Message}");
+            throw;
+        }
     }
-    public void Initialize() { }
-    // 플레이어의 현재 입력 모드(상태)를 제어합니다.
-    public void UpdateInputState()
-    {
-        Debug.Log("[PlayerInputCoordinator] 입력 상태 갱신.");
-    }
+
+    public void UpdateInputState() { }
 }

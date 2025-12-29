@@ -3,23 +3,65 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 
+// [Refactoring Phase 1.5] BootManager와 연동하여 게임 흐름(FSM) 제어
 public class SessionManager : MonoBehaviour, IInitializable
 {
+    // ========================================================================
+    // 1. 기존 FSM 및 데이터 로직 (복구됨)
+    // ========================================================================
     public event Action<SessionState, SessionState> OnStateChanged;
     public SessionState CurrentState { get; private set; } = SessionState.None;
 
     private List<object> _pendingLoot = new List<object>();
 
+    // ========================================================================
+    // 2. 인프라 및 초기화 (ServiceLocator & BootManager 연동)
+    // ========================================================================
+    private void Awake()
+    {
+        ServiceLocator.Register(this, ManagerScope.Scene);
+    }
+
+    private void OnDestroy()
+    {
+        ServiceLocator.Unregister<SessionManager>(ManagerScope.Scene);
+        // 이벤트 구독 해제 (메모리 누수 방지)
+        BootManager.OnBootComplete -= OnSystemBootFinished;
+    }
+
     public async UniTask Initialize(InitializationContext context)
     {
+        // SessionManager 자체의 데이터 로딩이 필요하다면 여기서 수행
+        // 현재는 BootManager가 완료 신호를 줄 때까지 대기하는 구조이므로 비워둠
         _pendingLoot.Clear();
-
-        // 아직 특별히 비동기 로딩할 게 없다면 바로 상태 변경
-        ChangeState(SessionState.Boot);
-
-        // 비동기 함수 규격을 맞추기 위해 완료 신호 보냄
         await UniTask.CompletedTask;
     }
+
+    private void Start()
+    {
+        // [핵심 변경점] 스스로 시작하지 않고, BootManager가 "모든 매니저 준비 끝!" 할 때까지 기다림
+        BootManager.OnBootComplete += OnSystemBootFinished;
+    }
+
+    // BootManager가 초기화가 끝났다고 알려주면 실행되는 함수
+    private void OnSystemBootFinished(bool isSuccess)
+    {
+        if (!isSuccess)
+        {
+            Debug.LogError("[SessionManager] 부팅 실패로 인해 게임을 시작할 수 없습니다. (State: Error)");
+            ChangeState(SessionState.Error);
+            return;
+        }
+
+        Debug.Log("[SessionManager] 시스템 부팅 완료. 게임 루프(FSM)를 가동합니다.");
+
+        // [진입점] 초기 상태인 Setup으로 진입하여 게임 시작
+        ChangeState(SessionState.Setup);
+    }
+
+    // ========================================================================
+    // 3. 상태 관리 로직 (기존 코드 유지)
+    // ========================================================================
     public void ChangeState(SessionState newState)
     {
         if (CurrentState == newState) return;
@@ -33,7 +75,6 @@ public class SessionManager : MonoBehaviour, IInitializable
         SessionState oldState = CurrentState;
         CurrentState = newState;
 
-        // 상태 변경 로그 (이모티콘 제거, 표준 포맷)
         Debug.Log($"[SessionManager] State Change: {oldState} -> {newState}");
 
         HandleStateEntry(newState).Forget();
@@ -45,20 +86,25 @@ public class SessionManager : MonoBehaviour, IInitializable
         switch (state)
         {
             case SessionState.Boot:
-                await ProcessBooting();
+                // BootManager가 이미 처리했으므로 여기서는 패스하거나 대기
                 break;
 
             case SessionState.Setup:
                 ResumeGameTime();
-                // MapManager.Generate() 호출 로직
-                // Setup 완료 로그는 필요할 수 있음 (흐름 파악용)
+                Debug.Log("[SessionManager] 1. 맵 생성 요청...");
+                // TODO: await MapManager.Generate(); 와 같이 실제 연결
+
+                Debug.Log("[SessionManager] 2. 유닛 배치...");
+                // TODO: await UnitManager.SpawnUnits();
+
                 Debug.Log("[SessionManager] Setup Complete. Auto-transition to TurnWaiting.");
                 ChangeState(SessionState.TurnWaiting);
                 break;
 
             case SessionState.TurnWaiting:
                 ResumeGameTime();
-                // TurnManager.DetermineNextUnit()
+                // TODO: TurnManager.StartTurn();
+                Debug.Log("[SessionManager] 턴 대기 중...");
                 break;
 
             case SessionState.SystemOption:
@@ -82,6 +128,9 @@ public class SessionManager : MonoBehaviour, IInitializable
         }
     }
 
+    // ========================================================================
+    // 4. 유틸리티 (기존 코드 유지)
+    // ========================================================================
     private void PauseGameTime()
     {
         Time.timeScale = 0f;
@@ -90,13 +139,6 @@ public class SessionManager : MonoBehaviour, IInitializable
     private void ResumeGameTime()
     {
         Time.timeScale = 1f;
-    }
-
-    private async UniTask ProcessBooting()
-    {
-        // 데이터 로드 시뮬레이션
-        await UniTask.Delay(TimeSpan.FromSeconds(0.5f));
-        ChangeState(SessionState.Setup);
     }
 
     public void AddLoot(object item)

@@ -1,18 +1,24 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
+using System;
 
 public class TilemapGenerator : MonoBehaviour, IInitializable
 {
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
+    private void OnDestroy() => ServiceLocator.Unregister<TilemapGenerator>(ManagerScope.Scene);
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 지금은 할 일이 없으니 바로 완료 보고
-        await UniTask.CompletedTask;
+        try
+        {
+            await UniTask.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[TilemapGenerator] Error: {ex.Message}");
+            throw;
+        }
     }
 
-    public void Initialize() { }
-    // 설정된 크기대로 타일을 스폰하고 관리합니다.
-    public void Generate()
-    {
-        Debug.Log("[TilemapGenerator] 타일맵 생성 실행.");
-    }
+    public void Generate() { Debug.Log("Generate Map"); }
 }
