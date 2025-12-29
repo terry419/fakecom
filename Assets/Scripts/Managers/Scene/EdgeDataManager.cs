@@ -47,18 +47,5 @@ public class EdgeDataManager : MonoBehaviour, IInitializable
         }
     }
 
-    private void ValidateAllDataLoaded()
-    {
-        foreach (EdgeDataType type in System.Enum.GetValues(typeof(EdgeDataType)))
-        {
-            if (type == EdgeDataType.None) continue;
-
-            if (!_library.ContainsKey(type))
-            {
-                Debug.LogError($"[EdgeDataManager] MISSING DATA: '{type}' 타입의 데이터가 로드되지 않았습니다. SO 파일에 'EdgeData' 라벨을 붙였는지 확인하세요.");
-            }
-        }
-    }
-
     public EdgeDataSO GetData(EdgeDataType type) => _library.TryGetValue(type, out var data) ? data : null;
 }

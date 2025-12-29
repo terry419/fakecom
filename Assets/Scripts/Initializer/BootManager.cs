@@ -1,100 +1,81 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
-using System.Collections.Generic;
+using System.Text;
 
-// [Refactoring Phase 1] P0: ServiceLocator 기반 부트스트래퍼
 public class BootManager : MonoBehaviour
 {
-    // 외부에서 부팅 완료를 구독할 수 있는 이벤트
     public static event Action<bool> OnBootComplete;
 
-    private const string PREFIX = "[BootManager]";
+    // 에러 발생 시 경로 추적용 로그
+    private StringBuilder _trackLog = new StringBuilder();
 
     private async void Start()
     {
         await BootAsync();
     }
 
-    // BootManager.cs 내부
     public async UniTask<bool> BootAsync()
     {
+        _trackLog.Clear();
+        _trackLog.AppendLine("Boot Start");
+
         try
         {
-            LogInfo("System Boot Started...");
+            // 1. Global (여기서 에러나면 AppBootstrapper가 상세 내용을 뱉음)
+            await AppBootstrapper.EnsureGlobalSystems();
+            _trackLog.AppendLine(" -> Global OK");
 
-            // ------------------------------------------------------------
-            // Phase 1: Core Data (핵심 데이터 로드)
-            // ------------------------------------------------------------
-            // 병렬 처리를 원한다면 UniTask.WhenAll 사용 가능
-            // 현재는 안정성을 위해 순차 실행 구조 유지
-            await InitializeManager<DataManager>("DataManager");
-            await InitializeManager<EdgeDataManager>("EdgeDataManager");
-            await InitializeManager<TileDataManager>("TileDataManager");
+            // 2. Scene Managers
+            await InitMan<MapManager>();
+            await InitMan<TilemapGenerator>();
+            await InitManOptional<CameraController>();
+            await InitManOptional<TurnManager>();
+            await InitManOptional<CombatManager>();
+            await InitManOptional<PathVisualizer>();
+            await InitManOptional<PlayerInputCoordinator>();
+            await InitManOptional<TargetUIManager>();
+            await InitManOptional<QTEManager>();
+            await InitManOptional<DamageTextManager>();
 
-            // ------------------------------------------------------------
-            // Phase 2: Scene Construction (맵 구성)
-            // ------------------------------------------------------------
-            await InitializeManager<MapManager>("MapManager");
-            await InitializeManager<TilemapGenerator>("TilemapGenerator");
-
-            // ------------------------------------------------------------
-            // Phase 3: Runtime Systems (인게임 시스템 활성화)
-            // ------------------------------------------------------------
-            // [기존 목록]
-            await InitializeManagerOptional<CameraController>("CameraController");
-            await InitializeManagerOptional<TurnManager>("TurnManager");
-
-            // [추가된 나머지 매니저 목록]
-            await InitializeManagerOptional<CombatManager>("CombatManager");
-            await InitializeManagerOptional<PathVisualizer>("PathVisualizer");
-            await InitializeManagerOptional<PlayerInputCoordinator>("PlayerInputCoordinator");
-            await InitializeManagerOptional<TargetUIManager>("TargetUIManager");
-            await InitializeManagerOptional<QTEManager>("QTEManager");
-            await InitializeManagerOptional<DamageTextManager>("DamageTextManager");
-
-            LogInfo("Boot Sequence Complete. Game is Ready.");
+            // 성공 시 딱 한 줄만 출력
+            Debug.Log("<color=green>[BootManager] System Ready (All Systems Initialized)</color>");
             OnBootComplete?.Invoke(true);
             return true;
         }
         catch (Exception ex)
         {
-            LogError($"CRITICAL FAILURE: {ex.Message}");
+            // 실패 시: 추적 로그 + 범인 지목
+            Debug.LogError($"\n<color=red><b>[BOOT FAILED]</b></color>\n" +
+                           $"Last Success: {_trackLog}\n" +
+                           $"<b>Error Cause: {ex.Message}</b>");
+
             OnBootComplete?.Invoke(false);
             return false;
         }
     }
-    
-    // 필수 매니저 초기화 (없으면 부팅 중단)
-    private async UniTask InitializeManager<T>(string name) where T : IInitializable
+
+    // 필수 매니저 초기화 헬퍼
+    private async UniTask InitMan<T>() where T : IInitializable
     {
-        // GDD 규칙에 따라 매니저는 Awake에서 이미 Register되어 있어야 함
+        var name = typeof(T).Name;
         var manager = ServiceLocator.Get<T>();
 
         if (manager == null)
-            throw new NullReferenceException($"Critical Dependency '{name}' is missing in ServiceLocator! Verify Awake() registration.");
+            throw new Exception($"<b>'{name}'</b>가 ServiceLocator에 없습니다! 씬에 배치되었는지 확인하세요.");
 
         await manager.Initialize(new InitializationContext());
+        _trackLog.Append($" -> {name}");
     }
 
-    // 선택적 매니저 초기화 (없어도 부팅 계속)
-    private async UniTask InitializeManagerOptional<T>(string name) where T : IInitializable
+    // 선택적 매니저 초기화 헬퍼
+    private async UniTask InitManOptional<T>() where T : IInitializable
     {
         var manager = ServiceLocator.Get<T>();
-        if (manager == null)
+        if (manager != null)
         {
-            LogWarning($"Optional System '{name}' not found. Skipping.");
-            return;
+            await manager.Initialize(new InitializationContext());
+            _trackLog.Append($" -> {typeof(T).Name}");
         }
-
-        await manager.Initialize(new InitializationContext());
     }
-
-    #region Logging Helpers
-    private void LogInfo(string msg) => Debug.Log($"{PREFIX} {msg}");
-    private void LogPhase(int n, string desc) => Debug.Log($"{PREFIX} [Phase {n}] {desc}");
-    private void LogSuccess(string msg) => Debug.Log($"{PREFIX}  {msg}");
-    private void LogWarning(string msg) => Debug.LogWarning($"{PREFIX}  {msg}");
-    private void LogError(string msg) => Debug.LogError($"{PREFIX}  {msg}");
-    #endregion
 }
