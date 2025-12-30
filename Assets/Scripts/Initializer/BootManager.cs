@@ -20,36 +20,43 @@ public class BootManager : MonoBehaviour
 
         try
         {
-            // 1. Global Systems (AppBootstrapper 호출)
-            // 발생하는 모든 치명적 오류는 BootstrapException으로 래핑되어 올라옵니다.
+            // 1. Global Systems
             await AppBootstrapper.EnsureGlobalSystems();
-            _bootLog.AppendLine("1. Global Systems Check OK");
+            _bootLog.AppendLine("1. Global Systems Initialized OK");
 
-            // 2. Scene Context (MapData) 로드 등 나머지 초기화 로직...
-            // (기존 코드 유지)
+            // 2. Scene Systems
+            var sceneInitializer = FindObjectOfType<SceneInitializer>();
+            if (sceneInitializer == null)
+            {
+                // [수정] 씬 이니셜라이저가 없으면 치명적 오류로 처리
+                throw new BootstrapException("SceneInitializer not found in the current scene. Cannot proceed.");
+            }
+            
+            await sceneInitializer.InitializeSceneAsync(_bootLog);
+            _bootLog.AppendLine("2. Scene Systems Initialized OK");
 
-            _bootLog.AppendLine("<color=green>ALL SYSTEMS READY.</color>");
+            _bootLog.AppendLine("\n<color=green>ALL SYSTEMS READY.</color>");
             Debug.Log(_bootLog.ToString());
-
+            
             OnBootComplete?.Invoke(true);
             return true;
         }
         catch (BootstrapException bex)
         {
-            // [Critical] 초기화 실패 (예상된 오류)
+            // ... (이하 오류 처리 로직은 동일)
             Debug.LogError(
                 $"<color=red>[BOOT FAILED]</color>\n" +
                 $"{_bootLog}\n" +
                 $"================================\n" +
                 $"<b>Error:</b> {bex.Message}\n" +
-                $"<b>Inner Exception:</b> {bex.InnerException?.Message}");
+                $"<b>Inner Exception:</b> {bex.InnerException?.Message}\n" +
+                $"<b>StackTrace:</b>\n{bex.StackTrace}");
 
             OnBootComplete?.Invoke(false);
             return false;
         }
         catch (Exception ex)
         {
-            // [Unexpected] 예상치 못한 런타임 오류
             Debug.LogError(
                 $"<color=red>[BOOT FAILED - UNEXPECTED]</color>\n" +
                 $"{_bootLog}\n" +

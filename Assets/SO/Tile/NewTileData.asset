@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e7739c38a269fa64ca399d7db3035f08, type: 3}
   m_Name: NewTileData
   m_EditorClassIdentifier: 
-  FloorType: 0
-  PillarType: 0
+  FloorType: 2
+  PillarType: 2
   IsPillarData: 0
   ModelPrefab: {fileID: 0}
   WalkSoundKey: 

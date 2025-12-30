@@ -22,6 +22,11 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
+  MapVisualSettingsRef:
+    m_AssetGUID: 46880c9bbacb56f42b9621e7b6189606
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
   GameManagerRef:
     m_AssetGUID: f0a08f7e386d680459127b2a1abded3f
     m_SubObjectName: 
