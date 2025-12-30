@@ -10,6 +10,9 @@ public class AppConfig : ScriptableObject
     [Header("Global Managers (DontDestroyOnLoad)")]
     public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef;
 
+    // [New] 맵 비주얼 설정 (TileDataManager 주입용)
+    public AssetReferenceT<MapEditorSettingsSO> MapVisualSettingsRef;
+
     // 시스템 매니저
     public AssetReferenceGameObject GameManagerRef;
     public AssetReferenceGameObject DataManagerRef;

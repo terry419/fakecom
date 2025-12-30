@@ -4,15 +4,11 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using System.Collections.Generic;
 using System;
-using System.Linq; // 리스트 검색용
+using System.Linq;
 
 public class TileDataManager : MonoBehaviour, IInitializable
 {
-    // [핵심 변경] 진짜 프리팹이 들어있는 설정 파일 참조
-    [Header("Visual Settings (Source of Truth)")]
-    [SerializeField] private MapEditorSettingsSO _visualSettings;
-
-    // 논리 데이터 (기존 유지)
+    private MapEditorSettingsSO _visualSettings;
     private Dictionary<FloorType, TileDataSO> _floorLibrary;
     private Dictionary<PillarType, TileDataSO> _pillarLibrary;
     private AsyncOperationHandle<IList<TileDataSO>> _loadHandle;
@@ -31,15 +27,19 @@ public class TileDataManager : MonoBehaviour, IInitializable
         _floorLibrary = new Dictionary<FloorType, TileDataSO>();
         _pillarLibrary = new Dictionary<PillarType, TileDataSO>();
 
-        // [방어 코드] 시각 설정 파일이 연결 안 되어 있으면 경고
+        // [필수] 설정 주입
+        _visualSettings = context.MapVisualSettings;
+
+        // [Fail-Fast] 설정 누락 시 즉시 중단
         if (_visualSettings == null)
         {
-            Debug.LogError("[TileDataManager] CRITICAL: 'MapEditorSettingsSO' is NOT assigned in Inspector! Map will be invisible.");
+            throw new BootstrapException(
+                "[TileDataManager] CRITICAL: MapEditorSettingsSO missing in InitializationContext.\n" +
+                "Check AppConfig -> MapVisualSettingsRef assignments.");
         }
 
         try
         {
-            // 논리 데이터 로딩 (기존 유지 - 소리, 스탯 등)
             _loadHandle = Addressables.LoadAssetsAsync<TileDataSO>("TileData", null);
             IList<TileDataSO> results = await _loadHandle.ToUniTask();
 
@@ -60,34 +60,59 @@ public class TileDataManager : MonoBehaviour, IInitializable
             }
 
             _isInitialized = true;
-            Debug.Log($"[TileDataManager] Initialized. Logic Data: {_floorLibrary.Count}, Visual Source: {(_visualSettings != null ? "Linked" : "Missing")}");
+            Debug.Log($"[TileDataManager] Initialized. Floor Types: {_floorLibrary.Count}, Pillar Types: {_pillarLibrary.Count}");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[TileDataManager] Initialize Failed: {ex.Message}");
-            throw;
+            // 상위 Bootstrapper에서 처리하도록 예외 전파
+            throw new BootstrapException($"[TileDataManager] Logic Data Load Failed: {ex.Message}", ex);
         }
     }
 
-    // [핵심 변경] TileDataSO가 아니라 MapEditorSettingsSO에서 프리팹을 찾습니다.
     public GameObject GetFloorPrefab(FloorType type)
     {
-        if (_visualSettings == null) return null;
-
-        // MapEditorSettingsSO의 리스트를 뒤져서 ID(type)가 같은 놈의 Prefab을 리턴
-        var mapping = _visualSettings.FloorMappings.FirstOrDefault(x => x.type == type);
-
-        // 구조체(struct)라 null 체크 대신 프리팹 유무 확인
-        if (mapping.prefab != null)
+        // 1. 초기화 여부 확인
+        if (!_isInitialized)
         {
-            return mapping.prefab;
+            throw new InvalidOperationException("[TileDataManager] Not initialized. EnsureGlobalSystems() might have failed.");
         }
 
-        Debug.LogWarning($"[TileDataManager] No Prefab found in MapEditorSettings for: {type}");
-        return null;
+        // 2. 설정 데이터 유효성 확인 (List<EditorFloorMapping> FloorMappings)
+        if (_visualSettings == null || _visualSettings.FloorMappings == null || _visualSettings.FloorMappings.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "[TileDataManager] MapEditorSettingsSO has no FloorMappings configured.\n" +
+                "Action: Add floor type mappings in the MapEditorSettings asset Inspector.");
+        }
+
+        // 3. 매핑 검색
+        var mapping = _visualSettings.FloorMappings.FirstOrDefault(x => x.type == type);
+
+        // 4. 특수 케이스: None/Void는 프리팹이 없을 수 있음 (정상)
+        if (type == FloorType.None || type == FloorType.Void)
+        {
+            return mapping.prefab; // null 가능
+        }
+
+        // 5. 일반 타입인데 프리팹이 없는 경우 (데이터 누락)
+        if (mapping.prefab == null)
+        {
+            // 현재 설정된 타입들 목록 생성 (디버깅용)
+            var availableTypes = string.Join(", ",
+                _visualSettings.FloorMappings
+                    .Where(m => m.prefab != null)
+                    .Select(m => m.type)
+                    .Distinct());
+
+            throw new KeyNotFoundException(
+                $"[TileDataManager] Missing prefab for FloorType '{type}'.\n" +
+                $"Available mapped types: [{availableTypes}]\n" +
+                $"Action: Assign a prefab for '{type}' in MapEditorSettingsSO.");
+        }
+
+        return mapping.prefab;
     }
 
-    // (필요 시 기둥도 동일한 방식으로 추가 가능)
     public TileDataSO GetFloorData(FloorType type)
     {
         return _floorLibrary.TryGetValue(type, out var data) ? data : null;
