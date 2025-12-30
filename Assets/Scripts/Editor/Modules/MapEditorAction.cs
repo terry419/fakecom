@@ -1,3 +1,4 @@
+// 파일: Assets/Scripts/Editor/Modules/MapEditorAction.cs
 using UnityEngine;
 using UnityEditor;
 
@@ -5,22 +6,23 @@ public class MapEditorAction
 {
     private readonly MapEditorContext _context;
     private Transform _tileParent;
+    private Transform _edgeParent;
 
     public MapEditorAction(MapEditorContext context)
     {
         _context = context;
-        UpdateTileParentReference();
+        UpdateParentReferences();
     }
 
-    // --- Public Handlers ---
+    // ... (HandleCreateTile 등 기존 코드는 유지하되, 아래 RebuildPillarVisual 수정이 핵심입니다) ...
 
     public void HandleCreateTile(GridCoords coords)
     {
-        // ... (기존 타일 생성 로직 동일) ...
+        // (기존과 동일)
         if (_context.Settings.DefaultTilePrefab == null) return;
         if (_context.GetTile(coords) != null) return;
 
-        UpdateTileParentReference();
+        UpdateParentReferences();
         GameObject newTileObj = (GameObject)PrefabUtility.InstantiatePrefab(_context.Settings.DefaultTilePrefab, _tileParent);
         Undo.RegisterCreatedObjectUndo(newTileObj, "Create Tile");
 
@@ -33,33 +35,39 @@ public class MapEditorAction
         _context.InvalidateCache();
     }
 
-    // [Fix] 기둥 생성 핸들러
     public void HandleCreatePillar(GridCoords coords)
     {
         EditorTile tile = _context.GetTile(coords);
+
         if (tile == null)
         {
-            // 타일이 없으면 타일을 먼저 생성
             HandleCreateTile(coords);
-            tile = _context.GetTile(coords); // 다시 가져오기
+            tile = _context.GetTile(coords);
         }
 
         if (tile != null)
         {
             Undo.RecordObject(tile, "Set Pillar");
             tile.PillarID = _context.SelectedPillarType;
-            EditorUtility.SetDirty(tile);
 
-            // 시각적 기둥 객체 생성 (기존 기둥이 있다면 제거 후 생성)
+            // [중요] 비주얼 갱신 (바닥 숨김 처리 포함)
             RebuildPillarVisual(tile);
+
+            EditorUtility.SetDirty(tile);
         }
     }
 
+    // ... (HandleModifyEdge, HandleEraseTile 등 기존 유지) ...
     public void HandleModifyEdge(GridCoords coords, Direction dir)
     {
-        // ... (기존 엣지 로직 동일) ...
         var newEdgeData = CreateEdgeDataFromContext();
-        SyncEdgeData(coords, dir, newEdgeData);
+        var tile = _context.GetTile(coords);
+        if (tile != null)
+        {
+            Undo.RecordObject(tile, "Modify Edge");
+            tile.Edges[(int)dir] = newEdgeData;
+            EditorUtility.SetDirty(tile);
+        }
         ReplaceEdgeVisuals(coords, dir, newEdgeData);
         _context.InvalidateCache();
     }
@@ -67,41 +75,32 @@ public class MapEditorAction
     public void HandleEraseTile(GridCoords coords)
     {
         var tile = _context.GetTile(coords);
-        if (tile != null)
-        {
-            Undo.DestroyObjectImmediate(tile.gameObject);
-        }
+        if (tile != null) Undo.DestroyObjectImmediate(tile.gameObject);
 
-        // 연관된 벽 제거
         for (int i = 0; i < 4; i++)
         {
-            Direction dir = (Direction)i;
-            var (neighbor, opposite) = GridUtils.GetOppositeEdge(coords, dir);
-
-            EditorWall w1 = _context.GetWall(coords, dir);
-            EditorWall w2 = _context.GetWall(neighbor, opposite);
-
-            if (w1 != null) Undo.DestroyObjectImmediate(w1.gameObject);
-            if (w2 != null) Undo.DestroyObjectImmediate(w2.gameObject);
+            var wall = _context.GetWall(coords, (Direction)i);
+            if (wall != null) Undo.DestroyObjectImmediate(wall.gameObject);
         }
-
         _context.InvalidateCache();
     }
 
+
+    // [Fix Issue 2] 로드 시 기존 맵 클리어 후 생성
     public void LoadMapFromData(MapDataSO data)
     {
-        // ... (기존 Load 로직 + 기둥 복원 로직 추가) ...
-        UpdateTileParentReference();
-        ClearMap();
+        if (data == null) return;
+
+        UpdateParentReferences();
+        ClearMap(); // 깔끔하게 지우고 시작
 
         Undo.SetCurrentGroupName("Load Map");
         int group = Undo.GetCurrentGroup();
-        Transform edgeParent = GetOrCreateEdgeParent();
 
         foreach (var tileData in data.Tiles)
         {
-            // 타일 생성
             if (_context.Settings.DefaultTilePrefab == null) continue;
+
             var tileObj = (GameObject)PrefabUtility.InstantiatePrefab(_context.Settings.DefaultTilePrefab, _tileParent);
             Undo.RegisterCreatedObjectUndo(tileObj, "Load Tile");
 
@@ -113,75 +112,160 @@ public class MapEditorAction
             {
                 editorTile.Coordinate = tileData.Coords;
                 editorTile.FloorID = tileData.FloorID;
-                editorTile.PillarID = tileData.PillarID; // [Fix] 기둥 데이터 복원
-                editorTile.Edges = tileData.Edges;
+                editorTile.PillarID = tileData.PillarID;
 
-                // 기둥 시각화 복원
+                if (tileData.Edges != null && tileData.Edges.Length == 4)
+                    editorTile.Edges = (SavedEdgeInfo[])tileData.Edges.Clone();
+                else
+                    editorTile.Edges = new SavedEdgeInfo[4];
+
+                // 로드할 때도 Pillar 상태에 따라 바닥 On/Off 처리
                 if (editorTile.PillarID != PillarType.None)
                 {
                     RebuildPillarVisual(editorTile);
                 }
             }
 
-            // 벽 생성 Loop ... (기존 동일)
             for (int i = 0; i < 4; i++)
             {
-                if (tileData.Edges[i].Type == EdgeType.Open) continue;
-                Direction dir = (Direction)i;
-                GameObject wallPrefab = GetPrefabForEdgeType(tileData.Edges[i].Type);
-                if (wallPrefab == null) continue;
-
-                var wallObj = (GameObject)PrefabUtility.InstantiatePrefab(wallPrefab, edgeParent);
-                Undo.RegisterCreatedObjectUndo(wallObj, "Load Wall");
-                // ... 위치/회전 설정 및 Initialize ...
-                Vector3 edgePos = GridUtils.GetEdgeWorldPosition(tileData.Coords, dir);
-                wallObj.transform.position = edgePos + new Vector3(0, GridUtils.LEVEL_HEIGHT / 2.0f, 0);
-                wallObj.transform.rotation = (dir == Direction.North || dir == Direction.South) ? Quaternion.identity : Quaternion.Euler(0, 90, 0);
-
-                var editorWall = wallObj.GetComponent<EditorWall>();
-                if (editorWall != null) editorWall.Initialize(tileData.Coords, dir, tileData.Edges[i]);
+                if (editorTile == null) break;
+                SavedEdgeInfo edgeInfo = editorTile.Edges[i];
+                if (edgeInfo.Type != EdgeType.Open && edgeInfo.Type != EdgeType.Unknown)
+                    CreateWallVisual(tileData.Coords, (Direction)i, edgeInfo);
             }
         }
+
         Undo.CollapseUndoOperations(group);
         _context.InvalidateCache();
+        Debug.Log($"[MapEditor] Map Loaded from {data.name}");
     }
 
     // --- Helpers ---
 
-    // [Fix] 기둥 비주얼 생성 로직
+    // [Fix Issue 1] 기둥 생성 시 바닥(Top_White) 숨기기
     private void RebuildPillarVisual(EditorTile tile)
     {
-        // 기존 기둥 비주얼 제거 (자식 중 이름으로 찾거나 태그로 관리)
+        // 1. 기존 기둥 비주얼 삭제
         Transform existingPillar = tile.transform.Find("Visual_Pillar");
         if (existingPillar != null) Undo.DestroyObjectImmediate(existingPillar.gameObject);
 
-        if (tile.PillarID == PillarType.None) return;
+        // 2. 바닥 비주얼 찾기 (이름은 프리팹 구조에 따라 다를 수 있음, 여기서는 'Top_White' 가정)
+        // 만약 이름이 확실치 않다면 transform.GetChild(0) 등으로 접근하거나 Tag를 사용해야 합니다.
+        Transform floorVisual = tile.transform.Find("Top_White");
 
-        // Settings에서 프리팹 찾기 (SettingsSO에 PillarTable이 있다고 가정)
+        // 기둥이 없으면 -> 바닥 보여주기
+        if (tile.PillarID == PillarType.None)
+        {
+            if (floorVisual != null) floorVisual.gameObject.SetActive(true);
+            return;
+        }
+
+        // 기둥이 있으면 -> 바닥 숨기기 (Visual Replacement)
+        if (floorVisual != null) floorVisual.gameObject.SetActive(false);
+
+        // 3. 새 기둥 생성
         GameObject pillarPrefab = GetPrefabForPillarType(tile.PillarID);
         if (pillarPrefab != null)
         {
             GameObject pillarObj = (GameObject)PrefabUtility.InstantiatePrefab(pillarPrefab, tile.transform);
             Undo.RegisterCreatedObjectUndo(pillarObj, "Create Pillar Visual");
             pillarObj.name = "Visual_Pillar";
-            pillarObj.transform.localPosition = Vector3.zero; // 타일 중앙
+
+            // 스케일 보정 (이전 답변 내용 유지)
+            Vector3 parentScale = tile.transform.localScale;
+            Vector3 originalScale = pillarPrefab.transform.localScale;
+            Vector3 originalPos = pillarPrefab.transform.localPosition;
+
+            float scaleX = (Mathf.Abs(parentScale.x) > 0.001f) ? (1f / parentScale.x) : 1f;
+            float scaleY = (Mathf.Abs(parentScale.y) > 0.001f) ? (1f / parentScale.y) : 1f;
+            float scaleZ = (Mathf.Abs(parentScale.z) > 0.001f) ? (1f / parentScale.z) : 1f;
+
+            pillarObj.transform.localScale = new Vector3(originalScale.x * scaleX, originalScale.y * scaleY, originalScale.z * scaleZ);
+            pillarObj.transform.localPosition = new Vector3(originalPos.x * scaleX, originalPos.y * scaleY, originalPos.z * scaleZ);
         }
     }
 
-    private GameObject GetPrefabForPillarType(PillarType type)
+    // ... (ClearMap, UpdateParentReferences, CreateWallVisual 등은 이전 답변과 동일하게 유지) ...
+    private void UpdateParentReferences()
     {
-        // GDD 14.4에 따라 MapEditorSettingsSO가 PillarTable을 가짐
-        // 실제 구현 시 SettingsSO에 매핑 로직 필요
-        // 임시로 DefaultPillarPrefab 반환 (실제로는 type에 따라 switch)
-        return _context.Settings.DefaultPillarPrefab;
+        if (_tileParent == null)
+        {
+            var go = GameObject.Find("MapEditor_Tiles");
+            if (go == null) go = new GameObject("MapEditor_Tiles");
+            _tileParent = go.transform;
+        }
+        if (_edgeParent == null)
+        {
+            var go = GameObject.Find("MapEditor_Edges");
+            if (go == null) go = new GameObject("MapEditor_Edges");
+            _edgeParent = go.transform;
+        }
     }
 
-    // ... (나머지 ClearMap, SyncEdgeData 등 기존 동일) ...
-    private void ClearMap() { /* ... */ }
-    private void UpdateTileParentReference() { /* ... */ }
-    private Transform GetOrCreateEdgeParent() { /* ... */ return null; } // 생략(기존 코드 참조)
-    private SavedEdgeInfo CreateEdgeDataFromContext() { /* ... */ return default; } // 생략
-    private void SyncEdgeData(GridCoords c, Direction d, SavedEdgeInfo e) { /* ... */ }
-    private void ReplaceEdgeVisuals(GridCoords c, Direction d, SavedEdgeInfo e) { /* ... */ }
-    private GameObject GetPrefabForEdgeType(EdgeType t) { return null; } // 생략
+    private void ClearMap()
+    {
+        if (_tileParent != null)
+        {
+            for (int i = _tileParent.childCount - 1; i >= 0; i--)
+                Undo.DestroyObjectImmediate(_tileParent.GetChild(i).gameObject);
+        }
+        if (_edgeParent != null)
+        {
+            for (int i = _edgeParent.childCount - 1; i >= 0; i--)
+                Undo.DestroyObjectImmediate(_edgeParent.GetChild(i).gameObject);
+        }
+        _context.InvalidateCache();
+    }
+
+    // ... (이하 CreateWallVisual, Helpers 생략 - 이전 답변 코드를 사용해주세요) ...
+    private void CreateWallVisual(GridCoords coords, Direction dir, SavedEdgeInfo edgeInfo)
+    {
+        // 이전 답변의 CreateWallVisual 복사
+        GameObject wallPrefab = GetPrefabForEdgeType(edgeInfo.Type);
+        if (wallPrefab == null) return;
+
+        GameObject wallObj = (GameObject)PrefabUtility.InstantiatePrefab(wallPrefab, _edgeParent);
+        Undo.RegisterCreatedObjectUndo(wallObj, "Create Wall");
+
+        Vector3 edgePos = GridUtils.GetEdgeWorldPosition(coords, dir);
+        wallObj.transform.position = edgePos + new Vector3(0, GridUtils.LEVEL_HEIGHT * 0.5f, 0);
+        wallObj.transform.rotation = (dir == Direction.North || dir == Direction.South) ? Quaternion.identity : Quaternion.Euler(0, 90, 0);
+
+        var editorWall = wallObj.GetComponent<EditorWall>();
+        if (editorWall != null) editorWall.Initialize(coords, dir, edgeInfo);
+    }
+
+    private SavedEdgeInfo CreateEdgeDataFromContext()
+    {
+        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
+        {
+            switch (_context.SelectedEdgeType)
+            {
+                case EdgeType.Wall: return SavedEdgeInfo.CreateWall(_context.SelectedEdgeDataType);
+                case EdgeType.Window: return SavedEdgeInfo.CreateWindow(_context.SelectedEdgeDataType);
+                case EdgeType.Door: return SavedEdgeInfo.CreateDoor(_context.SelectedEdgeDataType);
+            }
+        }
+        return SavedEdgeInfo.CreateOpen();
+    }
+
+    private void ReplaceEdgeVisuals(GridCoords coords, Direction dir, SavedEdgeInfo edgeInfo)
+    {
+        var existingWall = _context.GetWall(coords, dir);
+        if (existingWall != null) Undo.DestroyObjectImmediate(existingWall.gameObject);
+        if (edgeInfo.Type == EdgeType.Open) return;
+        CreateWallVisual(coords, dir, edgeInfo);
+    }
+
+    private GameObject GetPrefabForPillarType(PillarType type) => _context.Settings.DefaultPillarPrefab;
+    private GameObject GetPrefabForEdgeType(EdgeType type)
+    {
+        switch (type)
+        {
+            case EdgeType.Wall: return _context.Settings.DefaultWallPrefab;
+            case EdgeType.Window: return _context.Settings.DefaultWindowPrefab;
+            case EdgeType.Door: return _context.Settings.DefaultDoorPrefab;
+            default: return null;
+        }
+    }
 }
