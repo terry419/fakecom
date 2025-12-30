@@ -100,19 +100,36 @@ public class MapEditorTool : EditorWindow
 
         if (GUILayout.Button("Load Data to Scene"))
         {
-            if (_context.TargetMapData != null)
+            // [수정] TargetMapData와 Settings가 모두 할당되었는지 확인
+            if (_context.TargetMapData != null && _context.Settings != null)
             {
                 _action.LoadMapFromData(_context.TargetMapData);
             }
             else
             {
-                Debug.LogError("Target Map Data가 비어있습니다! 로드할 데이터를 먼저 할당하세요.");
+                // 더 상세한 에러 메시지 제공
+                if (_context.TargetMapData == null)
+                    Debug.LogError("Target Map Data가 비어있습니다! 로드할 데이터를 먼저 할당하세요.");
+                if (_context.Settings == null)
+                    Debug.LogError("Settings가 비어있습니다! Map Editor Settings 에셋을 할당하세요.");
             }
         }
 
         if (GUILayout.Button("Save Scene to Data"))
         {
-            _io.SaveMap();
+            // [수정] TargetMapData와 Settings가 모두 할당되었는지 확인
+            if (_context.TargetMapData != null && _context.Settings != null)
+            {
+                _io.SaveMap();
+            }
+            else
+            {
+                // 더 상세한 에러 메시지 제공
+                if (_context.TargetMapData == null)
+                    Debug.LogError("Target Map Data가 비어있습니다! 저장할 데이터를 먼저 할당하세요.");
+                if (_context.Settings == null)
+                    Debug.LogError("Settings가 비어있습니다! Map Editor Settings 에셋을 할당하세요.");
+            }
         }
         GUILayout.EndHorizontal();
     }

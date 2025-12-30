@@ -18,7 +18,6 @@ public class SetupState : SessionStateBase
     public override UniTask Enter(StatePayload payload, CancellationToken cancellationToken)
     {
         Debug.Log("[SetupState] 맵 로딩 및 유닛 배치...");
-        // _context.Map.LoadMapAsync(cancellationToken); // 실제 맵 로딩 로직
         
         // Enter 메서드는 즉시 완료되어야 하므로, 대기 및 전환 로직은
         // 별도의 비동기 메서드에서 처리하도록 분리합니다.

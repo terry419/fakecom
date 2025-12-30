@@ -2,6 +2,8 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
 using System.Text; // StringBuilder 사용
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 public class BootManager : MonoBehaviour
 {
@@ -27,21 +29,48 @@ public class BootManager : MonoBehaviour
             await AppBootstrapper.EnsureGlobalSystems();
             _bootLog.AppendLine("1. Global Systems Check OK");
 
-            // 2. Scene Managers
+            // 2. 공유 컨텍스트 생성 및 데이터 로드
+            var context = new InitializationContext();
+            
+            Debug.Log("[BootManager] Attempting to load MapDataSO with label 'MapData'...");
+            // 맵 데이터 로드
+            // 'MapData' 라벨을 가진 모든 에셋을 리스트로 불러옵니다.
+            var locations = await Addressables.LoadResourceLocationsAsync("MapData").Task;
+            if (locations == null || locations.Count == 0)
+            {
+                throw new Exception("Failed to find any assets with label 'MapData'. Please ensure your MapDataSO assets are set as Addressable and have the 'MapData' label.");
+            }
+            // 일단 첫 번째 에셋을 로드합니다.
+            var mapDataHandle = Addressables.LoadAssetAsync<MapDataSO>(locations[0]);
+            var mapData = await mapDataHandle.Task;
+
+            if (mapDataHandle.Status != AsyncOperationStatus.Succeeded || mapData == null)
+            {
+                throw new Exception("Failed to load MapDataSO from Addressables via label 'MapData'.");
+            }
+            
+            Debug.Log($"[BootManager] Successfully loaded MapDataSO: '{mapData.DisplayName}'. Assigning to context.");
+            // 로드된 맵 데이터를 컨텍스트에 할당합니다.
+            context.MapData = mapData;
+            _bootLog.AppendLine("2. Shared Context Created & MapData Loaded");
+
+
+            // 3. Scene Managers (공유 컨텍스트 사용)
             // 필수 매니저들
-            await InitMan<MapManager>();
-            await InitMan<TilemapGenerator>();
-            await InitMan<SessionManager>();
+            Debug.Log("[BootManager] Calling Initialize on MapManager...");
+            await InitMan<MapManager>(context);
+            await InitMan<TilemapGenerator>(context);
+            await InitMan<SessionManager>(context);
 
             // 선택적 매니저들
-            await InitManOptional<CameraController>();
-            await InitManOptional<TurnManager>();
-            await InitManOptional<CombatManager>();
-            await InitManOptional<PathVisualizer>();
-            await InitManOptional<PlayerInputCoordinator>();
-            await InitManOptional<TargetUIManager>();
-            await InitManOptional<QTEManager>();
-            await InitManOptional<DamageTextManager>();
+            await InitManOptional<CameraController>(context);
+            await InitManOptional<TurnManager>(context);
+            await InitManOptional<CombatManager>(context);
+            await InitManOptional<PathVisualizer>(context);
+            await InitManOptional<PlayerInputCoordinator>(context);
+            await InitManOptional<TargetUIManager>(context);
+            await InitManOptional<QTEManager>(context);
+            await InitManOptional<DamageTextManager>(context);
 
             // 전부 성공 시
             _bootLog.AppendLine("<color=green>ALL SYSTEMS READY.</color>");
@@ -55,7 +84,7 @@ public class BootManager : MonoBehaviour
             // 실패 시: 지금까지 쌓인 성공 로그 + 에러 메시지 출력
             Debug.LogError($"<color=red>[BOOT FAILED]</color>\n" +
                            $"{_bootLog}\n" + // 어디까지 성공했는지 확인 가능
-                           $"--------------------------------\n" +
+                           "--------------------------------\n" +
                            $"<b>[Error Cause]:</b> {ex.Message}");
 
             OnBootComplete?.Invoke(false);
@@ -63,24 +92,24 @@ public class BootManager : MonoBehaviour
         }
     }
 
-    private async UniTask InitMan<T>() where T : IInitializable
+    private async UniTask InitMan<T>(InitializationContext context) where T : IInitializable
     {
         if (!ServiceLocator.TryGet<T>(out var manager))
         {
             throw new Exception($"[Missing] 필수 매니저 '{typeof(T).Name}' 없음.");
         }
 
-        await manager.Initialize(new InitializationContext());
+        await manager.Initialize(context);
 
         // [성공 로그 Append]
         _bootLog.AppendLine($"- [Scene] {typeof(T).Name} OK");
     }
 
-    private async UniTask InitManOptional<T>() where T : IInitializable
+    private async UniTask InitManOptional<T>(InitializationContext context) where T : IInitializable
     {
         if (ServiceLocator.TryGet<T>(out var manager))
         {
-            await manager.Initialize(new InitializationContext());
+            await manager.Initialize(context);
 
             // [성공 로그 Append]
             _bootLog.AppendLine($"- [Scene] {typeof(T).Name} (Opt) OK");

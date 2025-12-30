@@ -24,8 +24,8 @@ MonoBehaviour:
   MaxLevel: 3
   Tiles:
   - Coords:
-      x: -4
-      z: -2
+      x: 8
+      z: 2
       y: 0
     FloorID: 2
     PillarID: 0
@@ -51,8 +51,8 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -3
-      z: -2
+      x: 7
+      z: 2
       y: 0
     FloorID: 2
     PillarID: 0
@@ -78,8 +78,8 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -2
-      z: -2
+      x: 6
+      z: 2
       y: 0
     FloorID: 2
     PillarID: 0
@@ -105,8 +105,8 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -2
-      z: -1
+      x: 6
+      z: 1
       y: 0
     FloorID: 2
     PillarID: 0
@@ -132,7 +132,61 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -2
+      x: 7
+      z: 1
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 8
+      z: 1
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    Edges:
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+    - Type: 1
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+      DataType: 0
+  - Coords:
+      x: 8
       z: 0
       y: 0
     FloorID: 2
@@ -159,7 +213,7 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -3
+      x: 7
       z: 0
       y: 0
     FloorID: 2
@@ -186,61 +240,7 @@ MonoBehaviour:
       CurrentHP: 0
       DataType: 0
   - Coords:
-      x: -3
-      z: -1
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    Edges:
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-  - Coords:
-      x: -4
-      z: -1
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    Edges:
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-    - Type: 1
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-      DataType: 0
-  - Coords:
-      x: -4
+      x: 6
       z: 0
       y: 0
     FloorID: 2

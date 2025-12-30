@@ -5,13 +5,13 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// [GDD 5.6] ¸ÊÀÇ ÃÖ¼Ò ´ÜÀ§ (Logic Class). 
-/// ·»´õ¸µÀÌ³ª ¹°¸® ¿£Áø ¾øÀÌ ¼ø¼ö µ¥ÀÌÅÍ¿Í »óÅÂ ·ÎÁ÷À» °ü¸®ÇÕ´Ï´Ù.
+/// [GDD 5.6]  Ö¼  (Logic Class). 
+/// Ì³     Í¿   Õ´Ï´.
 /// </summary>
 public class Tile
 {
     // ==================================================================================
-    // 1. ±âº» µ¥ÀÌÅÍ & ÀÌº¥Æ®
+    // 1. âº»  & ÌºÆ®
     // ==================================================================================
     public GridCoords Coordinate { get; private set; }
     public FloorType FloorID { get; private set; }
@@ -19,41 +19,42 @@ public class Tile
 
     private EdgeInfo[] _edges = new EdgeInfo[4];
 
-    // [ÀÌº¥Æ®] ¿§Áö ÆÄ±« ¹× ¼Õ»ó
+    // [ÌºÆ®]  Ä±  Õ»
     public event Action<Direction, EdgeInfo> OnEdgeDestroyed;
     public event Action<Direction, EdgeInfo> OnEdgeDamaged;
 
-    // [ÀÌº¥Æ®] ÀÌµ¿ °¡´É ¿©ºÎ º¯°æ (Pathfinder °»½Å¿ë)
+    // [ÌºÆ®] Ìµ    (Pathfinder Å¿)
     public event Action<Tile> OnWalkableStatusChanged;
 
 
     // ==================================================================================
-    // 2. Á¡À¯ ½½·Ô (ºÐ¸®Çü & ÃÖÀûÈ­)
+    // 2.   (Ð¸ & È­)
     // ==================================================================================
     private ITileOccupant _primaryUnit;
     private List<ITileOccupant> _items = new();
     private List<ITileOccupant> _obstacles = new();
 
-    // [ÃÖÀûÈ­] ÀÐ±â Àü¿ë ·¡ÆÛ Ä³½Ì
+    // [È­] Ð±   Ä³
     private ReadOnlyCollection<ITileOccupant> _readOnlyItems;
 
-    // [Ä³½Ã] ÀÌµ¿ °¡´É ¿©ºÎ
+    // [Ä³] Ìµ  
     private bool _cachedIsWalkable = true;
 
 
     // ==================================================================================
-    // 3. »ý¼ºÀÚ
+    // 3. 
     // ==================================================================================
     public Tile(GridCoords coords, FloorType floorType, PillarType pillarType = PillarType.None)
     {
+        Debug.Log($"[Tile] Created new tile at {coords}");
         Coordinate = coords;
         FloorID = floorType;
         PillarID = pillarType;
 
-        // ±âº» ¿§Áö: Open
+        // âº» : Open
         for (int i = 0; i < 4; i++) _edges[i] = EdgeInfo.Open;
 
-        // ¸®½ºÆ® ·¡ÆÛ ÃÊ±âÈ­ (GC °¨¼Ò)
+        // Æ®  Ê±È­ (GC )
         _readOnlyItems = _items.AsReadOnly();
 
         UpdateCache();
@@ -61,21 +62,21 @@ public class Tile
 
 
     // ==================================================================================
-    // 4. Á¶È¸ (Getters)
+    // 4. È¸ (Getters)
     // ==================================================================================
     public bool IsWalkable => _cachedIsWalkable;
     public ITileOccupant PrimaryUnit => _primaryUnit;
 
     /// <summary>
-    /// [ÁÖÀÇ] ÇöÀç Å¸ÀÏÀÇ ¾ÆÀÌÅÛ ¸ñ·Ï ºä¸¦ ¹ÝÈ¯ÇÕ´Ï´Ù. (O(1))
-    /// ¹ÝÈ¯µÈ ¸®½ºÆ®¸¦ foreach·Î ¼øÈ¸ÇÏ´Â µµÁß Add/RemoveOccupant°¡ È£ÃâµÇ¸é ¿¹¿Ü°¡ ¹ß»ýÇÒ ¼ö ÀÖ½À´Ï´Ù.
-    /// ¾ÈÀüÇÑ ¼øÈ¸°¡ ÇÊ¿äÇÏ´Ù¸é GetItemsCopy()¸¦ »ç¿ëÇÏ¼¼¿ä.
+    /// []  Å¸   ä¸¦ È¯Õ´Ï´. (O(1))
+    /// È¯ Æ® foreach È¸Ï´  Add/RemoveOccupant È£Ç¸ Ü° ß»  Ö½Ï´.
+    ///  È¸ Ê¿Ï´Ù¸ GetItemsCopy() Ï¼.
     /// </summary>
     public IReadOnlyList<ITileOccupant> Items => _readOnlyItems;
 
     /// <summary>
-    /// [¾ÈÀü] ¾ÆÀÌÅÛ ¸®½ºÆ®ÀÇ º¹»çº»À» »ý¼ºÇÏ¿© ¹ÝÈ¯ÇÕ´Ï´Ù. (O(N))
-    /// ¼øÈ¸ Áß ¸®½ºÆ® º¯°æÀÌ ¿¹»óµÉ ¶§ »ç¿ëÇÏ¼¼¿ä.
+    /// []  Æ® çº» Ï¿ È¯Õ´Ï´. (O(N))
+    /// È¸  Æ®    Ï¼.
     /// </summary>
     public List<ITileOccupant> GetItemsCopy() => new List<ITileOccupant>(_items);
 
@@ -83,38 +84,38 @@ public class Tile
 
 
     // ==================================================================================
-    // 5. ¿§Áö Á¶ÀÛ (Logic Optimized)
+    // 5.   (Logic Optimized)
     // ==================================================================================
     public void SetEdge(Direction dir, EdgeInfo newInfo)
     {
         _edges[(int)dir] = newInfo;
     }
 
-    // [°³¼± 1] Áßº¹ ´ëÀÔ ¹æÁö ¹× ·ÎÁ÷ ÃÖÀûÈ­
+    // [ 1] ßº     È­
     public void DamageEdge(Direction dir, float damage)
     {
         EdgeInfo oldEdge = _edges[(int)dir];
         EdgeInfo newEdge = oldEdge.WithDamage(damage);
 
-        // 1. ÆÄ±«µÊ (ÀÌ¹ø µ¥¹ÌÁö·Î ÀÎÇØ HP°¡ 0ÀÌ µÊ)
+        // 1. Ä± (Ì¹   HP 0 )
         if (newEdge.IsDestroyed && oldEdge.CurrentHP > 0)
         {
-            // ÃÖÁ¾ »óÅÂ(°³¹æ)·Î ¹Ù·Î ¼³Á¤
+            //  () Ù· 
             _edges[(int)dir] = EdgeInfo.Open;
             OnEdgeDestroyed?.Invoke(dir, oldEdge);
         }
-        // 2. ¼Õ»óµÊ (¾ÆÁ÷ »ì¾ÆÀÖÀ½)
+        // 2. Õ» ( )
         else if (newEdge.CurrentHP < oldEdge.CurrentHP)
         {
             _edges[(int)dir] = newEdge;
             OnEdgeDamaged?.Invoke(dir, newEdge);
         }
-        // 3. º¯È­ ¾øÀ½ (ÀÌ¹Ì ÆÄ±«µÇ¾ú°Å³ª µ¥¹ÌÁö°¡ 0)
+        // 3. È­  (Ì¹ Ä±Ç¾Å³  0)
     }
 
 
     // ==================================================================================
-    // 6. Á¡À¯ Á¶ÀÛ (Exception Msg & Safety)
+    // 6.   (Exception Msg & Safety)
     // ==================================================================================
     public void AddOccupant(ITileOccupant occupant)
     {
@@ -123,7 +124,7 @@ public class Tile
         switch (occupant.Type)
         {
             case OccupantType.Unit:
-                // [°³¼± 2] ¿¹¿Ü ¸Þ½ÃÁö °­È­
+                // [ 2]  Þ½ È­
                 if (_primaryUnit != null)
                 {
                     throw new InvalidOperationException(
@@ -148,8 +149,8 @@ public class Tile
 
         occupant.OnBlockingChanged += HandleOccupantStateChange;
 
-        // OnCoverChanged´Â Tile ·ÎÁ÷(ÀÌµ¿°¡´É¼º)¿¡ ¿µÇâÀÌ ¾øÀ¸¹Ç·Î ±¸µ¶ÇÏÁö ¾ÊÀ½.
-        // Àü¼ú ¸Å´ÏÀú µî¿¡¼­ Á÷Á¢ ±¸µ¶ÇÒ °Í.
+        // OnCoverChanged Tile (ÌµÉ¼)  Ç·  .
+        //  Å´ î¿¡   .
 
         UpdateCache();
         occupant.OnAddedToTile(this);
@@ -204,7 +205,7 @@ public class Tile
 
 
     // ==================================================================================
-    // 7. ³»ºÎ ·ÎÁ÷
+    // 7.  
     // ==================================================================================
     private void HandleOccupantStateChange(bool isBlocking)
     {
@@ -227,26 +228,26 @@ public class Tile
     }
 
     /// <summary>
-    /// [ºñÆò°¡ ¹Ý¿µ] ÀúÀåµÈ µ¥ÀÌÅÍ(SaveData)·ÎºÎÅÍ Å¸ÀÏ »óÅÂ¸¦ º¹¿ø
+    /// [ Ý¿]  (SaveData)Îº Å¸ Â¸ 
     /// </summary>
     public void LoadFromSaveData(TileSaveData saveData)
     {
-        // 1. ±âº» Á¤º¸ º¹¿ø
+        // 1. âº»  
         this.Coordinate = saveData.Coords;
         this.FloorID = saveData.FloorID;
         this.PillarID = saveData.PillarID;
 
-        // 2. ¿§Áö(º®) Á¤º¸ º¹¿ø
+        // 2. ()  
         if (saveData.Edges != null && saveData.Edges.Length == 4)
         {
             for (int i = 0; i < 4; i++)
             {
-                // SavedEdgeInfo -> EdgeInfo º¯È¯ (DataType Æ÷ÇÔµÊ)
+                // SavedEdgeInfo -> EdgeInfo È¯ (DataType Ôµ)
                 _edges[i] = saveData.Edges[i].ToEdgeInfo();
             }
         }
 
-        // 3. Ä³½Ã °»½Å
+        // 3. Ä³ 
         UpdateCache();
     }
 
