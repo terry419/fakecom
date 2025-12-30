@@ -23,23 +23,46 @@ public class SetupState : SessionStateBase
     {
         Debug.Log("[SetupState] Entering Setup State...");
 
+        // [개선점 3] 전체 예외 처리 및 에러 상태 전환
         try
         {
-            // [수정] TilemapGenerator를 직접 생성하여 사용
             Debug.Log("[SetupState] Generating visual map...");
-            var generator = new TilemapGenerator();
-            await generator.GenerateAsync();
+
+            // 1. ServiceLocator 안전하게 가져오기
+            TilemapGenerator generator = null;
+            try
+            {
+                generator = ServiceLocator.Get<TilemapGenerator>();
+            }
+            catch (Exception)
+            {
+                // 여기서 잡아서 아래로 넘김
+                throw new Exception("ServiceLocator failed to find TilemapGenerator.");
+            }
+
+            // 2. 맵 생성 실행
+            if (generator != null)
+            {
+                await generator.GenerateAsync();
+            }
+            else
+            {
+                throw new Exception("TilemapGenerator is null.");
+            }
 
             Debug.Log("[SetupState] Map Ready. Waiting for confirmation...");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SetupState] Map generation failed: {ex.Message}\n{ex.StackTrace}");
+            Debug.LogError($"[SetupState] Map generation failed: {ex.Message}");
+
+            // 부모 클래스의 protected 메서드 사용 (이벤트 호출)
             RequestTransition(SessionState.Error, new ErrorPayload(ex));
             return;
         }
 
-        // 플레이어 확인 대기
+        // 3. 플레이어 확인 대기 (Enter는 끝나고 백그라운드에서 실행)
+        // 토큰 연결: 상태가 종료되면(Exit) 대기도 취소되도록 함
         _linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         WaitForPlayerConfirmation(_linkedCts.Token).Forget();
     }

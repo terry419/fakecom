@@ -1,144 +1,120 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using System.Collections.Generic;
 using System;
 using System.Linq;
 
 public class TileDataManager : MonoBehaviour, IInitializable
 {
-    [SerializeField] private AssetReferenceT<MapEditorSettingsSO> _visualSettingsRef;
-    [SerializeField] private AssetReferenceT<TileDataTableSO> _logicSettingsRef;
-
-    private Dictionary<FloorType, GameObject> _floorVisuals;
-    private Dictionary<PillarType, GameObject> _pillarVisuals;
-    private Dictionary<FloorType, TileLogicData> _floorLogics;
-    private Dictionary<PillarType, PillarLogicData> _pillarLogics;
-
+    private MapEditorSettingsSO _visualSettings;
+    private Dictionary<FloorType, TileDataSO> _floorLibrary;
+    private Dictionary<PillarType, TileDataSO> _pillarLibrary;
+    private AsyncOperationHandle<IList<TileDataSO>> _loadHandle;
     private bool _isInitialized = false;
 
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Global);
 
     private void OnDestroy()
     {
-        _floorVisuals?.Clear();
-        _pillarVisuals?.Clear();
-        _floorLogics?.Clear();
-        _pillarLogics?.Clear();
-        
-        if (_visualSettingsRef.IsValid()) Addressables.Release(_visualSettingsRef);
-        if (_logicSettingsRef.IsValid()) Addressables.Release(_logicSettingsRef);
-        
         ServiceLocator.Unregister<TileDataManager>(ManagerScope.Global);
+        if (_loadHandle.IsValid()) Addressables.Release(_loadHandle);
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
-        _floorVisuals = new Dictionary<FloorType, GameObject>();
-        _pillarVisuals = new Dictionary<PillarType, GameObject>();
-        _floorLogics = new Dictionary<FloorType, TileLogicData>();
-        _pillarLogics = new Dictionary<PillarType, PillarLogicData>();
+        _floorLibrary = new Dictionary<FloorType, TileDataSO>();
+        _pillarLibrary = new Dictionary<PillarType, TileDataSO>();
 
-        var (visualSettings, logicSettings) = await UniTask.WhenAll(
-            _visualSettingsRef.LoadAssetAsync().ToUniTask(),
-            _logicSettingsRef.LoadAssetAsync().ToUniTask()
-        );
+        // [필수] 설정 주입
+        _visualSettings = context.MapVisualSettings;
 
-        if (visualSettings == null)
-            throw new BootstrapException("Failed to load MapEditorSettingsSO.");
-        if (logicSettings == null)
-            throw new BootstrapException("Failed to load TileDataTableSO.");
-        
-        if (visualSettings.FloorMappings.Count == 0)
-            Debug.LogWarning("MapEditorSettingsSO has no FloorMappings.");
-        if (logicSettings.FloorLogics.Count == 0)
-            Debug.LogWarning("TileDataTableSO has no FloorLogics.");
-            
-        if (visualSettings.PillarMappings.Count == 0)
-            Debug.LogWarning("MapEditorSettingsSO has no PillarMappings.");
-        if (logicSettings.PillarLogics.Count == 0)
-            Debug.LogWarning("TileDataTableSO has no PillarLogics.");
-
-        foreach (var mapping in visualSettings.FloorMappings)
+        // [Fail-Fast] 설정 누락 시 즉시 중단
+        if (_visualSettings == null)
         {
-            if (!_floorVisuals.ContainsKey(mapping.type))
-                _floorVisuals.Add(mapping.type, mapping.prefab);
-        }
-        foreach (var mapping in visualSettings.PillarMappings)
-        {
-            if (!_pillarVisuals.ContainsKey(mapping.type))
-                _pillarVisuals.Add(mapping.type, mapping.prefab);
-        }
-        
-        foreach (var logicData in logicSettings.FloorLogics)
-        {
-            if (!_floorLogics.ContainsKey(logicData.Type))
-                _floorLogics.Add(logicData.Type, logicData);
-        }
-        foreach (var logicData in logicSettings.PillarLogics)
-        {
-            if (!_pillarLogics.ContainsKey(logicData.Type))
-                _pillarLogics.Add(logicData.Type, logicData);
+            throw new BootstrapException(
+                "[TileDataManager] CRITICAL: MapEditorSettingsSO missing in InitializationContext.\n" +
+                "Check AppConfig -> MapVisualSettingsRef assignments.");
         }
 
-        ValidateConsistency();
+        try
+        {
+            _loadHandle = Addressables.LoadAssetsAsync<TileDataSO>("TileData", null);
+            IList<TileDataSO> results = await _loadHandle.ToUniTask();
 
-        _isInitialized = true;
-        Debug.Log($"[TileDataManager] Initialized. Floors(V:{_floorVisuals.Count}, L:{_floorLogics.Count}), " +
-                  $"Pillars(V:{_pillarVisuals.Count}, L:{_pillarLogics.Count})");
+            if (_loadHandle.Status == AsyncOperationStatus.Succeeded && results != null)
+            {
+                foreach (var so in results)
+                {
+                    if (so == null) continue;
+                    if (so.IsPillarData)
+                    {
+                        if (!_pillarLibrary.ContainsKey(so.PillarType)) _pillarLibrary.Add(so.PillarType, so);
+                    }
+                    else
+                    {
+                        if (!_floorLibrary.ContainsKey(so.FloorType)) _floorLibrary.Add(so.FloorType, so);
+                    }
+                }
+            }
+
+            _isInitialized = true;
+            Debug.Log($"[TileDataManager] Initialized. Floor Types: {_floorLibrary.Count}, Pillar Types: {_pillarLibrary.Count}");
+        }
+        catch (Exception ex)
+        {
+            // 상위 Bootstrapper에서 처리하도록 예외 전파
+            throw new BootstrapException($"[TileDataManager] Logic Data Load Failed: {ex.Message}", ex);
+        }
     }
 
-    private void ValidateConsistency()
+    public GameObject GetFloorPrefab(FloorType type)
     {
-        var visualFloorTypes = _floorVisuals.Keys.ToHashSet();
-        var logicFloorTypes = _floorLogics.Keys.ToHashSet();
-        
-        var missingFloorLogic = visualFloorTypes.Except(logicFloorTypes);
-        if (missingFloorLogic.Any())
-            Debug.LogWarning($"[TileDataManager] Missing Logics for FloorTypes: {string.Join(", ", missingFloorLogic)}");
+        // 1. 초기화 여부 확인
+        if (!_isInitialized)
+        {
+            throw new InvalidOperationException("[TileDataManager] Not initialized. EnsureGlobalSystems() might have failed.");
+        }
 
-        var missingFloorVisual = logicFloorTypes.Except(visualFloorTypes);
-        if (missingFloorVisual.Any())
-            Debug.LogWarning($"[TileDataManager] Missing Visuals for FloorTypes: {string.Join(", ", missingFloorVisual)}");
+        // 2. 설정 데이터 유효성 확인 (List<EditorFloorMapping> FloorMappings)
+        if (_visualSettings == null || _visualSettings.FloorMappings == null || _visualSettings.FloorMappings.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "[TileDataManager] MapEditorSettingsSO has no FloorMappings configured.\n" +
+                "Action: Add floor type mappings in the MapEditorSettings asset Inspector.");
+        }
 
-        var visualPillarTypes = _pillarVisuals.Keys.ToHashSet();
-        var logicPillarTypes = _pillarLogics.Keys.ToHashSet();
+        // 3. 매핑 검색
+        var mapping = _visualSettings.FloorMappings.FirstOrDefault(x => x.type == type);
 
-        var missingPillarLogic = visualPillarTypes.Except(logicPillarTypes);
-        if (missingPillarLogic.Any())
-            Debug.LogWarning($"[TileDataManager] Missing Logics for PillarTypes: {string.Join(", ", missingPillarLogic)}");
+        // 4. 특수 케이스: None/Void는 프리팹이 없을 수 있음 (정상)
+        if (type == FloorType.None || type == FloorType.Void)
+        {
+            return mapping.prefab; // null 가능
+        }
 
-        var missingPillarVisual = logicPillarTypes.Except(visualPillarTypes);
-        if (missingPillarVisual.Any())
-            Debug.LogWarning($"[TileDataManager] Missing Visuals for PillarTypes: {string.Join(", ", missingPillarVisual)}");
+        // 5. 일반 타입인데 프리팹이 없는 경우 (데이터 누락)
+        if (mapping.prefab == null)
+        {
+            // 현재 설정된 타입들 목록 생성 (디버깅용)
+            var availableTypes = string.Join(", ",
+                _visualSettings.FloorMappings
+                    .Where(m => m.prefab != null)
+                    .Select(m => m.type)
+                    .Distinct());
+
+            throw new KeyNotFoundException(
+                $"[TileDataManager] Missing prefab for FloorType '{type}'.\n" +
+                $"Available mapped types: [{availableTypes}]\n" +
+                $"Action: Assign a prefab for '{type}' in MapEditorSettingsSO.");
+        }
+
+        return mapping.prefab;
     }
 
-    // --- Public API ---
-    public bool TryGetFloorVisual(FloorType type, out GameObject prefab)
+    public TileDataSO GetFloorData(FloorType type)
     {
-        prefab = null;
-        if (!_isInitialized) return false;
-        return _floorVisuals.TryGetValue(type, out prefab);
-    }
-
-    public bool TryGetFloorLogic(FloorType type, out TileLogicData logicData)
-    {
-        logicData = default;
-        if (!_isInitialized) return false;
-        return _floorLogics.TryGetValue(type, out logicData);
-    }
-    
-    public bool TryGetPillarVisual(PillarType type, out GameObject prefab)
-    {
-        prefab = null;
-        if (!_isInitialized) return false;
-        return _pillarVisuals.TryGetValue(type, out prefab);
-    }
-
-    public bool TryGetPillarLogic(PillarType type, out PillarLogicData logicData)
-    {
-        logicData = default;
-        if (!_isInitialized) return false;
-        return _pillarLogics.TryGetValue(type, out logicData);
+        return _floorLibrary.TryGetValue(type, out var data) ? data : null;
     }
 }
