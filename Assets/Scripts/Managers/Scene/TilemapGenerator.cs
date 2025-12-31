@@ -54,14 +54,22 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         int spawnedCount = 0;
 
-        // MapManager의 그리드 정보 순회
+        // [핵심 수정] BasePosition을 가져옵니다. (예: 18, 6)
+        int baseX = mapManager.BasePosition.x;
+        int baseZ = mapManager.BasePosition.y; // Vector2Int에서 y가 Z축(Depth) 역할
+
+        // MapManager의 그리드 크기만큼 순회
         for (int x = 0; x < mapManager.GridWidth; x++)
         {
             for (int z = 0; z < mapManager.GridDepth; z++)
             {
                 for (int y = 0; y < mapManager.LayerCount; y++)
                 {
-                    GridCoords coords = new GridCoords(x, z, mapManager.MinLevel + y);
+                    // [핵심 수정] Local Index(x,z)에 BasePosition을 더해 World 좌표로 복구합니다.
+                    // 기존 코드: new GridCoords(x, z, ...) -> 틀림 (0,0 호출됨)
+                    // 수정 코드: new GridCoords(baseX + x, baseZ + z, ...) -> 맞음 (18,6 호출됨)
+                    GridCoords coords = new GridCoords(baseX + x, baseZ + z, mapManager.MinLevel + y);
+
                     Tile tile = mapManager.GetTile(coords);
 
                     if (tile == null) continue;
@@ -91,8 +99,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                         for (int i = 0; i < 4; i++)
                         {
                             var edgeInfo = tile.TempSavedEdges[i];
-
-                            // [Fix] EdgeType.None 제거 -> Open이 아니면 벽이 있는 것으로 간주
                             if (edgeInfo.Type != EdgeType.Open)
                             {
                                 var edgeEntry = tileDataManager.GetEdgeData(edgeInfo.Type);
@@ -106,6 +112,7 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                         }
                     }
 
+                    // 프레임 드랍 방지 (100개마다 대기)
                     if (spawnedCount % 100 == 0)
                     {
                         await UniTask.Yield();
@@ -120,13 +127,19 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
     private void CreateVisual(TileDataManager dataMgr, FloorType type, GridCoords coords)
     {
         GameObject prefab = dataMgr.GetFloorPrefab(type);
-
         if (prefab != null)
         {
             Vector3 worldPos = GridUtils.GridToWorld(coords);
             GameObject instance = Instantiate(prefab, _mapContainer);
             instance.transform.position = worldPos;
             instance.name = $"Tile_{coords.x}_{coords.z}_{coords.y}";
+
+            // 바닥에는 Collider가 있어야 Raycast가 됩니다. 프리팹 확인 필요.
+            if (instance.GetComponent<Collider>() == null)
+            {
+                instance.AddComponent<BoxCollider>(); // 임시 조치
+            }
+
             _spawnedObjects.Add(instance);
         }
     }
@@ -150,11 +163,17 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         instance.name = isPillar ? $"Pillar_{coords}" : $"Wall_{coords}_{dir}";
 
-        // [Fix] StructureObj 참조 에러 해결을 위해 아래 StructureObj.cs 파일을 생성해야 합니다.
         var structure = instance.GetComponent<StructureObj>();
         if (structure == null) structure = instance.AddComponent<StructureObj>();
 
         structure.Initialize(coords, dir, hp, isPillar);
+
+        // 구조물에도 Collider 확인
+        if (instance.GetComponent<Collider>() == null)
+        {
+            // 모델 모양에 따라 다르겠지만 일단 BoxCollider 추가
+            instance.AddComponent<BoxCollider>();
+        }
 
         int layer = isPillar ? LayerMask.NameToLayer("Pillar") : LayerMask.NameToLayer("Wall");
         if (layer > -1) instance.layer = layer;
