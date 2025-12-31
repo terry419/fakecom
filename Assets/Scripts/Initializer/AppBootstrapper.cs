@@ -46,7 +46,6 @@ public static class AppBootstrapper
             await SpawnAndInit(config.InputManagerRef, "InputManager", context, rootParams.transform, globalLog);
             await SpawnAndInit(config.SaveManagerRef, "SaveManager", context, rootParams.transform, globalLog);
             await SpawnAndInit(config.DataManagerRef, "DataManager", context, rootParams.transform, globalLog);
-            await SpawnAndInit(config.EdgeDataManagerRef, "EdgeDataManager", context, rootParams.transform, globalLog);
             await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context, rootParams.transform, globalLog);
 
             globalLog.AppendLine("\nALL GLOBAL SYSTEMS INITIALIZED SUCCESSFULLY");

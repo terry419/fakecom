@@ -1,5 +1,5 @@
 using Cysharp.Threading.Tasks;
-using System;
+using System.Linq; // Min, Max 계산을 위해 사용 (성능이 중요하다면 foreach로 변경 가능)
 using UnityEngine;
 
 public class MapManager : MonoBehaviour, IInitializable
@@ -7,10 +7,15 @@ public class MapManager : MonoBehaviour, IInitializable
     private const int FRAME_TIME_BUDGET_MS = 16;
     private Tile[,,] _tiles;
 
+    // 맵 데이터 정보
     private int _gridWidth;
     private int _gridDepth;
     private int _layerCount;
     private int _minLevel;
+    private int _maxLevel;
+
+    // 계산된 오프셋
+    private Vector2Int _basePosition;
 
     private bool _isInitialized = false;
 
@@ -19,6 +24,7 @@ public class MapManager : MonoBehaviour, IInitializable
     public int GridDepth => _gridDepth;
     public int LayerCount => _layerCount;
     public int MinLevel => _minLevel;
+    public Vector2Int BasePosition => _basePosition;
 
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
     private void OnDestroy()
@@ -38,74 +44,99 @@ public class MapManager : MonoBehaviour, IInitializable
 
     public async UniTask LoadMap(MapDataSO mapData)
     {
-        if (mapData == null) throw new ArgumentNullException(nameof(mapData));
-
-        try
+        if (mapData == null || mapData.Tiles == null || mapData.Tiles.Count == 0)
         {
-            // [핵심] TileDataManager를 통해 레지스트리 정보에 접근
-            // (TileDataManager가 없다면 여기서 에러가 발생하여 문제를 바로 알 수 있습니다)
-            var tileMgr = ServiceLocator.Get<TileDataManager>();
+            Debug.LogError("[MapManager] MapData is null or empty!");
+            return;
+        }
 
-            int declaredWidth = mapData.GridSize.x;
-            int declaredDepth = mapData.GridSize.y;
-            _minLevel = mapData.MinLevel;
-            _layerCount = mapData.MaxLevel - mapData.MinLevel + 1;
+        // [핵심 변경] GridSize 메타데이터를 신뢰하지 않고, 실제 데이터로 범위 계산
+        CalculateActualBounds(mapData, out var minPos, out var size);
 
-            // 그리드 크기 보정 로직
-            int maxX = declaredWidth - 1;
-            int maxZ = declaredDepth - 1;
-            foreach (var tileData in mapData.Tiles)
+        _basePosition = minPos;
+        _gridWidth = size.x;
+        _gridDepth = size.y;
+
+        _minLevel = mapData.MinLevel;
+        _maxLevel = mapData.MaxLevel;
+        _layerCount = _maxLevel - _minLevel + 1;
+
+        Debug.Log($"[MapManager] Bounds Calculated: Base{_basePosition}, Size({_gridWidth}x{_gridDepth})");
+
+        // 2. 타일 배열 초기화
+        _tiles = new Tile[_gridWidth, _gridDepth, _layerCount];
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // 3. 타일 데이터 로드
+        foreach (var tileData in mapData.Tiles)
+        {
+            if (stopwatch.ElapsedMilliseconds > FRAME_TIME_BUDGET_MS)
             {
-                maxX = Mathf.Max(maxX, tileData.Coords.x);
-                maxZ = Mathf.Max(maxZ, tileData.Coords.z);
-            }
-            _gridWidth = maxX + 1;
-            _gridDepth = maxZ + 1;
-
-            _tiles = new Tile[_gridWidth, _gridDepth, _layerCount];
-
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-            foreach (var tileData in mapData.Tiles)
-            {
-                if (stopwatch.ElapsedMilliseconds > FRAME_TIME_BUDGET_MS)
-                {
-                    await UniTask.Yield();
-                    stopwatch.Restart();
-                }
-
-                int x = tileData.Coords.x;
-                int z = tileData.Coords.z;
-                int levelIndex = tileData.Coords.y - _minLevel;
-
-                // 1. 타일 객체 생성
-                Tile tile = new Tile(tileData.Coords, tileData.FloorID, tileData.PillarID);
-
-                // 2. 저장된 데이터(Edge 등) 로드
-                tile.LoadFromSaveData(tileData);
-
-                _tiles[x, z, levelIndex] = tile;
+                await UniTask.Yield();
+                stopwatch.Restart();
             }
 
-            Debug.Log($"[MapManager] Map '{mapData.DisplayName}' Loaded. Size: {_gridWidth}x{_gridDepth}");
+            // [좌표 변환] World -> Local Array Index
+            int x = tileData.Coords.x - _basePosition.x;
+            int z = tileData.Coords.z - _basePosition.y;
+            int levelIndex = tileData.Coords.y - _minLevel;
+
+            // 로직상 범위 밖일 수가 없으나(위에서 계산했으므로), 방어 코드 유지
+            if (IsOutOfBoundsLocal(x, z, levelIndex))
+            {
+                Debug.LogWarning($"[MapManager] Unexpected Out-of-Bounds: {tileData.Coords}");
+                continue;
+            }
+
+            Tile tile = new Tile(tileData.Coords, tileData.FloorID, tileData.PillarID);
+            tile.LoadFromSaveData(tileData);
+            _tiles[x, z, levelIndex] = tile;
         }
-        catch (Exception ex)
+
+        // [3단계] 환경 구축
+        var envManager = ServiceLocator.Get<EnvironmentManager>();
+        if (envManager != null) envManager.BuildMapFeatures();
+
+        Debug.Log($"[MapManager] Map Loaded Successfully: {mapData.name}");
+    }
+
+    // 실제 데이터 경계 계산 함수
+    private void CalculateActualBounds(MapDataSO data, out Vector2Int minPos, out Vector2Int size)
+    {
+        int minX = int.MaxValue;
+        int minZ = int.MaxValue;
+        int maxX = int.MinValue;
+        int maxZ = int.MinValue;
+
+        foreach (var t in data.Tiles)
         {
-            Debug.LogError($"[MapManager] LoadMap failed: {ex.Message}");
-            throw;
+            if (t.Coords.x < minX) minX = t.Coords.x;
+            if (t.Coords.z < minZ) minZ = t.Coords.z;
+            if (t.Coords.x > maxX) maxX = t.Coords.x;
+            if (t.Coords.z > maxZ) maxZ = t.Coords.z;
         }
+
+        minPos = new Vector2Int(minX, minZ);
+        // (Max - Min + 1)이 실제 크기
+        size = new Vector2Int(maxX - minX + 1, maxZ - minZ + 1);
     }
 
     public Tile GetTile(GridCoords coords)
     {
         if (!_isInitialized) return null;
+        int localX = coords.x - _basePosition.x;
+        int localZ = coords.z - _basePosition.y;
         int levelIndex = coords.y - _minLevel;
-        if (IsOutOfBounds(coords.x, coords.z, levelIndex)) return null;
-        return _tiles[coords.x, coords.z, levelIndex];
+
+        if (IsOutOfBoundsLocal(localX, localZ, levelIndex)) return null;
+        return _tiles[localX, localZ, levelIndex];
     }
 
-    private bool IsOutOfBounds(int x, int z, int levelIndex)
+    private bool IsOutOfBoundsLocal(int localX, int localZ, int levelIndex)
     {
-        return x < 0 || x >= _gridWidth || z < 0 || z >= _gridDepth || levelIndex < 0 || levelIndex >= _layerCount;
+        return localX < 0 || localX >= _gridWidth ||
+               localZ < 0 || localZ >= _gridDepth ||
+               levelIndex < 0 || levelIndex >= _layerCount;
     }
 }

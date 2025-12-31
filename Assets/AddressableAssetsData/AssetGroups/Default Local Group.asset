@@ -27,8 +27,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7943a248cbfbd484f9a61f64b5a86da6
-    m_Address: Assets/Prefabs/Manager/EdgeManager.prefab
+  - m_GUID: ed91cb3fbf8279d46bc8844ce423a49f
+    m_Address: Assets/SO/Tile/TileRegistry.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

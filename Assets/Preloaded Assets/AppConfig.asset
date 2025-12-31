@@ -22,8 +22,8 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  MapVisualSettingsRef:
-    m_AssetGUID: 46880c9bbacb56f42b9621e7b6189606
+  TileRegistryRef:
+    m_AssetGUID: ed91cb3fbf8279d46bc8844ce423a49f
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
