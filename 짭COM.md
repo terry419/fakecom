@@ -45,15 +45,18 @@
   * 사망한 대원들의 기록(이름, 계급, 킬 수, 사망 원인)을 열람하고 추모.  
 * 작전 통제실 (Operations Center)  
   * 월드맵을 통해 다음 수행할 미션(난이도, 보상, 적 유형)을 선택.  
+  * **구현 로직**:  
+    * `MissionManager`가 `CampaignDataSO`(전체 미션 덱)에서 규칙에 따라 여러 개의 `StageDataSO`(미션 패키지)를 추출하여 선택 리스트 구성.  
+    * 플레이어가 미션 선택 시, 해당 `StageDataSO`의 `MapPool` 내에서 하나의 `MapDataSO`를 랜덤 결정.  
+    * 최종 선택된 `MapDataSO`는 `InitializationContext`에 할당되어 전투 세션으로 전달됨.  
 * 수리공방 (Repair Shop)  
   *  **역할:** 전투에서 획득한 '손상된 장비'를 수리하여 사용 가능한 상태로 복구하는 시설.  
   * **기능:** 루팅된 무기는 기본적으로 '파손(Damaged)' 상태이며, 일정 자재(Junk)와 자금을 소모하여 수리해야 유닛에게 장착할 수 있습니다.
 
 2\. 출격 준비 (Provision)
 
-* 미션 시작 직전, 상점이 열리며 \*\*소모품(탄약, 수류탄, 회복약 등등)\*\*을 구매한다.  
-* 구매한 물품은 개인에게 지급되지 않고, \*\*\[원정대 가방\]\*\*에 일괄 보관된다.  
-* **Player Spawn Point**와 **Enemy Spawn Point**를 맵 데이터(`LevelDataSO`)에서 어떻게 가져와 배치할지 로직필요
+* 미션 시작 직전, 상점이 열리며 소모품(탄약, 수류탄, 회복약 등) 구매 및 **\[원정대 가방\]** 보관.  
+* **시스템 초기화**: `BootManager`가 `AppBootstrapper`와 `SceneInitializer`를 실행. `SceneInitializer`는 `MapManager`의 `Initialize(context)`를 호출하여 로드된 `MapDataSO`의 스폰 포인트 데이터를 전달하고 유닛을 배치함.
 
 3\. 전술 전투 (Tactical Combat)
 
@@ -192,7 +195,7 @@
 | 항목 | 상세 규칙 및 기술 사양 |
 | :---- | :---- |
 | **360도 시야** | **모든 유닛은 전방향을 감시하며, 별도의 사각지대는 존재하지 않습니다.** |
-| **차폐 및 투과** | • 벽(Wall) 및 천장(Ceiling): 시야를 완전히 차단합니다. • 창문(Window): 시야를 전혀 가리지 않는 완전 투과(0.0) 방식으로 처리하며, 창문을 통과하는 사격에도 별도의 명중 패널티는 적용하지 않습니다. |
+| **차폐 및 투과** | • 벽(Wall) 및 천장(Ceiling): 사격을 완전히 차단합니다. • 창문(Window): 완전 투과(0.0) 방식으로 처리하며, 창문을 통과하는 사격에도 별도의 명중 패널티는 적용하지 않습니다. |
 | **미식별 타겟 대응** | **시야가 확보되지 않은 안개 지역이라도 특정 타일(Grid Cell)을 지정하여 광역 공격을 시도할 수 있습니다. 공격에 적중하더라도 적의 위치는 드러나지 않고 은폐 상태를 유지합니다.** |
 | **높이 규격 📏**  *(Height Standards)* | **• 유닛 신장:** 2.0 (히트박스 기준). **• 발사 원점 (Yshoot):** **1.8** (유닛의 눈/총구 높이). **• 낮은 엄폐물 (Hlow):** **1.2** (반엄폐). **• 높은 엄폐물 (Hhigh):** 2.5m (완전엄폐/벽). **• 로직:**  **Yshoot**(1.8) \>**Hlow**1.2이므로, 반엄폐 상태에서는 전방 사격 시 장애물 간섭이 발생하지 않음. |
 | **레이캐스트 사양** | **3D 그리드 내 정확한 판정을 위해 시야 및 사격 레이캐스트는 반드시 지면이 아닌 발사 원점(1.8) 높이에서 시작하도록 고정합니다. (WYSIWYG 원칙 준수)** |
@@ -213,17 +216,18 @@
 #### **(2) 천장 유무 (Ceiling Property)**
 
 * **이동과 무관:** 층간 이동이 '순간이동' 방식으로 변경됨에 따라, 천장은 더 이상 유닛의 물리적 이동을 막는 요소가 아니다.  
-* **전술적 차단:** 대신 천장은 **'시야(Vision)'와 '투사체(Projectile)'를 물리적으로 차단**하는 역할을 수행한다.  
+* **전술적 차단:** 대신 천장은 **'투사체(Projectile)'를 물리적으로 차단**하는 역할을 수행한다.  
   * **실내 (Indoor):** 천장이 있어 곡사 무기(수류탄 등) 사용이 불가능하며, 고지대에서의 사격 이점을 받을 수 없다.  
   * **실외 (Outdoor):** 천장이 없어 곡사 투척 및 고지대 낙차 사격이 가능하다.
 
-#### **(3) 구조적 지지 시스템 (Structural Integrity) :**
+#### **(3) 지형 파손 및 상태 변화 (Terrain State Transition):**
 
-* **지지체(Anchor):** 지면(Level 0)과 \*\*독립된 타일로 존재하는 모든 기둥(Pillar Cell)\*\*은 지지력의 원천(S=5)이 된다. 기둥은 유닛이 진입할 수 없는 '점유된 타일'로 취급한다..  
-* **지지력(Support Value):** 기둥/지면에서 시작하여 인접 타일로 전파될 때마다 수치가 1씩 감소한다.  
-* **붕괴 조건:** 지지력이 n 이하가 된 타일은 물리적 지지 불능 상태로 간주하여 즉시 파괴된다.  
-* **전파 공식** : Stile=max(Sneighbors)-1 (단, 기둥/지면은 S \= 5\)  
-* **계산 시점:** 실시간 계산 삭제. **구조물 파괴/설치 이벤트 발생 시에만** 전체 재계산 수행.
+* **바닥 보존 법칙:** 수류탄 등 폭발 공격으로 인해 2층 바닥이 사라지는 '붕괴'는 발생하지 않으며, 모든 층의 바닥 타일은 물리적 위치를 유지함.  
+* **파손 상태 (Broken State):** 특정 데미지 이상을 받은 바닥 타일은 `FloorType.BrokenConcrete` 등으로 상태가 변경됨.  
+* **이동 제약:** 파손된 바닥은 시각적으로 파편이 표시되며, 해당 타일 통과 시 **이동 비용(Move Cost)이 증가**함 (예: 기본 1 → 파손 시 3).  
+* **구현 로직:**  
+  * `CombatManager`가 폭발 범위 내 타일의 `FloorID`를 변경.  
+  * `MapManager`의 길찾기 알고리즘이 변경된 `FloorID`에 따른 가중치를 실시간 반영.
 
 ### **5.3. 엄폐 효율 결정 공식 (Combat Formula)**
 
@@ -284,11 +288,20 @@
   * **엄폐:** 부분 엄폐 효과 제공.  
   * **투척:** 투사체가 통과 가능함.  
 * **문 (Auto-Door):**  
-  * 항상 열린 상태. 시야 차단 데이터 제외  
-* **구조적 파괴 (Structural Integrity):**  
-  * **맵의 기둥(Pillar)과 벽(Wall)은 내구도(HP)를 가지며 파괴될 수 있다.**  
-  * **붕괴(Collapse): 기둥 파괴로 인해 지지력을 상실한 상층 타일은 즉시 파괴되며, 위에 있던 유닛은 낙하 데미지를 입는다.**  
-  *  **추락 및 점유: 유닛은 직하단 타일로 추락하며, 아래층이 없으면 연쇄 추락함. 만약 착지 타일에 이미 다른 유닛이 점유 중일 경우, 인접한 빈 타일로 '옆 칸 밀려남' 처리를 수행하여 유닛 겹침을 방지함.**  
+  * 항상 열린 상태.   
+* **구조적 파괴 및 이동성 복구 (Destruction & Recovery):**  
+  * **파괴 대상: 맵의 기둥(Pillar)과 벽(Wall)은 고유 HP를 가지며, 수류탄 등의 공격으로 파괴될 수 있음.**  
+  * **점유 해제 (De-occupation): 타일 중심을 차지하던 기둥이 파괴되면, 해당 타일의 점유자 목록에서 즉시 제거됨.**  
+  * **이동성 복구: 기둥이 사라진 타일은 즉시 `UpdateCache()`를 실행하여 `IsWalkable` 상태를 `True`로 전환함.**  
+  * **구현 로직:**  
+    * **`CombatManager`가 `PillarInfo.TakeDamage()` 호출.**  
+    * **기둥 HP 0 도달 시 `Tile.RemoveOccupant(PillarInfo)` 실행.**  
+    * **`Tile.UpdateCache()`에 의해 `_cachedIsWalkable`이 `True`로 갱신되며 `OnWalkableStatusChanged` 이벤트 발생.**  
+    * **`TilemapGenerator`가 기둥 모델을 삭제하고 아래에 깔려 있던 바닥 모델을 노출함.**  
+  * **파괴 데이터 갱신 흐름:**  
+1. **파괴 시 `Tile.OnEdgeDestroyed` 이벤트 발생.**  
+2. **`TilemapGenerator`가 이벤트를 수신하여 벽/기둥 오브젝트 삭제 및 파편 생성.**  
+3. **`EnvironmentManager`가 파괴를 감지하고 `Tile.UpdateCache`를 호출하여 실시간 이동 가능 여부(IsWalkable) 재계산.**  
 * 타일 점유(Tile Occupation):  
   * 유닛, 파괴된 차량 등 일부 오브젝트는 타일 전체를 차지\*하며, 이 타일은 다른 유닛이 통과하거나 멈출 수 없다  
   * 길찾기 시 '이동 불가' 지역으로 취급된다.  
@@ -318,7 +331,8 @@
   * **희소 배열 (Sparse Array): 데이터가 없는 좌표는 `null`로 유지하여 모바일 메모리 한계를 극복한다.**  
 * **에디터 (Map Editor):**  
   * **Scene-First: 편집 중에는 `EditorTile` (MonoBehaviour) 프리팹을 씬에 직접 배치하여 Unity의 기본 툴(이동, 회전, Undo)을 활용한다.**  
-  * **Baking: 저장(Save) 시점에만 씬의 `EditorTile` 객체들을 순회하여 `MapDataSO`의 순수 데이터로 직렬화(Serialize)한다.**
+  * Baking: 저장(Save) 시점에만 씬의 `EditorTile` 객체들을 순회하여 `MapDataSO`의 순수 데이터로 직렬화(Serialize)한다.  
+  * 계층 구조 생성 (Layered Generation): 모든 객체화는 \[타일(Floor) → 구조물(Edge/Pillar)\] 순서로 수행함. 타일 객체를 먼저 생성한 뒤, 그 위에 벽 정보를 설정하거나 기둥(PillarInfo)을 점유자로 등록함.
 
 #### **3\. 구성 요소 (Cell Composition)**
 
@@ -328,7 +342,6 @@
 
 * **센터 (Center):**  
   * **FloorID (Enum):** 바닥재 재질. **\[예외 처리\]** 이 값이 None이거나 Null일 경우, 해당 좌표는 물리적으로 뚫려있는 구멍으로 간주하며, 유닛 진입 시 추락(Fall) 판정이 발생한다.  
-  * **CeilingID (Enum):** 천장재 정보. (상층의 바닥과 별개로 렌더링되거나 공유됨)  
   * **점유 슬롯 (Occupancy Slots) \- *변수 분리*:**  
     * **PrimaryUnit (Unit):** 타일을 점유 중인 유닛 혹은 파괴 가능한 장애물(Object). 이동 불가 판정의 기준이 되며 **단 하나만 존재**한다.  
     * **LootItems (List\<Item\>):** 바닥에 떨어진 아이템 목록. (이동 가능, 겹치기 가능).  
@@ -339,17 +352,17 @@
   * **데이터 최적화:** 런타임에는 가벼운 `EdgeInfo` 구조체를 사용하여 물리 연산을 처리한다.  
   * 데이터 저장 (Persistence):  
     * 파일 저장 시에는 **`SavedEdgeInfo`** 구조체를 사용하여 데이터 손실을 방지한다.  
-    * **저장 항목:** `EdgeType` (벽/창문), `CoverType`, `MaxHP`, **`CurrentHP` (파괴 상태 보존)**, **`EdgeDataType` (재질: Concrete, Brick 등)**.  
+    * **저장 항목:** `EdgeType` (벽/창문), `CoverType`, `MaxHP`, **`CurrentHP` (파괴 상태 보존)**  
     * **목적:** 로드 시 파괴된 벽이 복구되거나, 콘크리트 벽이 투명 벽으로 변하는 데이터 무결성 오류를 원천 차단함.  
   * **데이터 무결성 (Data Integrity \- Sync Rule):**  
     * 엣지 데이터는 인접한 두 타일이 공유하는 물리적 벽면이므로, **반드시 양방향 동기화**되어야 한다.  
     * **규칙:** 좌표 (C, R)의 **North** 벽을 생성/파괴할 경우, 인접한 (C, R+1) 좌표의 **South** 벽 데이터도 동일한 값으로 갱신해야 한다. MapManager는 이를 강제하는 메서드(SyncEdge 혹은 SetEdge)를 통해 데이터를 조작한다.
 
-(2) 기둥 셀 (Pillar Cell)
+(2) 기둥 셀 및 PillarInfo (Pillar Cell & Logic)
 
-타일 한 칸 전체를 차지하는 독립적인 구조물 타일이다.
-
-* **PillarID (Enum):** 기둥의 외형 및 내구도 정보.  
+* **PillarID (Enum):** 기둥의 외형 및 내구도 정보 식별.  
+* **PillarInfo 객체:** 타일 점유와 HP를 관리하는 논리 클래스. `ITileOccupant`를 상속받음.  
+* **논리적 구축:** `MapManager` 초기화 시 기둥 데이터를 읽어 `PillarInfo`를 생성하고, 타일의 `AddOccupant()`로 등록함. 등록 시 타일의 `UpdateCache()`가 실행되어 해당 타일의 `_cachedIsWalkable`을 `false`로 자동 확정함.  
 * **특성:**  
   * 엣지(Edge) 데이터를 가지지 않으며, 좌표 전체를 물리적으로 점유함.  
   * 유닛 진입 불가(Impassable).  
@@ -452,8 +465,9 @@
 | **Combat** | **CombatManager** | • 공격/피격 판정 공식 계산 및 데미지 적용. |
 |  | **UnitManager** | • 유닛 스폰, 사망 처리, 리스트 관리. |
 | **Visual / UI** | **CameraManager** | • 시점 제어 및 액션 캠 연출. |
-|  | **TargetUIManager** | • 타겟 머리 위 UI(HP바, 명중률) 표시 및 풀링. |
+| **Visual** | **TilemapGenerator** | MapManager의 논리 데이터를 기반으로 실제 프리팹을 월드에 비동기(GenerateAsync) 스폰 및 배치. |
 |  | **DamageTextMgr** | • 데미지 플로팅 텍스트 연출. |
+| **System** | **EnvironmentManager** | • **환경 변화 중계:** 벽/기둥 파괴 이벤트를 수신하여 데이터와 비주얼 간의 동기화 명령 하달. 333  • **논리 갱신 트리거:** 구조물 제거 시 Tile.UpdateCache()를 호출하여 이동 가능 여부 및 시야를 실시간 재계산하게 함.   • **상태 변환 관리:** 바닥 타일의 파손 상태(FloorType 변경)와 그에 따른 이동 비용(Cost) 가중치 적용 관리.  |
 
 ### **(3) Scene Scope (Non-Battle)**
 
@@ -473,8 +487,8 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 | 레이어 이름 | 용도 | Raycast 활용 예시 |
 | :---- | :---- | :---- |
 | **Ground** | 바닥/지형 | 마우스 클릭 이동 지점 판별. |
-| **Wall** | 높은 벽 | 시야(Vision) 차단, 직사 화기 차단. |
-| **Cover** | 낮은 엄폐물 | 엄폐 판정, 시야는 통과(부분 엄폐)하나 이동은 차단. |
+| **Wall** | 높은 벽 | 높은 엄폐 판정, 이동 차단. |
+| **Cover** | 낮은 엄폐물 | 엄폐 판정, 이동 차단. |
 | **Unit** | 캐릭터 | 공격 타겟팅 판별. |
 | **Ceiling** | 지붕/천장 | 실내 판정, 곡사 화기(투척) 차단. |
 
@@ -760,7 +774,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 |  | Evasion | int | 기본 회피율. |
 |  | CritChance | float | 기본 치명타 확률. |
 | 4\. AI Logic | BaseAILevel | int | \[AI\] 유닛 본인의 지능 레벨 (1\~10). 딥러닝 스코어 가중치. |
-|  | CommandAIBonus | int | \[AI\] 주변(시야 내) 아군에게 부여하는 지능 보너스. (음수 가능) |
+|  | CommandAIBonus | int | \[AI\] 주변 아군에게 부여하는 지능 보너스. (음수 가능) |
 | 5\. Reward | DropTable | LootTableSO | 사망 시 드랍할 아이템 및 확률 테이블. |
 
 ### 
@@ -824,10 +838,8 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | 필드명 | 데이터 타입 | 설명 |
 | :---- | :---- | :---- |
 | **AttackTier** | int | **공격 등급 (T1\~T5).** 방어구 등급(TDef)과의 격차 계산에 사용됨. |
-| **CompatibleWeapons** | List\<WeaponType\> | 이 탄약을 사용할 수 있는 무기군 (예: Rifle, Sniper) |
-| **DamageMod** | float | 데미지 보정 계수 (기본 1.0. 특수탄의 경우 1.2 등) |
-| **HitMod** | int | 명중률 보정값 (예: \+10, \-5) |
-| **CritMod** | float | 치명타 확률 보정값 |
+| **AllowedWeaponTypes** | List\<WeaponType\> | 이 탄약을 사용할 수 있는 class군 (예: Rifle, Sniper) |
+| \- `StatusEffects` |  |  |
 
 #### **8.5.3 ConsumableDataSO (사용형 소모품 데이터) `ItemDataSO`를 상속받음. 액티브 스킬처럼 사용되는 아이템.**
 
@@ -835,8 +847,6 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | :---- | :---- | :---- |
 | **EffectType** | Enum | 발동 효과 정의 (Heal, Buff\_Stat, Cure\_Status, Zone\_Create, Scan) |
 | **EffectValue** | float | 효과의 강도 (회복량, 버프 수치 등) |
-| **Range** | int | 사용/투척 사거리 (0일 경우 즉시 자신에게 사용) |
-| **Radius** | int | 효과 범위 (0: 단일, 1 이상: 광역) |
 | **Duration** | int | 지속 턴 수 (즉발성 효과는 0\) |
 | **VFX\_Ref** | AssetReference | 사용 시 재생할 이펙트 |
 
@@ -847,7 +857,6 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | 필드명 | 데이터 타입 | 설명 |
 | :---- | :---- | :---- |
 | **(Inherited)** | \- | ItemID, ItemName, ItemIcon, Description, Price\_Sell, MaxStack 상속 |
-| **RarityTier** | Enum | 자원 등급 (Common, Rare, Epic, Legendary). 드랍률과 가치 결정. |
 | **IsAutoSell** | bool | **자동 환불 여부.**  • **True:** 환금 아이템. 전투 종료 시 Price\_Sell 가격으로 즉시 판매. • **False:** 재료 아이템. 기지 창고(Inventory)로 이송되어 보관. |
 
 ### **8.6. QTEActionModuleSO (액션 기믹 모듈)**
@@ -1269,7 +1278,7 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 |  | **High-Velocity (T2)** | 자신 | • **\[AttackTier\]** 2\. | 방어구 T2 상대로 효율 100% |
 |  | **Armor-Piercing (T3)** | 자신 | • **\[AttackTier\]** 3\. | 방어구 T3 상대로 효율 100% |
 |  | **... (T4\~T5)** | 자신 | • **\[AttackTier\]** 4\~5. | 고티어 적 대응용 |
-| **투척** | **파편 수류탄** | 적/지형 | • **\[Damage\]** 범위(Radius 2.5) 내 적에게 5-8 피해 \+ 엄폐물 파괴. | **Assault 전용** |
+| **투척** | **파편 수류탄** | 적/지형 | • **\[Damage\]** 범위 내 적에게 피해 \+ **벽 및 기둥 파괴 \+ 바닥 타일 파손(이동 비용 증가)**. | **Assault 전용** |
 |  | **화염병** | 지형 | • **\[ZoneDamage\]** 범위(Radius 1.5)에 3턴간 화염지대 생성. | **Sniper 전용** |
 |  | **스캔 수류탄** | 지형 | • **\[Scan\]** 범위(Radius 5.0) 내 시야 확보 및 은신 유닛 감지. | **Scout 전용** |
 
@@ -1328,7 +1337,7 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 * **목표:** XCOM 2 수준의 전술 맵 제작을 위한 **최소 기능 단위(MVP)** 구현.  
 * **필수 편집 대상:**  
   1. **Tile (Floor):** 유닛이 밟는 바닥.  
-  2. **Pillar (Column):** 구조적 지지 및 시야 차단 기둥.  
+  2. **Pillar (Column):** Tile 위에 올라가는 오브젝트.  
   3. **Edge (Wall/Window/Door):** **\[핵심\]** 엄폐(Cover) 및 이동 경로를 결정하는 벽면 데이터.  
 * **제외 대상 (Phase 2):** 복잡한 컷신 트리거, 적 AI 순찰 경로 디테일 설정 등은 추후 구현한다.
 
@@ -1339,7 +1348,10 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 1. **배치 (Place):** 팔레트에서 타일/벽을 선택하여 씬(Scene)에 `EditorTile` 프리팹을 생성.  
 2. **조작 (Manipulate):** Unity 기본 툴(Move/Rotate) 및 `Undo/Redo` 기능을 그대로 사용.  
 3. **검증 (Validate):** '유효성 검사' 버튼을 통해 맵 밖으로 나간 타일이나 겹친 벽을 감지.  
-4. **저장 (Bake):** 저장 버튼 클릭 시, 씬의 모든 `EditorTile` 정보를 긁어모아 `MapDataSO`로 변환(Overwrite).
+4. **저장 (Bake):** 저장 버튼 클릭 시, 씬의 모든 `EditorTile` 정보를 긁어모아 `MapDataSO`로 변환(Overwrite).  
+5. 편집 논리 (Editor Logic) :   
+   1. 타일 우선 원칙: 바닥 타일이 없는 좌표에는 벽/기둥 배치 불가.   
+   2. 자동 동기화: 기둥 배치 시 해당 좌표 \`EditorTile\`의 \`PillarID\`를 즉시 갱신.
 
 ### **14.3. UX 및 조작 (Interaction)**
 
