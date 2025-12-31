@@ -17,11 +17,6 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: cfa6d96333108bf41a202744f6c34c37
   m_SerializeEntries:
-  - m_GUID: 46880c9bbacb56f42b9621e7b6189606
-    m_Address: Assets/SO/Tile/MapEditorSettings.asset
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 675ec267342fded43b7a3e7095ad5ba0
     m_Address: Assets/Prefabs/SaveManager.prefab
     m_ReadOnly: 0

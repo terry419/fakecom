@@ -21,7 +21,7 @@ public enum EdgeType
     Wall,
     Window,
     Door,
-    fence
+    Fence
 }
 
 public enum CoverType

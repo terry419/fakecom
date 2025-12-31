@@ -119,7 +119,7 @@ GameObject:
   - component: {fileID: 8116671813238730060}
   - component: {fileID: -8786275655183845955}
   m_Layer: 0
-  m_Name: Floor_Damaged
+  m_Name: Tile_0_0_0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

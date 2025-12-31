@@ -6,19 +6,18 @@ public class MapEditorContext : ScriptableObject
     private static MapEditorContext _instance;
     public static MapEditorContext Instance => _instance ??= CreateInstance<MapEditorContext>();
 
-    public MapEditorSettingsSO Settings;
+    // [Wiring] Settings 삭제 -> Registry가 유일한 장부
+    public TileRegistrySO Registry;
     public MapDataSO TargetMapData;
 
     public enum ToolMode { Tile, Edge, Pillar, Erase }
     public ToolMode CurrentToolMode = ToolMode.Tile;
+
     public int CurrentLevel = 0;
 
     public FloorType SelectedFloorType = FloorType.Standard;
     public PillarType SelectedPillarType = PillarType.Standing;
     public EdgeType SelectedEdgeType = EdgeType.Wall;
-
-    // [Fix] 삭제된 EdgeDataType 대신 int형이나 더미를 사용하되, 
-    // 여기서는 로직에 직접 관여하지 않으므로 필드 제거
 
     public GridCoords MouseGridCoords;
     public bool IsMouseOverGrid;
@@ -30,7 +29,6 @@ public class MapEditorContext : ScriptableObject
 
     public void InvalidateCache() => _isCacheDirty = true;
 
-    // [Fix] MapEditorIO가 호출하는 메서드 복구 (공개 인터페이스)
     public void RefreshCache()
     {
         if (_isCacheDirty) RebuildCache();
@@ -79,7 +77,8 @@ public class MapEditorContext : ScriptableObject
 
         public void Set(GridCoords t, Direction d, Vector3 p, bool v)
         {
-            Tile = t; Dir = d; WorldPos = p; IsValid = v;
+            Tile = t;
+            Dir = d; WorldPos = p; IsValid = v;
         }
         public void SetInvalid() => IsValid = false;
     }

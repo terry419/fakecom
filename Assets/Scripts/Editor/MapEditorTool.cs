@@ -16,29 +16,22 @@ public class MapEditorTool : EditorWindow
 
     private void OnEnable()
     {
-        // 1. Context 초기화 (Singleton)
         _context = MapEditorContext.Instance;
-
-        // 2. 모듈 인스턴스 생성
         _sceneInput = new MapEditorSceneInput(_context);
         _action = new MapEditorAction(_context);
         _io = new MapEditorIO(_context);
 
-        // 3. 이벤트 연결 (사용자 입력 -> 액션 실행)
         _sceneInput.OnCreateTileRequested += _action.HandleCreateTile;
         _sceneInput.OnModifyEdgeRequested += _action.HandleModifyEdge;
         _sceneInput.OnCreatePillarRequested += _action.HandleCreatePillar;
         _sceneInput.OnEraseTileRequested += _action.HandleEraseTile;
 
-        // 4. 씬 GUI 델리게이트 등록
         SceneView.duringSceneGui += OnSceneGUI;
     }
 
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
-
-        // 이벤트 연결 해제 (메모리 누수 방지)
         if (_sceneInput != null && _action != null)
         {
             _sceneInput.OnCreateTileRequested -= _action.HandleCreateTile;
@@ -50,7 +43,6 @@ public class MapEditorTool : EditorWindow
 
     private void OnGUI()
     {
-        // 플레이 모드 중에는 에디터 GUI 비활성화
         if (Application.isPlaying)
         {
             GUILayout.Label("Editor disabled during Play Mode", EditorStyles.boldLabel);
@@ -60,7 +52,14 @@ public class MapEditorTool : EditorWindow
         if (_context == null) _context = MapEditorContext.Instance;
 
         GUILayout.Label("Construction Settings", EditorStyles.boldLabel);
-        _context.Settings = (MapEditorSettingsSO)EditorGUILayout.ObjectField("Settings", _context.Settings, typeof(MapEditorSettingsSO), false);
+
+        // [Wiring] Registry만 남기고 Settings 삭제
+        _context.Registry = (TileRegistrySO)EditorGUILayout.ObjectField("Tile Registry", _context.Registry, typeof(TileRegistrySO), false);
+
+        if (_context.Registry == null)
+        {
+            EditorGUILayout.HelpBox("Please assign Tile Registry!", MessageType.Error);
+        }
 
         // Max Level 설정
         int maxLevel = 5;
@@ -84,7 +83,11 @@ public class MapEditorTool : EditorWindow
         // 툴 모드 선택
         _context.CurrentToolMode = (MapEditorContext.ToolMode)EditorGUILayout.EnumPopup("Mode", _context.CurrentToolMode);
 
-        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
+        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Tile)
+        {
+            _context.SelectedFloorType = (FloorType)EditorGUILayout.EnumPopup("Floor Type", _context.SelectedFloorType);
+        }
+        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
         {
             _context.SelectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Edge Type", _context.SelectedEdgeType);
         }
@@ -106,18 +109,18 @@ public class MapEditorTool : EditorWindow
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Load Data to Scene"))
         {
-            if (_context.TargetMapData != null && _context.Settings != null)
+            if (_context.TargetMapData != null && _context.Registry != null)
                 _action.LoadMapFromData(_context.TargetMapData);
             else
-                Debug.LogError("TargetMapData or Settings is missing!");
+                Debug.LogError("TargetMapData or Registry is missing!");
         }
 
         if (GUILayout.Button("Save Scene to Data"))
         {
-            if (_context.TargetMapData != null && _context.Settings != null)
+            if (_context.TargetMapData != null)
                 _io.SaveMap();
             else
-                Debug.LogError("TargetMapData or Settings is missing!");
+                Debug.LogError("TargetMapData is missing!");
         }
         GUILayout.EndHorizontal();
     }

@@ -10,16 +10,17 @@ public class AppConfig : ScriptableObject
     [Header("Global Managers (DontDestroyOnLoad)")]
     public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef;
 
-    // [New] 맵 비주얼 설정 (TileDataManager 주입용)
-    public AssetReferenceT<MapEditorSettingsSO> MapVisualSettingsRef;
+    // [Mod] MapEditorSettingsSO -> TileRegistrySO 로 교체
+    // 기존: public AssetReferenceT<MapEditorSettingsSO> MapVisualSettingsRef;
+    public AssetReferenceT<TileRegistrySO> TileRegistryRef;
 
-    // 시스템 매니저
+    // 시스템 매니저 (기존 유지)
     public AssetReferenceGameObject GameManagerRef;
     public AssetReferenceGameObject DataManagerRef;
     public AssetReferenceGameObject InputManagerRef;
     public AssetReferenceGameObject SaveManagerRef;
 
-    // [추가] 리소스 매니저 (Global Scope)
+    // 리소스 매니저 (기존 유지)
     public AssetReferenceGameObject EdgeDataManagerRef;
     public AssetReferenceGameObject TileDataManagerRef;
 }

@@ -2,11 +2,9 @@ using UnityEngine;
 using UnityEditor;
 using System;
 
-// [Fix] static 제거 -> 인스턴스 생성 가능
 public class MapEditorSceneInput
 {
     private readonly MapEditorContext _context;
-
     public event Action<GridCoords> OnCreateTileRequested;
     public event Action<GridCoords, Direction> OnModifyEdgeRequested;
     public event Action<GridCoords> OnCreatePillarRequested;
@@ -19,7 +17,7 @@ public class MapEditorSceneInput
 
     public void HandleSceneGUI(SceneView sceneView)
     {
-        if (_context.Settings == null) return;
+        // [Wiring] Settings 체크 제거
         HandleMouseInput();
         DrawVisuals();
     }
@@ -27,14 +25,12 @@ public class MapEditorSceneInput
     private void HandleMouseInput()
     {
         Event guiEvent = Event.current;
-        // 마우스 이벤트가 아니면 무시 (레이아웃 에러 방지)
         if (guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint) return;
 
         int controlID = GUIUtility.GetControlID(FocusType.Passive);
         HandleUtility.AddDefaultControl(controlID);
 
         Ray mouseRay = HandleUtility.GUIPointToWorldRay(guiEvent.mousePosition);
-        // Y축 평면 (현재 레벨 기준)
         Plane gridPlane = new Plane(Vector3.up, new Vector3(0, _context.CurrentLevel * GridUtils.LEVEL_HEIGHT, 0));
 
         if (gridPlane.Raycast(mouseRay, out float distance))
@@ -67,7 +63,6 @@ public class MapEditorSceneInput
 
         float threshold = GridUtils.CELL_SIZE * 0.35f;
 
-        // 타일 중앙에 가까우면 엣지 선택 안 함
         if (Mathf.Abs(offset.x) < threshold && Mathf.Abs(offset.z) < threshold)
         {
             _context.HighlightedEdge.SetInvalid();
@@ -82,7 +77,6 @@ public class MapEditorSceneInput
 
         Vector3 edgePos = GridUtils.GetEdgeWorldPosition(tileCoords, dir);
 
-        // [Fix] Set 메서드 인자 4개 (Context 정의와 일치시킴)
         _context.HighlightedEdge.Set(tileCoords, dir, edgePos, true);
     }
 
@@ -94,7 +88,6 @@ public class MapEditorSceneInput
                 OnCreateTileRequested?.Invoke(_context.MouseGridCoords);
                 break;
             case MapEditorContext.ToolMode.Edge:
-                // [Fix] IsValid는 프로퍼티이므로 () 제거
                 if (_context.HighlightedEdge.IsValid)
                     OnModifyEdgeRequested?.Invoke(_context.HighlightedEdge.Tile, _context.HighlightedEdge.Dir);
                 break;
@@ -117,7 +110,6 @@ public class MapEditorSceneInput
 
         DrawWireCube(GridUtils.GridToWorld(_context.MouseGridCoords), new Vector3(GridUtils.CELL_SIZE, 0.1f, GridUtils.CELL_SIZE), c);
 
-        // [Fix] IsValid 프로퍼티 사용
         if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge && _context.HighlightedEdge.IsValid)
         {
             DrawEdgeHighlight(_context.HighlightedEdge.WorldPos, _context.HighlightedEdge.Dir, Color.magenta);
@@ -138,6 +130,7 @@ public class MapEditorSceneInput
         Vector3 s = (dir == Direction.North || dir == Direction.South)
             ? new Vector3(GridUtils.CELL_SIZE, 0.2f, t)
             : new Vector3(t, 0.2f, GridUtils.CELL_SIZE);
+
         DrawWireCube(center, s, color);
     }
 }

@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-// [구조체 외부 선언]
+// --- [누락되었던 구조체 정의 복구] ---
 
 [System.Serializable]
 public struct FloorEntry
@@ -37,6 +37,8 @@ public struct EdgeEntry
     public bool IsPassable;
 }
 
+// --- [메인 클래스] ---
+
 [CreateAssetMenu(fileName = "TileRegistry", menuName = "Data/Map/TileRegistry")]
 public class TileRegistrySO : ScriptableObject
 {
@@ -49,6 +51,14 @@ public class TileRegistrySO : ScriptableObject
     [Header("Edges")]
     public List<EdgeEntry> Edges;
 
+    // [New] MapEditorSettingsSO의 유산을 흡수 (비주얼 설정)
+    [Header("Editor Visuals")]
+    [Tooltip("에디터에서 마우스 오버 시 사용할 하이라이트 재질")]
+    public Material HighlightMaterial;
+    public Color GridColor = Color.white;
+    public Color PillarHighlightColor = Color.yellow;
+    public Color EraseHighlightColor = Color.red;
+
     // --- 런타임 캐싱 (Dictionary) ---
     private Dictionary<FloorType, FloorEntry> _floorCache;
     private Dictionary<PillarType, PillarEntry> _pillarCache;
@@ -60,7 +70,7 @@ public class TileRegistrySO : ScriptableObject
     private void OnValidate() => _isDirty = true;
 #endif
 
-    private void RebuildCache()
+    public void RebuildCache()
     {
         _floorCache = Floors?.ToDictionary(x => x.Type) ?? new Dictionary<FloorType, FloorEntry>();
         _pillarCache = Pillars?.ToDictionary(x => x.Type) ?? new Dictionary<PillarType, PillarEntry>();

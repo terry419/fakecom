@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: e91724415919a4d4dad33ad73b917085, type: 3}
   m_Name: TileRegistry
-  m_EditorClassIdentifier: Assembly-CSharp::TileRegistrySO
+  m_EditorClassIdentifier: 
   Floors:
   - Type: 2
     Prefab: {fileID: 8354126558350536518, guid: 81456c2288f7229408047a2d5506205c, type: 3}
@@ -35,15 +35,19 @@ MonoBehaviour:
   - Type: 1
     Prefab: {fileID: 6330735686944801787, guid: 8f0eb350a33c82d4ab4b1eae034824c0, type: 3}
     MaxHP: 25
-    DefaultCover: 2
+    DefaultCover: 0
     IsPassable: 0
   - Type: 2
-    Prefab: {fileID: 8302463656597242646, guid: 390d97d512254524d8a460dd0a0e7e6e, type: 3}
+    Prefab: {fileID: 7892387242418326335, guid: 390d97d512254524d8a460dd0a0e7e6e, type: 3}
     MaxHP: 25
-    DefaultCover: 1
-    IsPassable: 1
+    DefaultCover: 0
+    IsPassable: 0
   - Type: 4
     Prefab: {fileID: 2830432925599487230, guid: 5d77c99198af9224a8d1394137945824, type: 3}
     MaxHP: 25
-    DefaultCover: 1
+    DefaultCover: 0
     IsPassable: 0
+  HighlightMaterial: {fileID: 2100000, guid: 6bfc2b92c847a7d44b06fc5a7655c755, type: 2}
+  GridColor: {r: 1, g: 1, b: 1, a: 1}
+  PillarHighlightColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  EraseHighlightColor: {r: 1, g: 0, b: 0, a: 1}
