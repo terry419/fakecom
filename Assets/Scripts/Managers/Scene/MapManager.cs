@@ -84,18 +84,6 @@ public class MapManager : MonoBehaviour, IInitializable
                 // 2. 저장된 데이터(Edge 등) 로드
                 tile.LoadFromSaveData(tileData);
 
-                // 3. [데이터 주입] 레지스트리에서 기둥의 MaxHP 등을 가져와 설정
-                if (tileData.PillarID != PillarType.None)
-                {
-                    var pillarEntry = tileMgr.GetPillarData(tileData.PillarID);
-
-                    // 저장된 HP가 있다면(>0) 그것을 쓰고, 없다면(-1 or 0) MaxHP로 초기화
-                    // (새로 만든 맵은 CurrentPillarHP가 0일 수 있으므로 MaxHP를 기본값으로 사용)
-                    float currentHP = tileData.CurrentPillarHP > 0 ? tileData.CurrentPillarHP : pillarEntry.MaxHP;
-
-                    tile.InitializePillarHP(pillarEntry.MaxHP, currentHP);
-                }
-
                 _tiles[x, z, levelIndex] = tile;
             }
 

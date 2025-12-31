@@ -88,6 +88,50 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05ef2ff8516916647b112e41611e2f84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &2562847573293440251
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1573259171302870502}
+  - component: {fileID: 6204360807431166004}
+  m_Layer: 0
+  m_Name: EnvironmentManage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1573259171302870502
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2562847573293440251}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 7.184296, y: 0.7252872, z: -0.47021627}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6051140353520375680}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6204360807431166004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2562847573293440251}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05f13a0ca0d6ad842b9d95aa30c49510, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &3031048406308749683
 GameObject:
   m_ObjectHideFlags: 0
@@ -405,6 +449,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6051140353520375680}
+  - component: {fileID: 7993066719342763643}
   m_Layer: 0
   m_Name: SceneManager
   m_TagString: Untagged
@@ -437,8 +482,21 @@ Transform:
   - {fileID: 4209442709347666878}
   - {fileID: 5605859432140853620}
   - {fileID: 7402632981541156695}
+  - {fileID: 1573259171302870502}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7993066719342763643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6717286281797422196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2894218d8d38b440bbf9054c3f2b5aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &7042416757996620872
 GameObject:
   m_ObjectHideFlags: 0

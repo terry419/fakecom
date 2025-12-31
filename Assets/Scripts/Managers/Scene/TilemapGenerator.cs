@@ -1,7 +1,7 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
-using System.Collections.Generic; // List 사용을 위해 추가
+using System.Collections.Generic;
 
 public class TilemapGenerator : MonoBehaviour, IInitializable
 {
@@ -15,7 +15,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
     {
         try
         {
-            // [구현] 맵 오브젝트들을 담을 부모 트랜스폼 생성
             GameObject containerGo = new GameObject("@MapContainer");
             _mapContainer = containerGo.transform;
             await UniTask.CompletedTask;
@@ -27,7 +26,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
         }
     }
 
-    // [변경] Generate() -> GenerateAsync() (개선점 3: 비동기 및 프레임 드랍 방지)
     public async UniTask GenerateAsync()
     {
         Debug.Log("[TilemapGenerator] Start generating visuals (Async)...");
@@ -35,26 +33,20 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
         MapManager mapManager = null;
         TileDataManager tileDataManager = null;
 
-        // [개선점 2 반영] ServiceLocator 예외 명시적 처리
         try
         {
             mapManager = ServiceLocator.Get<MapManager>();
             tileDataManager = ServiceLocator.Get<TileDataManager>();
         }
-        catch (InvalidOperationException ex)
-        {
-            Debug.LogError($"[TilemapGenerator] Failed to get dependencies: {ex.Message}");
-            return;
-        }
         catch (Exception ex)
         {
-            Debug.LogError($"[TilemapGenerator] Unexpected error during dependency resolution: {ex.Message}");
+            Debug.LogError($"[TilemapGenerator] Dependency Error: {ex.Message}");
             return;
         }
 
         if (mapManager == null || tileDataManager == null)
         {
-            Debug.LogError("[TilemapGenerator] Managers are missing (Available but returned null)!");
+            Debug.LogError("[TilemapGenerator] Managers are missing!");
             return;
         }
 
@@ -72,17 +64,48 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                     GridCoords coords = new GridCoords(x, z, mapManager.MinLevel + y);
                     Tile tile = mapManager.GetTile(coords);
 
-                    // 빈 타일 건너뜀
                     if (tile == null) continue;
 
-                    // 바닥 생성
-                    if (tile.FloorID != FloorType.None)
+                    // 1. 바닥 (Floor) 생성
+                    if (tile.FloorID != FloorType.None && tile.FloorID != FloorType.Void)
                     {
                         CreateVisual(tileDataManager, tile.FloorID, coords);
                         spawnedCount++;
                     }
 
-                    // [개선점 3] 100개 생성 시마다 프레임 양보 (메인 스레드 프리징 방지)
+                    // 2. 기둥 (Pillar) 생성
+                    if (tile.InitialPillarID != PillarType.None)
+                    {
+                        var pillarEntry = tileDataManager.GetPillarData(tile.InitialPillarID);
+                        if (pillarEntry.Prefab != null)
+                        {
+                            float hp = tile.InitialPillarHP > 0 ? tile.InitialPillarHP : pillarEntry.MaxHP;
+                            CreateStructureVisual(pillarEntry.Prefab, coords, Direction.North, hp, true);
+                            spawnedCount++;
+                        }
+                    }
+
+                    // 3. 벽 (Edge) 생성
+                    if (tile.TempSavedEdges != null)
+                    {
+                        for (int i = 0; i < 4; i++)
+                        {
+                            var edgeInfo = tile.TempSavedEdges[i];
+
+                            // [Fix] EdgeType.None 제거 -> Open이 아니면 벽이 있는 것으로 간주
+                            if (edgeInfo.Type != EdgeType.Open)
+                            {
+                                var edgeEntry = tileDataManager.GetEdgeData(edgeInfo.Type);
+                                if (edgeEntry.Prefab != null)
+                                {
+                                    float hp = edgeInfo.CurrentHP;
+                                    CreateStructureVisual(edgeEntry.Prefab, coords, (Direction)i, hp, false);
+                                    spawnedCount++;
+                                }
+                            }
+                        }
+                    }
+
                     if (spawnedCount % 100 == 0)
                     {
                         await UniTask.Yield();
@@ -96,7 +119,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
     private void CreateVisual(TileDataManager dataMgr, FloorType type, GridCoords coords)
     {
-        // [수정] 새로 만든 안전한 메서드 사용
         GameObject prefab = dataMgr.GetFloorPrefab(type);
 
         if (prefab != null)
@@ -107,6 +129,37 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
             instance.name = $"Tile_{coords.x}_{coords.z}_{coords.y}";
             _spawnedObjects.Add(instance);
         }
+    }
+
+    private void CreateStructureVisual(GameObject prefab, GridCoords coords, Direction dir, float hp, bool isPillar)
+    {
+        if (prefab == null) return;
+
+        Vector3 pos = GridUtils.GetEdgeWorldPosition(coords, dir);
+        if (isPillar) pos = GridUtils.GridToWorld(coords);
+
+        GameObject instance = Instantiate(prefab, _mapContainer);
+        instance.transform.position = pos;
+
+        if (!isPillar)
+        {
+            instance.transform.rotation = (dir == Direction.North || dir == Direction.South)
+                ? Quaternion.identity
+                : Quaternion.Euler(0, 90, 0);
+        }
+
+        instance.name = isPillar ? $"Pillar_{coords}" : $"Wall_{coords}_{dir}";
+
+        // [Fix] StructureObj 참조 에러 해결을 위해 아래 StructureObj.cs 파일을 생성해야 합니다.
+        var structure = instance.GetComponent<StructureObj>();
+        if (structure == null) structure = instance.AddComponent<StructureObj>();
+
+        structure.Initialize(coords, dir, hp, isPillar);
+
+        int layer = isPillar ? LayerMask.NameToLayer("Pillar") : LayerMask.NameToLayer("Wall");
+        if (layer > -1) instance.layer = layer;
+
+        _spawnedObjects.Add(instance);
     }
 
     public void ClearMap()
