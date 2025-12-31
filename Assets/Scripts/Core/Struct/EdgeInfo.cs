@@ -1,4 +1,3 @@
-// 경로: Assets/Scripts/Core/Structs/EdgeInfo.cs
 using System;
 using UnityEngine;
 
@@ -9,45 +8,43 @@ public struct EdgeInfo
     public CoverType Cover;
     public float CurrentHP;
     public float MaxHP;
-    public EdgeDataType DataType;
+    // EdgeDataType 삭제됨
 
-    private EdgeInfo(EdgeType type, CoverType cover, float currentHP, float maxHP, EdgeDataType dataType)
+    private EdgeInfo(EdgeType type, CoverType cover, float currentHP, float maxHP)
     {
         Type = type;
         Cover = cover;
         CurrentHP = currentHP;
         MaxHP = maxHP;
-        DataType = dataType;
     }
 
     public bool IsDestroyed => MaxHP > 0 && CurrentHP <= 0;
 
-    /// <summary>
-    /// [Factory] 엣지 생성. EdgeDataSO가 있으면 그 값을 쓰고, 없으면 기본값을 씁니다.
-    /// </summary>
-    public static EdgeInfo Create(EdgeType type, EdgeDataType dataType, EdgeDataSO edgeData = null)
+    // 팩토리 메서드 (상수 사용)
+    public static EdgeInfo Create(EdgeType type)
     {
-        // 1. 데이터(SO)가 있으면 그걸 우선 사용 (Data-Driven)
-        if (edgeData != null)
-        {
-            return new EdgeInfo(type, edgeData.DefaultCover, edgeData.MaxHP, edgeData.MaxHP, dataType);
-        }
-
-        // 2. 데이터가 없으면 하드코딩 기본값 (Fallback)
+        // 1단계: Registry 연동 전 기본값 사용
         float defaultMaxHP = type switch
         {
-            EdgeType.Wall => 100,
-            EdgeType.Window => 30,
-            EdgeType.Door => 50,
+            EdgeType.Wall => EdgeConstants.HP_WALL,
+            EdgeType.Window => EdgeConstants.HP_WINDOW,
+            EdgeType.Door => EdgeConstants.HP_DOOR,
             _ => 0
         };
 
-        return new EdgeInfo(type, CoverType.None, defaultMaxHP, defaultMaxHP, dataType);
+        CoverType defaultCover = type switch
+        {
+            EdgeType.Wall => EdgeConstants.BASE_COVER_HIGH > 0.3f ? CoverType.High : CoverType.Low,
+            EdgeType.Window => CoverType.Low,
+            _ => CoverType.None
+        };
+
+        return new EdgeInfo(type, defaultCover, defaultMaxHP, defaultMaxHP);
     }
 
-    public static EdgeInfo CreateDamaged(EdgeType type, CoverType cover, float currentHP, float maxHP, EdgeDataType dataType)
+    public static EdgeInfo CreateDamaged(EdgeType type, CoverType cover, float currentHP, float maxHP)
     {
-        return new EdgeInfo(type, cover, currentHP, maxHP, dataType);
+        return new EdgeInfo(type, cover, currentHP, maxHP);
     }
 
     public EdgeInfo WithDamage(float damage)
@@ -57,5 +54,5 @@ public struct EdgeInfo
         return newInfo;
     }
 
-    public static EdgeInfo Open => Create(EdgeType.Open, EdgeDataType.None, null);
+    public static EdgeInfo Open => new EdgeInfo(EdgeType.Open, CoverType.None, 0, 0);
 }

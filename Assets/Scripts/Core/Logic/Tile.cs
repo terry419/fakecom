@@ -4,195 +4,184 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using UnityEngine;
 
-/// <summary>
-/// [GDD 5.6]  ּ  (Logic Class). 
-/// ̳     Ϳ   մϴ.
-/// </summary>
 public class Tile
 {
     // ==================================================================================
-    // 1. ⺻  & ̺Ʈ
+    // 1. 기본 속성
     // ==================================================================================
     public GridCoords Coordinate { get; private set; }
     public FloorType FloorID { get; private set; }
+
+    // 기둥 관련 속성 (전역 Enum 사용)
     public PillarType PillarID { get; private set; }
+    private float _currentPillarHP;
+    private float _maxPillarHP;
 
     private EdgeInfo[] _edges = new EdgeInfo[4];
 
-    // [̺Ʈ]  ı  ջ
+    // ==================================================================================
+    // 2. 이벤트 정의
+    // ==================================================================================
+    public event Action<PillarType, PillarType> OnPillarStateChanged; // (Old, New)
     public event Action<Direction, EdgeInfo> OnEdgeDestroyed;
     public event Action<Direction, EdgeInfo> OnEdgeDamaged;
-
-    // [̺Ʈ] ̵    (Pathfinder ſ)
     public event Action<Tile> OnWalkableStatusChanged;
 
-
     // ==================================================================================
-    // 2.   (и & ȭ)
+    // 3. 점유자 관리
     // ==================================================================================
     private ITileOccupant _primaryUnit;
     private List<ITileOccupant> _items = new();
     private List<ITileOccupant> _obstacles = new();
 
-    // [ȭ] б   ĳ
-    private ReadOnlyCollection<ITileOccupant> _readOnlyItems;
-
-    // [ĳ] ̵  
     private bool _cachedIsWalkable = true;
-
+    public bool IsWalkable => _cachedIsWalkable;
 
     // ==================================================================================
-    // 3. 
+    // 4. 생성자 및 초기화
     // ==================================================================================
-    public Tile(GridCoords coords, FloorType floorType, PillarType pillarType = PillarType.None)
+    public Tile(GridCoords coords, FloorType floorType, PillarType pillarType)
     {
-        Debug.Log($"[Tile] Created new tile at {coords}");
         Coordinate = coords;
         FloorID = floorType;
         PillarID = pillarType;
 
-        // ⺻ : Open
+        // 초기화: 벽 없음(Open)
         for (int i = 0; i < 4; i++) _edges[i] = EdgeInfo.Open;
 
-        // Ʈ  ʱȭ (GC )
-        _readOnlyItems = _items.AsReadOnly();
+        // Pillar HP는 초기화 시 0, 이후 InitializePillarHP로 주입
+        _maxPillarHP = 0f;
+        _currentPillarHP = 0f;
 
         UpdateCache();
     }
 
-
-    // ==================================================================================
-    // 4. ȸ (Getters)
-    // ==================================================================================
-    public bool IsWalkable => _cachedIsWalkable;
-    public ITileOccupant PrimaryUnit => _primaryUnit;
-
-    /// <summary>
-    /// []  Ÿ   並 ȯմϴ. (O(1))
-    /// ȯ Ʈ foreach ȸϴ  Add/RemoveOccupant ȣǸ ܰ ߻  ֽϴ.
-    ///  ȸ ʿϴٸ GetItemsCopy() ϼ.
-    /// </summary>
-    public IReadOnlyList<ITileOccupant> Items => _readOnlyItems;
-
-    /// <summary>
-    /// []  Ʈ 纻 Ͽ ȯմϴ. (O(N))
-    /// ȸ  Ʈ    ϼ.
-    /// </summary>
-    public List<ITileOccupant> GetItemsCopy() => new List<ITileOccupant>(_items);
-
-    public EdgeInfo GetEdge(Direction dir) => _edges[(int)dir];
-
-
-    // ==================================================================================
-    // 5.   (Logic Optimized)
-    // ==================================================================================
-    public void SetEdge(Direction dir, EdgeInfo newInfo)
+    public void InitializePillarHP(float maxHP, float currentHP = -1f)
     {
-        _edges[(int)dir] = newInfo;
+        _maxPillarHP = maxHP;
+        _currentPillarHP = currentHP >= 0 ? currentHP : maxHP;
+        UpdateCache();
     }
 
-    // [ 1] ߺ     ȭ
+    // ==================================================================================
+    // 5. 파괴 및 상태 변화 로직
+    // ==================================================================================
+
+    public void DamagePillar(float damage)
+    {
+        if (PillarID == PillarType.None || PillarID == PillarType.Debris) return;
+
+        _currentPillarHP -= damage;
+
+        PillarType oldState = PillarID;
+        PillarType newState = GetNextPillarState();
+
+        if (newState != oldState)
+        {
+            PillarID = newState;
+            OnPillarStateChanged?.Invoke(oldState, newState);
+            UpdateCache();
+        }
+    }
+
+    private PillarType GetNextPillarState()
+    {
+        float hpPercent = _maxPillarHP > 0
+            ? Mathf.Max(0f, _currentPillarHP / _maxPillarHP)
+            : 0f;
+
+        // 상태 전이 규칙: Standing -> Broken -> Debris
+        if (hpPercent > EdgeConstants.PILLAR_BROKEN_THRESHOLD)
+            return PillarType.Standing;
+        else if (hpPercent > 0f)
+            return PillarType.Broken;
+        else
+            return PillarType.Debris;
+    }
+
     public void DamageEdge(Direction dir, float damage)
     {
-        EdgeInfo oldEdge = _edges[(int)dir];
+        int idx = (int)dir;
+        EdgeInfo oldEdge = _edges[idx];
         EdgeInfo newEdge = oldEdge.WithDamage(damage);
 
-        // 1. ı (̹   HP 0 )
         if (newEdge.IsDestroyed && oldEdge.CurrentHP > 0)
         {
-            //  () ٷ 
-            _edges[(int)dir] = EdgeInfo.Open;
+            _edges[idx] = EdgeInfo.Open;
             OnEdgeDestroyed?.Invoke(dir, oldEdge);
         }
-        // 2. ջ ( )
         else if (newEdge.CurrentHP < oldEdge.CurrentHP)
         {
-            _edges[(int)dir] = newEdge;
+            _edges[idx] = newEdge;
             OnEdgeDamaged?.Invoke(dir, newEdge);
         }
-        // 3. ȭ  (̹ ıǾų  0)
     }
 
+    // ==================================================================================
+    // 6. 캐시 갱신
+    // ==================================================================================
+    private void UpdateCache()
+    {
+        bool oldState = _cachedIsWalkable;
+
+        // 기둥이 있고 잔해가 아니면 차단
+        bool pillarBlocking = (PillarID != PillarType.None && PillarID != PillarType.Debris);
+        bool unitBlocking = _primaryUnit != null && _primaryUnit.IsBlockingMovement;
+        bool obstacleBlocking = _obstacles.Any(o => o.IsBlockingMovement);
+
+        _cachedIsWalkable = !pillarBlocking && !unitBlocking && !obstacleBlocking;
+
+        if (oldState != _cachedIsWalkable)
+        {
+            OnWalkableStatusChanged?.Invoke(this);
+        }
+    }
 
     // ==================================================================================
-    // 6.   (Exception Msg & Safety)
+    // 7. 데이터 로드/저장 및 접근자
     // ==================================================================================
+    public void LoadFromSaveData(TileSaveData saveData)
+    {
+        this.Coordinate = saveData.Coords;
+        this.FloorID = saveData.FloorID;
+        this.PillarID = saveData.PillarID;
+
+        if (saveData.Edges != null && saveData.Edges.Length == 4)
+        {
+            for (int i = 0; i < 4; i++)
+                _edges[i] = saveData.Edges[i].ToEdgeInfo();
+        }
+        UpdateCache();
+    }
+
     public void AddOccupant(ITileOccupant occupant)
     {
         if (occupant == null) return;
-
         switch (occupant.Type)
         {
             case OccupantType.Unit:
-                // [ 2]  ޽ ȭ
-                if (_primaryUnit != null)
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot add unit to {Coordinate}: already occupied by {_primaryUnit}. " +
-                        $"Remove existing unit first using RemoveOccupant().");
-                }
+                if (_primaryUnit != null) throw new InvalidOperationException($"Tile {Coordinate} occupied.");
                 _primaryUnit = occupant;
                 break;
-
-            case OccupantType.Item:
-                _items.Add(occupant);
-                break;
-
-            case OccupantType.Obstacle:
-                _obstacles.Add(occupant);
-                break;
-
-            default:
-                Debug.LogWarning($"Unknown occupant type: {occupant.Type}");
-                return;
+            case OccupantType.Item: _items.Add(occupant); break;
+            case OccupantType.Obstacle: _obstacles.Add(occupant); break;
         }
-
         occupant.OnBlockingChanged += HandleOccupantStateChange;
-
-        // OnCoverChanged Tile (̵ɼ)  Ƿ  .
-        //  Ŵ    .
-
         UpdateCache();
         occupant.OnAddedToTile(this);
     }
 
     public void RemoveOccupant(ITileOccupant occupant)
     {
-        if (occupant == null)
-        {
-            Debug.LogWarning($"RemoveOccupant: Occupant is null at {Coordinate}");
-            return;
-        }
-
+        if (occupant == null) return;
         bool removed = false;
-
         switch (occupant.Type)
         {
             case OccupantType.Unit:
-                if (_primaryUnit == occupant)
-                {
-                    _primaryUnit = null;
-                    removed = true;
-                }
-                else
-                {
-                    Debug.LogWarning($"RemoveOccupant: Unit mismatch or empty at {Coordinate}");
-                }
+                if (_primaryUnit == occupant) { _primaryUnit = null; removed = true; }
                 break;
-
-            case OccupantType.Item:
-                removed = _items.Remove(occupant);
-                if (!removed) Debug.LogWarning($"RemoveOccupant: Item not found at {Coordinate}");
-                break;
-
-            case OccupantType.Obstacle:
-                removed = _obstacles.Remove(occupant);
-                if (!removed) Debug.LogWarning($"RemoveOccupant: Obstacle not found at {Coordinate}");
-                break;
-
-            default:
-                Debug.LogError($"RemoveOccupant: Unknown type {occupant.Type}");
-                return;
+            case OccupantType.Item: removed = _items.Remove(occupant); break;
+            case OccupantType.Obstacle: removed = _obstacles.Remove(occupant); break;
         }
 
         if (removed)
@@ -203,55 +192,7 @@ public class Tile
         }
     }
 
-
-    // ==================================================================================
-    // 7.  
-    // ==================================================================================
-    private void HandleOccupantStateChange(bool isBlocking)
-    {
-        UpdateCache();
-    }
-
-    private void UpdateCache()
-    {
-        bool oldState = _cachedIsWalkable;
-
-        bool unitBlocking = _primaryUnit != null && _primaryUnit.IsBlockingMovement;
-        bool obstacleBlocking = _obstacles.Any(o => o.IsBlockingMovement);
-
-        _cachedIsWalkable = !unitBlocking && !obstacleBlocking;
-
-        if (oldState != _cachedIsWalkable)
-        {
-            OnWalkableStatusChanged?.Invoke(this);
-        }
-    }
-
-    /// <summary>
-    /// [ ݿ]  (SaveData)κ Ÿ ¸ 
-    /// </summary>
-    public void LoadFromSaveData(TileSaveData saveData)
-    {
-        // 1. ⺻  
-        this.Coordinate = saveData.Coords;
-        this.FloorID = saveData.FloorID;
-        this.PillarID = saveData.PillarID;
-
-        // 2. ()  
-        if (saveData.Edges != null && saveData.Edges.Length == 4)
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                // SavedEdgeInfo -> EdgeInfo ȯ (DataType Ե)
-                _edges[i] = saveData.Edges[i].ToEdgeInfo();
-            }
-        }
-
-        // 3. ĳ 
-        UpdateCache();
-    }
-
-    public override string ToString() => $"Tile {Coordinate} [{FloorID}]";
-
-
+    private void HandleOccupantStateChange(bool isBlocking) => UpdateCache();
+    public EdgeInfo GetEdge(Direction dir) => _edges[(int)dir];
+    public void SetEdge(Direction dir, EdgeInfo info) => _edges[(int)dir] = info;
 }

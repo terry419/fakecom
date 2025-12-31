@@ -2,13 +2,14 @@ using UnityEngine;
 using UnityEditor;
 using System;
 
+// [Fix] static 제거 -> 인스턴스 생성 가능
 public class MapEditorSceneInput
 {
     private readonly MapEditorContext _context;
 
     public event Action<GridCoords> OnCreateTileRequested;
     public event Action<GridCoords, Direction> OnModifyEdgeRequested;
-    public event Action<GridCoords> OnCreatePillarRequested; // [Fix] 기둥 생성 요청 이벤트
+    public event Action<GridCoords> OnCreatePillarRequested;
     public event Action<GridCoords> OnEraseTileRequested;
 
     public MapEditorSceneInput(MapEditorContext context)
@@ -19,7 +20,6 @@ public class MapEditorSceneInput
     public void HandleSceneGUI(SceneView sceneView)
     {
         if (_context.Settings == null) return;
-
         HandleMouseInput();
         DrawVisuals();
     }
@@ -27,10 +27,14 @@ public class MapEditorSceneInput
     private void HandleMouseInput()
     {
         Event guiEvent = Event.current;
+        // 마우스 이벤트가 아니면 무시 (레이아웃 에러 방지)
+        if (guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint) return;
+
         int controlID = GUIUtility.GetControlID(FocusType.Passive);
         HandleUtility.AddDefaultControl(controlID);
 
         Ray mouseRay = HandleUtility.GUIPointToWorldRay(guiEvent.mousePosition);
+        // Y축 평면 (현재 레벨 기준)
         Plane gridPlane = new Plane(Vector3.up, new Vector3(0, _context.CurrentLevel * GridUtils.LEVEL_HEIGHT, 0));
 
         if (gridPlane.Raycast(mouseRay, out float distance))
@@ -42,7 +46,7 @@ public class MapEditorSceneInput
 
             CalculateHighlightedEdge(worldPos);
 
-            if (guiEvent.type == EventType.MouseDown && guiEvent.button == 0)
+            if (guiEvent.type == EventType.MouseDown && guiEvent.button == 0 && !guiEvent.alt)
             {
                 DispatchClickEvent();
                 guiEvent.Use();
@@ -57,26 +61,28 @@ public class MapEditorSceneInput
 
     private void CalculateHighlightedEdge(Vector3 mouseWorldPos)
     {
-        // ... (기존 엣지 하이라이트 로직 동일) ...
         GridCoords tileCoords = _context.MouseGridCoords;
         Vector3 tileCenter = GridUtils.GridToWorld(tileCoords);
         Vector3 offset = mouseWorldPos - tileCenter;
 
         float threshold = GridUtils.CELL_SIZE * 0.35f;
-        float absX = Mathf.Abs(offset.x);
-        float absZ = Mathf.Abs(offset.z);
 
-        if (absX < threshold && absZ < threshold)
+        // 타일 중앙에 가까우면 엣지 선택 안 함
+        if (Mathf.Abs(offset.x) < threshold && Mathf.Abs(offset.z) < threshold)
         {
             _context.HighlightedEdge.SetInvalid();
             return;
         }
 
-        Direction dir = (absX > absZ)
-            ? (offset.x > 0 ? Direction.East : Direction.West)
-            : (offset.z > 0 ? Direction.North : Direction.South);
+        Direction dir;
+        if (Mathf.Abs(offset.x) > Mathf.Abs(offset.z))
+            dir = offset.x > 0 ? Direction.East : Direction.West;
+        else
+            dir = offset.z > 0 ? Direction.North : Direction.South;
 
         Vector3 edgePos = GridUtils.GetEdgeWorldPosition(tileCoords, dir);
+
+        // [Fix] Set 메서드 인자 4개 (Context 정의와 일치시킴)
         _context.HighlightedEdge.Set(tileCoords, dir, edgePos, true);
     }
 
@@ -88,10 +94,11 @@ public class MapEditorSceneInput
                 OnCreateTileRequested?.Invoke(_context.MouseGridCoords);
                 break;
             case MapEditorContext.ToolMode.Edge:
+                // [Fix] IsValid는 프로퍼티이므로 () 제거
                 if (_context.HighlightedEdge.IsValid)
                     OnModifyEdgeRequested?.Invoke(_context.HighlightedEdge.Tile, _context.HighlightedEdge.Dir);
                 break;
-            case MapEditorContext.ToolMode.Pillar: // [Fix] 기둥 모드 처리
+            case MapEditorContext.ToolMode.Pillar:
                 OnCreatePillarRequested?.Invoke(_context.MouseGridCoords);
                 break;
             case MapEditorContext.ToolMode.Erase:
@@ -104,13 +111,13 @@ public class MapEditorSceneInput
     {
         if (!_context.IsMouseOverGrid) return;
 
-        // [Fix] 모드별 하이라이트 색상 구분
-        Color tileColor = Color.cyan;
-        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Pillar) tileColor = Color.yellow;
-        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Erase) tileColor = Color.red;
+        Color c = Color.cyan;
+        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Pillar) c = Color.yellow;
+        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Erase) c = Color.red;
 
-        DrawWireCube(GridUtils.GridToWorld(_context.MouseGridCoords), new Vector3(GridUtils.CELL_SIZE, 0.1f, GridUtils.CELL_SIZE), tileColor);
+        DrawWireCube(GridUtils.GridToWorld(_context.MouseGridCoords), new Vector3(GridUtils.CELL_SIZE, 0.1f, GridUtils.CELL_SIZE), c);
 
+        // [Fix] IsValid 프로퍼티 사용
         if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge && _context.HighlightedEdge.IsValid)
         {
             DrawEdgeHighlight(_context.HighlightedEdge.WorldPos, _context.HighlightedEdge.Dir, Color.magenta);
@@ -119,18 +126,18 @@ public class MapEditorSceneInput
 
     private void DrawWireCube(Vector3 center, Vector3 size, Color color)
     {
-        Color oldColor = Handles.color;
+        Color old = Handles.color;
         Handles.color = color;
         Handles.DrawWireCube(center, size);
-        Handles.color = oldColor;
+        Handles.color = old;
     }
 
     private void DrawEdgeHighlight(Vector3 center, Direction dir, Color color)
     {
-        float thickness = GridUtils.CELL_SIZE * 0.1f;
-        Vector3 size = (dir == Direction.North || dir == Direction.South)
-            ? new Vector3(GridUtils.CELL_SIZE, 0.2f, thickness)
-            : new Vector3(thickness, 0.2f, GridUtils.CELL_SIZE);
-        DrawWireCube(center, size, color);
+        float t = 0.1f;
+        Vector3 s = (dir == Direction.North || dir == Direction.South)
+            ? new Vector3(GridUtils.CELL_SIZE, 0.2f, t)
+            : new Vector3(t, 0.2f, GridUtils.CELL_SIZE);
+        DrawWireCube(center, s, color);
     }
 }

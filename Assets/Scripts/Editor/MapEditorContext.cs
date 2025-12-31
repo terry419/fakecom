@@ -1,89 +1,86 @@
 using UnityEngine;
-using UnityEditor;
 using System.Collections.Generic;
 
-// [Data] 공유 컨텍스트 & 캐시 저장소
-public class MapEditorContext
+public class MapEditorContext : ScriptableObject
 {
-    // --- 1. 설정 및 데이터 ---
+    private static MapEditorContext _instance;
+    public static MapEditorContext Instance => _instance ??= CreateInstance<MapEditorContext>();
+
     public MapEditorSettingsSO Settings;
     public MapDataSO TargetMapData;
 
-    // --- 2. 작업 상태 ---
-    public int CurrentLevel = 0;
-
-    // [Fix] Pillar 모드 추가
     public enum ToolMode { Tile, Edge, Pillar, Erase }
     public ToolMode CurrentToolMode = ToolMode.Tile;
+    public int CurrentLevel = 0;
 
+    public FloorType SelectedFloorType = FloorType.Standard;
+    public PillarType SelectedPillarType = PillarType.Standing;
     public EdgeType SelectedEdgeType = EdgeType.Wall;
-    public EdgeDataType SelectedEdgeDataType = EdgeDataType.Concrete;
 
-    // [Fix] 선택된 기둥 타입
-    public PillarType SelectedPillarType = PillarType.Concrete;
+    // [Fix] 삭제된 EdgeDataType 대신 int형이나 더미를 사용하되, 
+    // 여기서는 로직에 직접 관여하지 않으므로 필드 제거
 
-    // --- 3. 씬 뷰 상태 ---
     public GridCoords MouseGridCoords;
     public bool IsMouseOverGrid;
     public HighlightedEdgeInfo HighlightedEdge = new HighlightedEdgeInfo();
 
-    // --- 4. 객체 캐싱 ---
     private Dictionary<GridCoords, EditorTile> _tileCache = new Dictionary<GridCoords, EditorTile>();
     private Dictionary<(GridCoords, Direction), EditorWall> _wallCache = new Dictionary<(GridCoords, Direction), EditorWall>();
-    private bool _cacheValid = false;
+    private bool _isCacheDirty = true;
 
-    public void InvalidateCache() => _cacheValid = false;
+    public void InvalidateCache() => _isCacheDirty = true;
 
+    // [Fix] MapEditorIO가 호출하는 메서드 복구 (공개 인터페이스)
     public void RefreshCache()
     {
-        if (_cacheValid) return;
+        if (_isCacheDirty) RebuildCache();
+    }
 
+    private void RebuildCache()
+    {
         _tileCache.Clear();
         _wallCache.Clear();
 
-        var tiles = Object.FindObjectsOfType<EditorTile>();
-        var walls = Object.FindObjectsOfType<EditorWall>();
-
-        foreach (var tile in tiles)
+        var tiles = FindObjectsOfType<EditorTile>();
+        foreach (var t in tiles)
         {
-            if (!_tileCache.ContainsKey(tile.Coordinate))
-                _tileCache.Add(tile.Coordinate, tile);
+            if (!_tileCache.ContainsKey(t.Coordinate))
+                _tileCache.Add(t.Coordinate, t);
         }
 
-        foreach (var wall in walls)
+        var walls = FindObjectsOfType<EditorWall>();
+        foreach (var w in walls)
         {
-            var key = (wall.Coordinate, wall.Direction);
-            if (!_wallCache.ContainsKey(key))
-                _wallCache.Add(key, wall);
+            if (!_wallCache.ContainsKey((w.Coordinate, w.Direction)))
+                _wallCache.Add((w.Coordinate, w.Direction), w);
         }
 
-        _cacheValid = true;
+        _isCacheDirty = false;
     }
 
     public EditorTile GetTile(GridCoords coords)
     {
-        RefreshCache();
+        if (_isCacheDirty) RebuildCache();
         return _tileCache.TryGetValue(coords, out var tile) ? tile : null;
     }
 
     public EditorWall GetWall(GridCoords coords, Direction dir)
     {
-        RefreshCache();
+        if (_isCacheDirty) RebuildCache();
         return _wallCache.TryGetValue((coords, dir), out var wall) ? wall : null;
     }
-}
 
-// Helper Class for Highlights
-public class HighlightedEdgeInfo
-{
-    public GridCoords Tile { get; set; }
-    public Direction Dir { get; set; }
-    public Vector3 WorldPos { get; set; }
-    public bool IsValid { get; set; }
-
-    public void Set(GridCoords tile, Direction dir, Vector3 pos, bool valid)
+    public class HighlightedEdgeInfo
     {
-        Tile = tile; Dir = dir; WorldPos = pos; IsValid = valid;
+        public GridCoords Tile;
+        public Direction Dir;
+        public Vector3 WorldPos;
+        public bool IsValid;
+
+        public void Set(GridCoords t, Direction d, Vector3 p, bool v)
+        {
+            Tile = t; Dir = d; WorldPos = p; IsValid = v;
+        }
+        public void SetInvalid() => IsValid = false;
     }
-    public void SetInvalid() { IsValid = false; }
 }

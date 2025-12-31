@@ -124,7 +124,6 @@ MonoBehaviour:
     y: 0
   Direction: 0
   Type: 0
-  DataType: 0
   Cover: 0
   MaxHP: 0
   CurrentHP: 0

@@ -1,17 +1,14 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
-using System.Collections.Generic;
 using System;
-using System.Linq;
 
 public class TileDataManager : MonoBehaviour, IInitializable
 {
-    private MapEditorSettingsSO _visualSettings;
-    private Dictionary<FloorType, TileDataSO> _floorLibrary;
-    private Dictionary<PillarType, TileDataSO> _pillarLibrary;
-    private AsyncOperationHandle<IList<TileDataSO>> _loadHandle;
+    // [핵심] 씬 오브젝트가 아니라 '프리팹'에 미리 할당해야 합니다.
+    [Header("Configuration")]
+    [Tooltip("Project 창에서 TileDataManager 프리팹을 열고, TileRegistry 파일을 여기에 넣으세요.")]
+    [SerializeField] private TileRegistrySO _registry;
+
     private bool _isInitialized = false;
 
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Global);
@@ -19,102 +16,79 @@ public class TileDataManager : MonoBehaviour, IInitializable
     private void OnDestroy()
     {
         ServiceLocator.Unregister<TileDataManager>(ManagerScope.Global);
-        if (_loadHandle.IsValid()) Addressables.Release(_loadHandle);
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
-        _floorLibrary = new Dictionary<FloorType, TileDataSO>();
-        _pillarLibrary = new Dictionary<PillarType, TileDataSO>();
+        // 프리팹에 할당을 깜빡했을 경우를 대비한 안전장치
+        if (_registry == null)
+        {
+            // 비상용: Resources 폴더에서라도 로드 시도 (경로는 프로젝트에 맞게 수정 가능)
+            _registry = Resources.Load<TileRegistrySO>("Data/Map/TileRegistry");
+        }
 
-        // [필수] 설정 주입
-        _visualSettings = context.MapVisualSettings;
-
-        // [Fail-Fast] 설정 누락 시 즉시 중단
-        if (_visualSettings == null)
+        if (_registry == null)
         {
             throw new BootstrapException(
-                "[TileDataManager] CRITICAL: MapEditorSettingsSO missing in InitializationContext.\n" +
-                "Check AppConfig -> MapVisualSettingsRef assignments.");
+                "[TileDataManager] CRITICAL: TileRegistrySO가 연결되지 않았습니다.\n" +
+                "Action: Project 폴더의 TileDataManager 프리팹을 열고 인스펙터에 할당하십시오.");
         }
 
-        try
-        {
-            _loadHandle = Addressables.LoadAssetsAsync<TileDataSO>("TileData", null);
-            IList<TileDataSO> results = await _loadHandle.ToUniTask();
-
-            if (_loadHandle.Status == AsyncOperationStatus.Succeeded && results != null)
-            {
-                foreach (var so in results)
-                {
-                    if (so == null) continue;
-                    if (so.IsPillarData)
-                    {
-                        if (!_pillarLibrary.ContainsKey(so.PillarType)) _pillarLibrary.Add(so.PillarType, so);
-                    }
-                    else
-                    {
-                        if (!_floorLibrary.ContainsKey(so.FloorType)) _floorLibrary.Add(so.FloorType, so);
-                    }
-                }
-            }
-
-            _isInitialized = true;
-            Debug.Log($"[TileDataManager] Initialized. Floor Types: {_floorLibrary.Count}, Pillar Types: {_pillarLibrary.Count}");
-        }
-        catch (Exception ex)
-        {
-            // 상위 Bootstrapper에서 처리하도록 예외 전파
-            throw new BootstrapException($"[TileDataManager] Logic Data Load Failed: {ex.Message}", ex);
-        }
+        _isInitialized = true;
+        Debug.Log($"[TileDataManager] Initialized with Registry: {_registry.name}");
+        await UniTask.CompletedTask;
     }
+
+    // ========================================================================
+    // 1. Data Accessors (데이터 조회)
+    // ========================================================================
+
+    public FloorEntry GetFloorData(FloorType type)
+    {
+        if (!_isInitialized || _registry == null) return default;
+        return _registry.GetFloor(type);
+    }
+
+    public PillarEntry GetPillarData(PillarType type)
+    {
+        if (!_isInitialized || _registry == null) return default;
+        return _registry.GetPillar(type);
+    }
+
+    public EdgeEntry GetEdgeData(EdgeType type)
+    {
+        if (!_isInitialized || _registry == null) return default;
+        return _registry.GetEdge(type);
+    }
+
+    // ========================================================================
+    // 2. Visual Accessors (TilemapGenerator 등에서 호출)
+    // ========================================================================
 
     public GameObject GetFloorPrefab(FloorType type)
     {
-        // 1. 초기화 여부 확인
-        if (!_isInitialized)
+        var entry = GetFloorData(type);
+        if (type != FloorType.None && entry.Prefab == null)
         {
-            throw new InvalidOperationException("[TileDataManager] Not initialized. EnsureGlobalSystems() might have failed.");
+            Debug.LogWarning($"[TileDataManager] Missing prefab for Floor: {type}");
         }
-
-        // 2. 설정 데이터 유효성 확인 (List<EditorFloorMapping> FloorMappings)
-        if (_visualSettings == null || _visualSettings.FloorMappings == null || _visualSettings.FloorMappings.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "[TileDataManager] MapEditorSettingsSO has no FloorMappings configured.\n" +
-                "Action: Add floor type mappings in the MapEditorSettings asset Inspector.");
-        }
-
-        // 3. 매핑 검색
-        var mapping = _visualSettings.FloorMappings.FirstOrDefault(x => x.type == type);
-
-        // 4. 특수 케이스: None/Void는 프리팹이 없을 수 있음 (정상)
-        if (type == FloorType.None || type == FloorType.Void)
-        {
-            return mapping.prefab; // null 가능
-        }
-
-        // 5. 일반 타입인데 프리팹이 없는 경우 (데이터 누락)
-        if (mapping.prefab == null)
-        {
-            // 현재 설정된 타입들 목록 생성 (디버깅용)
-            var availableTypes = string.Join(", ",
-                _visualSettings.FloorMappings
-                    .Where(m => m.prefab != null)
-                    .Select(m => m.type)
-                    .Distinct());
-
-            throw new KeyNotFoundException(
-                $"[TileDataManager] Missing prefab for FloorType '{type}'.\n" +
-                $"Available mapped types: [{availableTypes}]\n" +
-                $"Action: Assign a prefab for '{type}' in MapEditorSettingsSO.");
-        }
-
-        return mapping.prefab;
+        return entry.Prefab;
     }
 
-    public TileDataSO GetFloorData(FloorType type)
+    public GameObject GetPillarPrefab(PillarType type)
     {
-        return _floorLibrary.TryGetValue(type, out var data) ? data : null;
+        var entry = GetPillarData(type);
+        if (type != PillarType.None && entry.Prefab == null)
+        {
+            Debug.LogWarning($"[TileDataManager] Missing prefab for Pillar: {type}");
+        }
+        return entry.Prefab;
+    }
+
+    // MapManager나 Generator에서 벽 프리팹 요청 시 사용
+    public GameObject GetEdgePrefab(EdgeType type)
+    {
+        var entry = GetEdgeData(type);
+        return entry.Prefab;
     }
 }
