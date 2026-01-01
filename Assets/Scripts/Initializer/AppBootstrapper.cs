@@ -25,27 +25,45 @@ public static class AppBootstrapper
             // 1. AppConfig 로드
             AppConfig config = await LoadAndValidateAppConfig(globalLog);
 
-            // 2. [Mod] 핵심 에셋 로드 (VisualSettings -> Registry)
-            var (globalSettings, registry) = await LoadCoreAssetsAsync(config, globalLog);
+            // 2. [Mod] 핵심 에셋 3종 로드 (Settings, Registry, *Catalog*)
+            var coreAssets = await LoadCoreAssetsAsync(config, globalLog);
 
             // 3. 컨텍스트 생성
             var context = new InitializationContext
             {
-                GlobalSettings = globalSettings,
-                Registry = registry, // [Mod] 교체된 레지스트리 주입
+                GlobalSettings = coreAssets.settings,
+                Registry = coreAssets.registry,
+                MapCatalog = coreAssets.catalog, // [New] 카탈로그 주입
                 Scope = ManagerScope.Global
             };
             globalLog.AppendLine("- Initialization Context Created: SUCCESS");
 
-            // 4. 매니저 루트 생성
+            // 4. 매니저 루트 오브젝트 생성
             GameObject rootParams = new GameObject("GlobalSystems");
             GameObject.DontDestroyOnLoad(rootParams);
 
-            // 5. 매니저 생성 및 초기화 (기존 유지)
+            // =================================================================
+            // [중요] 5. MapCatalogManager 수동 생성 (DataManager보다 먼저!)
+            // =================================================================
+            GameObject catalogObj = new GameObject("MapCatalogManager");
+            catalogObj.transform.SetParent(rootParams.transform); // 계층 정리
+            var catalogMgr = catalogObj.AddComponent<MapCatalogManager>();
+
+            // Awake(Register) -> Initialize 순서 실행
+            // Context에 이미 Catalog가 있으므로 Addressable 로드 없이 즉시 초기화됨
+            await catalogMgr.Initialize(context);
+            globalLog.AppendLine("- MapCatalogManager Init: OK");
+
+            // =================================================================
+            // 6. 기존 매니저 생성 및 초기화
+            // =================================================================
             await SpawnAndInit(config.GameManagerRef, "GameManager", context, rootParams.transform, globalLog);
             await SpawnAndInit(config.InputManagerRef, "InputManager", context, rootParams.transform, globalLog);
             await SpawnAndInit(config.SaveManagerRef, "SaveManager", context, rootParams.transform, globalLog);
+
+            // DataManager는 MapCatalogManager에 의존하므로 이 시점에는 안전함
             await SpawnAndInit(config.DataManagerRef, "DataManager", context, rootParams.transform, globalLog);
+
             await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context, rootParams.transform, globalLog);
 
             globalLog.AppendLine("\nALL GLOBAL SYSTEMS INITIALIZED SUCCESSFULLY");
@@ -59,7 +77,6 @@ public static class AppBootstrapper
         }
     }
 
-    // ... (LoadAndValidateAppConfig는 유지) ...
     private static async UniTask<AppConfig> LoadAndValidateAppConfig(StringBuilder globalLog)
     {
         AppConfig config;
@@ -83,12 +100,15 @@ public static class AppBootstrapper
         var missingRefs = new List<string>();
 
         CheckRef("GlobalSettingsRef", config.GlobalSettingsRef, missingRefs, isCritical: true);
-
-        // [Mod] 참조 검사 대상 변경
         CheckRef("TileRegistryRef", config.TileRegistryRef, missingRefs, isCritical: true);
 
+        // [New] 카탈로그 참조 검사 추가
+        CheckRef("MapCatalogRef", config.MapCatalogRef, missingRefs, isCritical: true);
+
         CheckRef("GameManagerRef", config.GameManagerRef, missingRefs, isCritical: true);
-        // ... (나머지 매니저 검사 유지) ...
+        CheckRef("DataManagerRef", config.DataManagerRef, missingRefs, isCritical: true);
+        CheckRef("InputManagerRef", config.InputManagerRef, missingRefs, isCritical: true);
+        CheckRef("SaveManagerRef", config.SaveManagerRef, missingRefs, isCritical: true);
         CheckRef("TileDataManagerRef", config.TileDataManagerRef, missingRefs, isCritical: true);
 
         if (missingRefs.Count > 0)
@@ -103,23 +123,26 @@ public static class AppBootstrapper
         if (refObj == null || !refObj.RuntimeKeyIsValid()) list.Add(name);
     }
 
-    // [Mod] 리턴 타입 및 로드 대상 변경: MapEditorSettingsSO -> TileRegistrySO
-    private static async UniTask<(GlobalSettingsSO, TileRegistrySO)> LoadCoreAssetsAsync(AppConfig config, StringBuilder globalLog)
+    // [Mod] 리턴 타입 변경: (Settings, Registry, Catalog) 3개를 반환
+    private static async UniTask<(GlobalSettingsSO settings, TileRegistrySO registry, MapCatalogSO catalog)>
+        LoadCoreAssetsAsync(AppConfig config, StringBuilder globalLog)
     {
         try
         {
-            // 병렬 로드 유지
-            var globalTask = LoadSingleAssetAsync(config.GlobalSettingsRef, "GlobalSettingsSO");
-            var registryTask = LoadSingleAssetAsync(config.TileRegistryRef, "TileRegistrySO");
+            // 병렬 로드
+            var t1 = LoadSingleAssetAsync(config.GlobalSettingsRef, "GlobalSettingsSO");
+            var t2 = LoadSingleAssetAsync(config.TileRegistryRef, "TileRegistrySO");
+            var t3 = LoadSingleAssetAsync(config.MapCatalogRef, "MapCatalogSO"); // [New]
 
-            var (globalSettings, registry) = await UniTask.WhenAll(globalTask, registryTask);
+            var results = await UniTask.WhenAll(t1, t2, t3);
 
-            if (globalSettings == null) throw new NullReferenceException("GlobalSettingsSO is null");
-            if (registry == null) throw new NullReferenceException("TileRegistrySO is null");
+            if (results.Item1 == null) throw new NullReferenceException("GlobalSettingsSO is null");
+            if (results.Item2 == null) throw new NullReferenceException("TileRegistrySO is null");
+            if (results.Item3 == null) throw new NullReferenceException("MapCatalogSO is null");
 
-            globalLog.AppendLine("- Core Assets (GlobalSettings, TileRegistry) Loaded OK");
+            globalLog.AppendLine("- Core Assets (Settings, Registry, Catalog) Loaded OK");
 
-            return (globalSettings, registry);
+            return (results.Item1, results.Item2, results.Item3);
         }
         catch (Exception ex)
         {
@@ -134,7 +157,6 @@ public static class AppBootstrapper
         return result;
     }
 
-    // ... (SpawnAndInit 유지) ...
     private static async UniTask SpawnAndInit(
         AssetReferenceGameObject refObj,
         string managerName,
@@ -152,12 +174,11 @@ public static class AppBootstrapper
         }
     }
 
+    // (사용처가 있다면 유지, 없다면 삭제 가능하지만 요청대로 기능 보존)
     private static void ValidateCatalogAsset(MapCatalogSO catalog)
     {
-        // [개선 8] 부팅 시점에 데이터 무결성 검증
         if (!catalog.ValidateAllPools(out string errorMsg))
         {
-            // 데이터 오류는 치명적이므로 부팅 중단
             throw new BootstrapException($"[MapCatalog] Validation Failed:\n{errorMsg}");
         }
     }

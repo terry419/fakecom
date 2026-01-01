@@ -13,24 +13,18 @@ MonoBehaviour:
   m_Name: State1
   m_EditorClassIdentifier: 
   MapID: 123
-  DisplayName: 123
   GridSize: {x: 3, y: 3}
   BasePosition: {x: 18, y: 6}
-  MapPrefabRef:
-    m_AssetGUID: 
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
   MinLevel: 0
   MaxLevel: 3
   Tiles:
   - Coords:
       x: 20
-      z: 8
+      z: 6
       y: 0
     FloorID: 2
     PillarID: 0
-    CurrentPillarHP: 0.16
+    CurrentPillarHP: 0
     Edges:
     - Type: 0
       Cover: 0
@@ -40,6 +34,46 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+  - Coords:
+      x: 20
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+  - Coords:
+      x: 20
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
     - Type: 0
       Cover: 0
       MaxHP: 0
@@ -48,6 +82,14 @@ MonoBehaviour:
       Cover: 1
       MaxHP: 100
       CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
   - Coords:
       x: 19
       z: 8
@@ -56,14 +98,6 @@ MonoBehaviour:
     PillarID: 0
     CurrentPillarHP: 0
     Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
     - Type: 0
       Cover: 0
       MaxHP: 0
@@ -72,6 +106,14 @@ MonoBehaviour:
       Cover: 1
       MaxHP: 30
       CurrentHP: 30
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
   - Coords:
       x: 18
       z: 8
@@ -84,18 +126,18 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
     - Type: 1
       Cover: 2
       MaxHP: 100
       CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
   - Coords:
       x: 18
       z: 7
@@ -145,8 +187,8 @@ MonoBehaviour:
       MaxHP: 0
       CurrentHP: 0
   - Coords:
-      x: 20
-      z: 7
+      x: 19
+      z: 6
       y: 0
     FloorID: 2
     PillarID: 0
@@ -169,7 +211,7 @@ MonoBehaviour:
       MaxHP: 0
       CurrentHP: 0
   - Coords:
-      x: 20
+      x: 18
       z: 6
       y: 0
     FloorID: 2
@@ -192,54 +234,4 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-  - Coords:
-      x: 19
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-  - Coords:
-      x: 18
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
   SpawnPoints: []
-  EnemyPool: []
-  MapLootTable: {fileID: 0}

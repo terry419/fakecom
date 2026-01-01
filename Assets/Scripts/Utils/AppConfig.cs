@@ -10,8 +10,7 @@ public class AppConfig : ScriptableObject
     [Header("Global Managers (DontDestroyOnLoad)")]
     public AssetReferenceT<GlobalSettingsSO> GlobalSettingsRef;
 
-    // [Mod] MapEditorSettingsSO -> TileRegistrySO 로 교체
-    // 기존: public AssetReferenceT<MapEditorSettingsSO> MapVisualSettingsRef;
+    public AssetReferenceT<MapCatalogSO> MapCatalogRef;
     public AssetReferenceT<TileRegistrySO> TileRegistryRef;
 
     // 시스템 매니저 (기존 유지)

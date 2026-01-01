@@ -4,20 +4,22 @@ using System.Collections.Generic;
 [CreateAssetMenu(fileName = "NewMapData", menuName = "Data/Map/MapData")]
 public class MapDataSO : ScriptableObject
 {
-    [Header("Debug Info")]
-    public string MapID;
+    // [문제 1 해결] MapID 삭제. 이제 메타데이터(MapEntry)가 ID를 전담합니다.
+    // public string MapID; (Deleted)
 
-    [Header("Map Structure")]
+    [Header("1. Environment")]
+    [Tooltip("전체 맵 크기")]
     public Vector2Int GridSize;
-    public Vector2Int BasePosition; // [Fix] MapManager 호환성 복구
-    public int MinLevel = 0;        // [Fix] MapManager 호환성 복구
-    public int MaxLevel = 5;        // [Fix] MapManager 호환성 복구
+    [Tooltip("기준 좌표")]
+    public Vector2Int BasePosition;
 
-    [Header("Content")]
+    public int MinLevel = 0;
+    public int MaxLevel = 5;
+
+    [Header("2. Tile Data")]
     public List<TileSaveData> Tiles = new List<TileSaveData>();
     public List<SpawnPointData> SpawnPoints;
 
-    // [개선 5] bool Validate() 로 변경
     public bool Validate(out string error)
     {
         if (Tiles == null || Tiles.Count == 0)
@@ -30,7 +32,6 @@ public class MapDataSO : ScriptableObject
             error = $"[MapDataSO] {name} has invalid GridSize: {GridSize}";
             return false;
         }
-
         error = string.Empty;
         return true;
     }
