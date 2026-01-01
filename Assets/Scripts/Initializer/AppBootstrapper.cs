@@ -55,6 +55,15 @@ public static class AppBootstrapper
             globalLog.AppendLine("- MapCatalogManager Init: OK");
 
             // =================================================================
+            // [New] 5.1 MissionManager 생성 (전역 미션 상태 관리)
+            // =================================================================
+            GameObject missionObj = new GameObject("MissionManager");
+            missionObj.transform.SetParent(rootParams.transform);
+            var missionMgr = missionObj.AddComponent<MissionManager>();
+            await missionMgr.Initialize(context);
+            globalLog.AppendLine("- MissionManager Init: OK");
+
+            // =================================================================
             // 6. 기존 매니저 생성 및 초기화
             // =================================================================
             await SpawnAndInit(config.GameManagerRef, "GameManager", context, rootParams.transform, globalLog);
@@ -64,7 +73,7 @@ public static class AppBootstrapper
             // DataManager는 MapCatalogManager에 의존하므로 이 시점에는 안전함
             await SpawnAndInit(config.DataManagerRef, "DataManager", context, rootParams.transform, globalLog);
 
-            await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context, rootParams.transform, globalLog);
+            //await SpawnAndInit(config.TileDataManagerRef, "TileDataManager", context, rootParams.transform, globalLog);
 
             globalLog.AppendLine("\nALL GLOBAL SYSTEMS INITIALIZED SUCCESSFULLY");
             Debug.Log(globalLog.ToString());
@@ -109,7 +118,7 @@ public static class AppBootstrapper
         CheckRef("DataManagerRef", config.DataManagerRef, missingRefs, isCritical: true);
         CheckRef("InputManagerRef", config.InputManagerRef, missingRefs, isCritical: true);
         CheckRef("SaveManagerRef", config.SaveManagerRef, missingRefs, isCritical: true);
-        CheckRef("TileDataManagerRef", config.TileDataManagerRef, missingRefs, isCritical: true);
+        //CheckRef("TileDataManagerRef", config.TileDataManagerRef, missingRefs, isCritical: true);
 
         if (missingRefs.Count > 0)
         {

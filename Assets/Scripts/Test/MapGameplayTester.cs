@@ -1,87 +1,153 @@
 using UnityEngine;
+using System.Text.RegularExpressions;
 
+/// <summary>
+/// [ìµœì¢… ì§„ë‹¨ ë° í…ŒìŠ¤íŠ¸ ë²„ì „]
+/// ê° ì…ë ¥ì— ë”°ë¼ ëª…í™•í•œ ë¡œê·¸ë¥¼ ì½˜ì†”ì— ì¶œë ¥í•˜ëŠ” í…ŒìŠ¤íŠ¸ ë„êµ¬.
+/// - ì¢Œí´ë¦­: Raycast ì§„ë‹¨ ì •ë³´ ì¶œë ¥
+/// - ìš°í´ë¦­: íƒ€ì¼ ì´ë™ ê°€ëŠ¥ì„± í…ŒìŠ¤íŠ¸
+/// - 'D' í‚¤: êµ¬ì¡°ë¬¼ íŒŒê´´ ì‹œë®¬ë ˆì´ì…˜
+/// </summary>
 public class MapGameplayTester : MonoBehaviour
 {
+    // --- Lazy-loading Properties ---
     private MapManager _mapManager;
+    private MapManager MapManager => _mapManager ?? (_mapManager = ServiceLocator.Get<MapManager>());
+
     private Camera _mainCamera;
+    private Camera MainCamera => _mainCamera ?? (_mainCamera = Camera.main);
+    
+    // --- Unity Lifecycle ---
 
-    private void Start()
+    private void Awake()
     {
-        // 1. ¸Å´ÏÀú¿Í Ä«¸Ş¶ó ¿¬°á È®ÀÎ
-        _mapManager = ServiceLocator.Get<MapManager>();
-        _mainCamera = Camera.main;
-
-        Debug.Log($"<color=yellow>[Tester] ½ÃÀÛµÊ. MapManager: {(_mapManager != null ? "OK" : "NULL")}, Camera: {(_mainCamera != null ? "OK" : "NULL")}</color>");
+        Debug.Log("<color=cyan>[Tester] Tester is active. Left-click for Raycast-Info, Right-click for Walk-Test, 'D' for Destroy-Test.</color>");
     }
 
     private void Update()
     {
-        // 2. °ÔÀÓ ·çÇÁ »ıÁ¸ È®ÀÎ (½ºÆäÀÌ½º¹Ù)
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            Debug.Log("[Tester] ½ºÆäÀÌ½º¹Ù ÀÔ·ÂµÊ - Update() ·çÇÁ Á¤»ó ÀÛµ¿ Áß.");
-        }
+        if (MapManager == null || MainCamera == null) return;
+        
+        HandleInputs();
+    }
 
-        // ¿ìÅ¬¸¯ µğ¹ö±ë
-        if (Input.GetMouseButtonDown(1))
-        {
-            Debug.Log("[Tester] ¿ìÅ¬¸¯ °¨ÁöµÊ -> Raycast ½Ãµµ");
-            CheckTileExistence("Move Check");
-        }
+    // --- Core Logic ---
 
-        // DÅ° µğ¹ö±ë
+    private void HandleInputs()
+    {
+        // ì¢Œí´ë¦­: ì§„ë‹¨ ì •ë³´
+        if (Input.GetMouseButtonDown(0))
+        {
+            PerformRaycastDiagnosis();
+        }
+        // ìš°í´ë¦­: ì´ë™ ê°€ëŠ¥ì„± í…ŒìŠ¤íŠ¸
+        if (Input.GetMouseButtonDown(1)) 
+        {
+            TestWalkability();
+        }
+        // 'D' í‚¤: íŒŒê´´ í…ŒìŠ¤íŠ¸
         if (Input.GetKeyDown(KeyCode.D))
         {
-            Debug.Log("[Tester] DÅ° °¨ÁöµÊ -> Raycast ½Ãµµ");
-            CheckTileExistence("Destruction Check");
+            TestDestruction();
         }
     }
 
-    private void CheckTileExistence(string actionName)
+    /// <summary>
+    /// ë§ˆìš°ìŠ¤ ìœ„ì¹˜ì˜ íƒ€ì¼ì„ ì°¾ëŠ” ê°€ì¥ ê²¬ê³ í•œ ë°©ë²•ì„ ì‚¬ìš©í•©ë‹ˆë‹¤.
+    /// 1. Raycastë¡œ ì¶©ëŒí•œ ì˜¤ë¸Œì íŠ¸ì˜ ì´ë¦„ì—ì„œ ì¢Œí‘œë¥¼ íŒŒì‹±í•©ë‹ˆë‹¤. (ê°€ì¥ ì •í™•)
+    /// 2. ì´ë¦„ íŒŒì‹±ì— ì‹¤íŒ¨í•˜ë©´, ì¶©ëŒ ì§€ì ì˜ ì›”ë“œ ì¢Œí‘œë¥¼ ë°˜ì˜¬ë¦¼í•˜ì—¬ íƒ€ì¼ì„ ì°¾ìŠµë‹ˆë‹¤. (ì°¨ì„ ì±…)
+    /// </summary>
+    private bool TryGetTileUnderCursor(out Tile tile)
     {
-        if (_mapManager == null)
+        tile = null;
+        Ray ray = MainCamera.ScreenPointToRay(Input.mousePosition);
+
+        bool originalQueriesHitTriggers = Physics.queriesHitTriggers;
+        Physics.queriesHitTriggers = true;
+
+        bool didHit = Physics.Raycast(ray, out RaycastHit hit, 1000f);
+        Physics.queriesHitTriggers = originalQueriesHitTriggers;
+
+        if (!didHit) return false;
+
+        // 1. ì´ë¦„ì—ì„œ ì¢Œí‘œ íŒŒì‹± ì‹œë„ (ì˜ˆ: "Pillar_(18, 6, 0)")
+        Match match = Regex.Match(hit.collider.gameObject.name, @"\((\d+),\s*(\d+),\s*(\d+)\)");
+        if (match.Success)
         {
-            Debug.LogError("[Tester] MapManager°¡ ¿¬°áµÇÁö ¾Ê¾Æ Å×½ºÆ® ºÒ°¡.");
-            return;
+            int x = int.Parse(match.Groups[1].Value);
+            int y = int.Parse(match.Groups[2].Value);
+            int z = int.Parse(match.Groups[3].Value);
+            var coords = new GridCoords(x, y, z);
+            tile = MapManager.GetTile(coords);
+            if (tile != null) return true;
         }
 
-        GridCoords coords = GetMouseGridCoords();
+        // 2. ì´ë¦„ íŒŒì‹± ì‹¤íŒ¨ ì‹œ, ì›”ë“œ ì¢Œí‘œë¡œ ê³„ì‚°
+        var worldPos = hit.point;
+        // ì°¸ê³ : Y(ë†’ì´) ë ˆë²¨ì„ 0ìœ¼ë¡œ ê°€ì •í•©ë‹ˆë‹¤.
+        var fallbackCoords = new GridCoords(Mathf.RoundToInt(worldPos.x), 0, Mathf.RoundToInt(worldPos.z));
+        tile = MapManager.GetTile(fallbackCoords);
+        return tile != null;
+    }
+    
+    // --- Test Methods ---
 
-        // Raycast°¡ ºø³ª°¬À¸¸é coords°¡ (0,0,0)ÀÏ ¼ö ÀÖÀ½. ·Î±× È®ÀÎ ÇÊ¿ä.
-
-        Tile tile = _mapManager.GetTile(coords);
-
-        if (tile == null)
+    private void PerformRaycastDiagnosis()
+    {
+        Ray ray = MainCamera.ScreenPointToRay(Input.mousePosition);
+        bool originalQueriesHitTriggers = Physics.queriesHitTriggers;
+        Physics.queriesHitTriggers = true;
+        
+        if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
         {
-            Debug.LogWarning($"[{actionName}] °á°ú: Å¸ÀÏ µ¥ÀÌÅÍ ¾øÀ½ (NULL). ÁÂÇ¥: {coords}");
+            GameObject hitObject = hit.collider.gameObject;
+            Debug.Log($"<color=white>===== [Left-Click] Raycast Diagnosis =====</color>\n" +
+                      $"<b>Name:</b> {hitObject.name}\n" +
+                      $"<b>Tag:</b> {hitObject.tag}\n" +
+                      $"<b>Layer:</b> {LayerMask.LayerToName(hitObject.layer)}\n" +
+                      $"<b>Hit Point (World):</b> {hit.point}\n" +
+                      "=====================================");
         }
         else
         {
-            Debug.Log($"<color=green>[{actionName}] ¼º°ø! Å¸ÀÏ Ã£À½. ÁÂÇ¥: {coords} / FloorID: {tile.FloorID}</color>");
+            Debug.LogWarning("[Left-Click] Raycast hit NOTHING.");
+        }
+        Physics.queriesHitTriggers = originalQueriesHitTriggers;
+    }
+
+    private void TestWalkability()
+    {
+        if (TryGetTileUnderCursor(out Tile tile))
+        {
+            bool isWalkable = tile.IsWalkable;
+            bool hasPillar = tile.InitialPillarID != PillarType.None;
+            string pillarInfo = hasPillar ? "(Pillar exists)" : "";
+
+            if (isWalkable)
+            {
+                Debug.Log($"<color=green>[Right-Click] Walk Test: SUCCESS. Tile {tile.Coordinate} is WALKABLE.</color>");
+            }
+            else
+            {
+                Debug.Log($"<color=orange>[Right-Click] Walk Test: SUCCESS. Tile {tile.Coordinate} is UNWALKABLE {pillarInfo}.</color>");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[Right-Click] Walk Test: No valid tile under cursor.");
         }
     }
 
-    private GridCoords GetMouseGridCoords()
+    private void TestDestruction()
     {
-        if (_mainCamera == null) return new GridCoords(0, 0, 0);
-
-        Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
-
-        // [Áß¿ä] ¾À ºä¿¡¼­ ·¹ÀÌ°¡ ³ª°¡´ÂÁö ´«À¸·Î È®ÀÎÇÏ±â À§ÇØ »¡°£ ¼± Ç¥½Ã
-        Debug.DrawRay(ray.origin, ray.direction * 1000, Color.red, 1.0f);
-
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        if (TryGetTileUnderCursor(out Tile tile))
         {
-            Debug.Log($"[Tester] Raycast Ãæµ¹ÇÔ: {hit.collider.name} (À§Ä¡: {hit.point})");
-
-            int x = Mathf.RoundToInt(hit.point.x);
-            int z = Mathf.RoundToInt(hit.point.z);
-            return new GridCoords(x, 0, z);
+            Debug.Log($"<color=cyan>[D-Key] Destroy Test: Attempting to destroy structures at {tile.Coordinate}.</color>");
+            Debug.LogWarning($"[Tester] íŒŒê´´ í…ŒìŠ¤íŠ¸: í˜„ì¬ {tile.Coordinate}ì˜ êµ¬ì¡°ë¬¼ì— ë°ë¯¸ì§€ë¥¼ ì£¼ëŠ” Public APIê°€ í•„ìš”í•©ë‹ˆë‹¤ (ì˜ˆ: EnvironmentManager.DamageStructureAt(coords, damage)).");
         }
         else
         {
-            Debug.LogError("[Tester] Raycast ½ÇÆĞ! (Çã°øÀ» Å¬¸¯Çß°Å³ª, ¸Ê Å¸ÀÏ¿¡ Collider°¡ ¾ø½À´Ï´Ù)");
-            return new GridCoords(0, 0, 0);
+            Debug.LogWarning("[D-Key] Destroy Test: No valid tile to destroy at cursor.");
         }
     }
 }

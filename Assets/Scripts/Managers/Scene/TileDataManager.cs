@@ -4,43 +4,50 @@ using System;
 
 public class TileDataManager : MonoBehaviour, IInitializable
 {
-    // [핵심] 씬 오브젝트가 아니라 '프리팹'에 미리 할당해야 합니다.
     [Header("Configuration")]
-    [Tooltip("Project 창에서 TileDataManager 프리팹을 열고, TileRegistry 파일을 여기에 넣으세요.")]
+    [Tooltip("Project 창에서 TileDataManager 프리팹을 열고, 기본 TileRegistry 파일을 여기에 넣으세요 (Fallback용).")]
     [SerializeField] private TileRegistrySO _registry;
 
     private bool _isInitialized = false;
 
-    private void Awake() => ServiceLocator.Register(this, ManagerScope.Global);
+    // [중요] Global이 아니라 Scene 스코프로 등록해야 합니다.
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
 
     private void OnDestroy()
     {
-        ServiceLocator.Unregister<TileDataManager>(ManagerScope.Global);
+        ServiceLocator.Unregister<TileDataManager>(ManagerScope.Scene);
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
-        // 프리팹에 할당을 깜빡했을 경우를 대비한 안전장치
+        // 1. 미션(Context)에서 넘어온 타일셋이 있으면 최우선 적용 (Override)
+        if (context.Registry != null)
+        {
+            _registry = context.Registry;
+        }
+
+        // 2. 프리팹 할당도 없고, Context도 없으면 비상용 로드
         if (_registry == null)
         {
-            // 비상용: Resources 폴더에서라도 로드 시도 (경로는 프로젝트에 맞게 수정 가능)
+            // 경로가 맞는지 확인 필요
             _registry = Resources.Load<TileRegistrySO>("Data/Map/TileRegistry");
         }
 
+        // 3. 그래도 없으면 에러
         if (_registry == null)
         {
             throw new BootstrapException(
                 "[TileDataManager] CRITICAL: TileRegistrySO가 연결되지 않았습니다.\n" +
-                "Action: Project 폴더의 TileDataManager 프리팹을 열고 인스펙터에 할당하십시오.");
+                "Action: Project 폴더의 TileDataManager 프리팹을 열고 인스펙터에 할당하거나 MapEntry의 BiomeRef를 확인하십시오.");
         }
 
         _isInitialized = true;
-        Debug.Log($"[TileDataManager] Initialized with Registry: {_registry.name}");
+        // Debug.Log($"[TileDataManager] Initialized with Registry: {_registry.name}");
         await UniTask.CompletedTask;
     }
 
     // ========================================================================
-    // 1. Data Accessors (데이터 조회)
+    // Data Accessors
     // ========================================================================
 
     public FloorEntry GetFloorData(FloorType type)
@@ -62,7 +69,7 @@ public class TileDataManager : MonoBehaviour, IInitializable
     }
 
     // ========================================================================
-    // 2. Visual Accessors (TilemapGenerator 등에서 호출)
+    // Visual Accessors
     // ========================================================================
 
     public GameObject GetFloorPrefab(FloorType type)
@@ -70,7 +77,7 @@ public class TileDataManager : MonoBehaviour, IInitializable
         var entry = GetFloorData(type);
         if (type != FloorType.None && entry.Prefab == null)
         {
-            Debug.LogWarning($"[TileDataManager] Missing prefab for Floor: {type}");
+            // Debug.LogWarning($"[TileDataManager] Missing prefab for Floor: {type}");
         }
         return entry.Prefab;
     }
@@ -80,12 +87,11 @@ public class TileDataManager : MonoBehaviour, IInitializable
         var entry = GetPillarData(type);
         if (type != PillarType.None && entry.Prefab == null)
         {
-            Debug.LogWarning($"[TileDataManager] Missing prefab for Pillar: {type}");
+            // Debug.LogWarning($"[TileDataManager] Missing prefab for Pillar: {type}");
         }
         return entry.Prefab;
     }
 
-    // MapManager나 Generator에서 벽 프리팹 요청 시 사용
     public GameObject GetEdgePrefab(EdgeType type)
     {
         var entry = GetEdgeData(type);

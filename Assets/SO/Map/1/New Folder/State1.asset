@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 540b354b3d66cbc45bfb19523995a983, type: 3}
   m_Name: State1
   m_EditorClassIdentifier: 
-  MapID: 123
   GridSize: {x: 3, y: 3}
   BasePosition: {x: 18, y: 6}
   MinLevel: 0
@@ -42,6 +41,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 20
       z: 7
@@ -66,6 +66,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 20
       z: 8
@@ -90,6 +91,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 19
       z: 8
@@ -114,6 +116,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 18
       z: 8
@@ -138,6 +141,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 18
       z: 7
@@ -162,6 +166,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 19
       z: 7
@@ -186,6 +191,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 19
       z: 6
@@ -210,6 +216,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   - Coords:
       x: 18
       z: 6
@@ -234,4 +241,5 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
+    RoleTag: 
   SpawnPoints: []

@@ -45,6 +45,10 @@ public struct TileSaveData
     public float CurrentPillarHP;
     public SavedEdgeInfo[] Edges;
 
+    // [New] 타일 자체에 역할 태그 부여 (SSOT: 데이터 불일치 방지)
+    // 예: "PlayerSpawn", "EnemySpawn_Alpha", "Objective_A"
+    public string RoleTag;
+
     public void InitializeEdges()
     {
         if (Edges == null || Edges.Length != 4)

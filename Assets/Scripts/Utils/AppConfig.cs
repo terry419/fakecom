@@ -20,5 +20,4 @@ public class AppConfig : ScriptableObject
     public AssetReferenceGameObject SaveManagerRef;
 
     // 리소스 매니저 (기존 유지)
-    public AssetReferenceGameObject TileDataManagerRef;
 }

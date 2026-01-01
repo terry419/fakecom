@@ -1,3 +1,4 @@
+// 파일: Assets/Scripts/Data/Map/MapEntry.cs
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using System;
@@ -23,9 +24,12 @@ public struct MapEntry
     [Header("4. Asset Link")]
     public AssetReferenceT<MapDataSO> MapDataRef;
 
+    // [Mod] 선택 사항으로 변경 (Null 허용 -> 기본 타일셋 사용)
+    [Header("5. Visual Theme (Optional)")]
+    public AssetReferenceT<TileRegistrySO> BiomeRegistryRef;
+
     public bool Validate(out string error)
     {
-        // 필수 ID 검사
         if (string.IsNullOrEmpty(MapID))
         {
             error = "MapID is empty.";
@@ -37,29 +41,14 @@ public struct MapEntry
             return false;
         }
 
-        // [개선 1] Enum 유효성 검사
-        if (!Enum.IsDefined(typeof(MissionType), Type))
+        // 맵 데이터는 필수 (지형이 없으면 게임 불가)
+        if (MapDataRef == null || !MapDataRef.RuntimeKeyIsValid())
         {
-            error = $"Invalid MissionType enum value in {MapID}";
-            return false;
-        }
-        if (!Enum.IsDefined(typeof(MapSize), Size))
-        {
-            error = $"Invalid MapSize enum value in {MapID}";
+            error = $"Invalid or Missing MapDataRef in MapID: {MapID}";
             return false;
         }
 
-        // [개선 6] 설명 누락 경고 (Error 아님 -> true 반환)
-        if (string.IsNullOrEmpty(Description))
-        {
-            Debug.LogWarning($"[MapEntry] Warning: Description is empty for {MapID}");
-        }
-
-        if (!MapDataRef.RuntimeKeyIsValid())
-        {
-            error = $"Invalid Addressable Key (MapID: {MapID})";
-            return false;
-        }
+        // [Mod] BiomeRegistryRef는 검사하지 않음 (Null이면 Fallback 사용)
 
         error = string.Empty;
         return true;

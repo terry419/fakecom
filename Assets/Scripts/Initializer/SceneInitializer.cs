@@ -9,53 +9,72 @@ using UnityEngine.AddressableAssets;
 
 public class SceneInitializer : MonoBehaviour, IInitializable
 {
-    // 자기 자신은 초기화 대상에서 제외해야 하므로, IInitializable을 구현하되 내용은 비워둡니다.
     public UniTask Initialize(InitializationContext context) => UniTask.CompletedTask;
-    
-    /// <summary>
-    /// BootManager에 의해 호출되어 씬 초기화 프로세스를 시작합니다.
-    /// </summary>
+
     public async UniTask InitializeSceneAsync(StringBuilder bootLog)
     {
         bootLog.AppendLine("\n-- Scene Initialization Sequence --");
 
-        // 1. [수정] 자기 자신과 자식 오브젝트에 포함된 씬 매니저들을 모두 찾습니다.
+        // 1. 자식 매니저 탐색
         var sceneManagers = GetComponentsInChildren<IInitializable>(true)
-            .Where(m => (UnityEngine.Object)m != this) // SceneInitializer 자기 자신은 제외
+            .Where(m => (UnityEngine.Object)m != this)
             .ToList();
 
         if (sceneManagers.Count == 0)
         {
-            bootLog.AppendLine("No scene managers found in children. Skipping scene-level initialization.");
+            bootLog.AppendLine("No scene managers found. Skipping.");
             return;
         }
-        bootLog.AppendLine($"{sceneManagers.Count} scene managers found in hierarchy.");
 
-        // 2. 의존성에 따라 매니저들을 정렬합니다.
+        // 2. 의존성 정렬
         var sortedManagers = SortManagersByDependency(sceneManagers);
-        bootLog.AppendLine("Dependency sort successful.");
 
-        // 3. 테스트를 위한 기본 맵 데이터를 로드합니다.
-        MapDataSO mapData;
-        try
+        // 3. 미션 정보 획득 (MissionManager)
+        var missionMgr = ServiceLocator.Get<MissionManager>();
+        MapEntry entry;
+
+        if (missionMgr.SelectedMission.HasValue)
         {
-            mapData = await Addressables.LoadAssetAsync<MapDataSO>("State1").ToUniTask();
-            if (mapData == null) throw new NullReferenceException("Loaded MapDataSO 'State1' is null.");
-            bootLog.AppendLine($"Default map 'State1' loaded successfully.");
+            entry = missionMgr.SelectedMission.Value;
+            bootLog.AppendLine($"Mission Selected: {entry.MapID}");
         }
-        catch (Exception ex)
+        else
         {
-            throw new BootstrapException("Failed to load default map 'State1'.", ex);
+            bootLog.AppendLine("No mission selected. Attempting fallback...");
+            var catalog = ServiceLocator.Get<MapCatalogManager>();
+            if (!catalog.TryGetRandomMapByDifficulty(1, out entry))
+            {
+                throw new BootstrapException("Failed to find any fallback map in Catalog.");
+            }
+            bootLog.AppendLine($"Fallback Map Loaded: {entry.MapID}");
         }
-        
-        // 4. 씬 컨텍스트를 생성하고 로드한 맵 데이터를 포함시킵니다.
+
+        // 4. [Fix] 맵 데이터 & 타일셋 병렬 로드 (에러 수정됨)
+        bootLog.AppendLine($"- Loading Assets for {entry.MapID}...");
+
+        var mapLoadTask = entry.MapDataRef.LoadAssetAsync().ToUniTask();
+
+        // BiomeRegistryRef가 있으면 로드, 없으면 null 리턴 태스크
+        UniTask<TileRegistrySO> biomeLoadTask = UniTask.FromResult<TileRegistrySO>(null);
+        if (entry.BiomeRegistryRef != null && entry.BiomeRegistryRef.RuntimeKeyIsValid())
+        {
+            biomeLoadTask = entry.BiomeRegistryRef.LoadAssetAsync().ToUniTask();
+        }
+
+        // [핵심 수정] WhenAll의 결과를 튜플로 한 번에 받습니다. (개별 Task 재접근 금지)
+        var (mapData, biomeRegistry) = await UniTask.WhenAll(mapLoadTask, biomeLoadTask);
+
+        if (mapData == null) throw new BootstrapException($"Failed to load MapData for {entry.MapID}");
+
+        // 5. 씬 컨텍스트 생성
         var sceneContext = new InitializationContext
         {
             Scope = ManagerScope.Scene,
-            MapData = mapData
+            MapData = mapData,
+            Registry = biomeRegistry // TileDataManager로 전달됨 (null일 수도 있음)
         };
-        
-        // 5. 정렬된 순서에 따라 순차적으로 초기화합니다.
+
+        // 6. 매니저 초기화 루프
         foreach (var manager in sortedManagers)
         {
             var managerName = manager.GetType().Name;
@@ -90,11 +109,6 @@ public class SceneInitializer : MonoBehaviour, IInitializable
                     graph[dependency].Add(type);
                     inDegree[type]++;
                 }
-                // [개선] 프리팹에 없는 의존성이 명시된 경우 에러 처리
-                else
-                {
-                    throw new BootstrapException($"Dependency Error: '{type.Name}' depends on '{dependency.Name}', but it was not found in the scene manager prefab.");
-                }
             }
         }
 
@@ -113,12 +127,7 @@ public class SceneInitializer : MonoBehaviour, IInitializable
             }
         }
 
-        if (sortedList.Count != managers.Count)
-        {
-            var circular = managerMap.Keys.Except(sortedList.Select(m => m.GetType()));
-            throw new InvalidOperationException($"Circular dependency detected: {string.Join(", ", circular.Select(t => t.Name))}");
-        }
-
+        if (sortedList.Count != managers.Count) return managers; // 순환 의존성 시 원본 반환
         return sortedList;
     }
 }
