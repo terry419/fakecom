@@ -21,13 +21,10 @@ public class SetupState : SessionStateBase
     // [Fix 2] 부모 클래스와 서명 일치 (StatePayload payload, CancellationToken cancellationToken)
     public override async UniTask Enter(StatePayload payload, CancellationToken cancellationToken)
     {
-        Debug.Log("[SetupState] Entering Setup State...");
 
         // [개선점 3] 전체 예외 처리 및 에러 상태 전환
         try
         {
-            Debug.Log("[SetupState] Generating visual map...");
-
             // 1. ServiceLocator 안전하게 가져오기
             TilemapGenerator generator = null;
             try

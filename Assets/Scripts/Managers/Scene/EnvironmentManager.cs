@@ -1,145 +1,121 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
 
+[DependsOn(typeof(MapManager), typeof(TileDataManager))]
 public class EnvironmentManager : MonoBehaviour, IInitializable
 {
     private MapManager _mapManager;
     private TileDataManager _tileDataManager;
 
-    // 1. 등록 (ServiceLocator)
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
     private void OnDestroy() => ServiceLocator.Unregister<EnvironmentManager>(ManagerScope.Scene);
 
-    // 2. 초기화
     public async UniTask Initialize(InitializationContext context)
     {
         _mapManager = ServiceLocator.Get<MapManager>();
         _tileDataManager = ServiceLocator.Get<TileDataManager>();
+
+        BuildMapFeatures();
         await UniTask.CompletedTask;
     }
 
-    // [3단계 핵심] MapManager가 로딩 끝난 직후 호출함
     public void BuildMapFeatures()
     {
         if (_mapManager == null) return;
 
-        Debug.Log("[EnvironmentManager] Start Building Features (Pillars & Edges)...");
+        Debug.Log("[EnvironmentManager] Start Building Features...");
 
-        int width = _mapManager.GridWidth;
-        int depth = _mapManager.GridDepth;
-        int layers = _mapManager.LayerCount;
-
-        // 전체 타일 순회
-        for (int y = 0; y < layers; y++)
+        // MapManager의 모든 타일을 직접 순회 (좌표 계산 로직 제거)
+        foreach (Tile tile in _mapManager.GetAllTiles())
         {
-            for (int x = 0; x < width; x++)
-            {
-                for (int z = 0; z < depth; z++)
-                {
-                    GridCoords coords = new GridCoords(x, z, _mapManager.MinLevel + y);
-                    Tile tile = _mapManager.GetTile(coords);
-                    if (tile == null) continue;
+            // 1. 기둥 생성
+            ProcessPillar(tile);
 
-                    // 1. 기둥 승격 (Pillar Promotion)
-                    ProcessPillar(tile);
-
-                    // 2. 엣지 연결 (Link Edges - SSOT Wiring)
-                    LinkEdgesForTile(tile, x, z, y);
-                }
-            }
+            // 2. 벽/창문 연결 (North, East 방향만 처리하여 중복 방지)
+            LinkEdgesForTile(tile);
         }
 
         Debug.Log("[EnvironmentManager] Build Complete.");
     }
 
-    // --- 기둥 처리 로직 ---
     private void ProcessPillar(Tile tile)
     {
         if (tile.InitialPillarID == PillarType.None) return;
 
-        // 데이터 매니저에서 기둥 스펙(MaxHP 등) 가져오기
+        // [Fix CS0019] 구조체는 null이 될 수 없으므로 null 체크 제거
         var pillarData = _tileDataManager.GetPillarData(tile.InitialPillarID);
-        if (pillarData.Prefab == null) return;
 
-        // 논리 객체(PillarInfo) 생성 및 타일 점유
-        // (현재 HP 로직이 따로 없다면 MaxHP로 초기화)
+        // 데이터 무결성 체크 (Prefab 존재 여부 확인)
+        if (pillarData.Prefab == null)
+        {
+            Debug.LogError($"[EnvManager] Pillar Data missing/invalid for ID: {tile.InitialPillarID}");
+            return;
+        }
+
+        // 디버그: (18, 6, 0) 타일 확인용
+        if (tile.Coordinate.x == 18 && tile.Coordinate.z == 6)
+        {
+            Debug.Log($"<color=green>[EnvManager] Creating Pillar at {tile.Coordinate}: {tile.InitialPillarID}</color>");
+        }
+
         var pillarInfo = new PillarInfo(tile.InitialPillarID, pillarData.MaxHP, pillarData.MaxHP);
-
         tile.AddOccupant(pillarInfo);
     }
 
-    // --- 엣지 연결 로직 (단일 소스 원칙) ---
-    // 알고리즘: 모든 타일은 자신의 "북쪽(North)"과 "동쪽(East)" 벽만 생성해서 책임진다.
-    // 내 북쪽 벽 = 북쪽 이웃의 남쪽 벽 (공유)
-    // 내 동쪽 벽 = 동쪽 이웃의 서쪽 벽 (공유)
-    private void LinkEdgesForTile(Tile currentTile, int x, int z, int y)
+    private void LinkEdgesForTile(Tile currentTile)
     {
-        // 1. North 처리
-        // 내 TempData에서 North 정보 가져와서 RuntimeEdge 생성
-        SavedEdgeInfo northInfo = currentTile.TempSavedEdges[(int)Direction.North];
-        RuntimeEdge northEdge = new RuntimeEdge(northInfo.Type, northInfo.Cover, northInfo.MaxHP, northInfo.CurrentHP);
+        GridCoords pos = currentTile.Coordinate;
 
-        // 나한테 꽂기
-        currentTile.SetSharedEdge(Direction.North, northEdge);
+        // [Fix] GridCoords 생성자 순서 (x, z, y) 준수
 
-        // 북쪽 이웃 찾아서 꽂기 (이웃의 South는 나와 같은 객체)
-        Tile northNeighbor = _mapManager.GetTile(new GridCoords(x, z + 1, _mapManager.MinLevel + y));
-        if (northNeighbor != null)
+        // 1. North Check (Z + 1)
+        // 생성자 2번째 인자가 z이므로 여기에 pos.z + 1 전달
+        GridCoords northPos = new GridCoords(pos.x, pos.z + 1, pos.y);
+
+        if (_mapManager.HasTile(northPos))
         {
-            northNeighbor.SetSharedEdge(Direction.South, northEdge);
+            ProcessEdge(currentTile, Direction.North, northPos, Direction.South);
         }
 
-        // 2. East 처리
-        SavedEdgeInfo eastInfo = currentTile.TempSavedEdges[(int)Direction.East];
-        RuntimeEdge eastEdge = new RuntimeEdge(eastInfo.Type, eastInfo.Cover, eastInfo.MaxHP, eastInfo.CurrentHP);
+        // 2. East Check (X + 1)
+        // 생성자 1번째 인자가 x이므로 여기에 pos.x + 1 전달
+        GridCoords eastPos = new GridCoords(pos.x + 1, pos.z, pos.y);
 
-        // 나한테 꽂기
-        currentTile.SetSharedEdge(Direction.East, eastEdge);
-
-        // 동쪽 이웃 찾아서 꽂기 (이웃의 West는 나와 같은 객체)
-        Tile eastNeighbor = _mapManager.GetTile(new GridCoords(x + 1, z, _mapManager.MinLevel + y));
-        if (eastNeighbor != null)
+        if (_mapManager.HasTile(eastPos))
         {
-            eastNeighbor.SetSharedEdge(Direction.West, eastEdge);
+            ProcessEdge(currentTile, Direction.East, eastPos, Direction.West);
         }
-
-        // 주의: South와 West는 처리하지 않음.
-        // 왜냐하면 나의 South는 "내 남쪽 이웃"이 루프를 돌 때 그의 North로서 처리해서 나에게 꽂아주기 때문.
-        // (단, 맵의 가장자리일 경우 null 상태일 수 있으므로, 예외적으로 맵 경계선 처리가 필요하다면 추가 로직 필요)
-        // 여기서는 MapManager가 Load 시 이미 TempSavedEdges에 Open을 채워두므로,
-        // 가장자리(이웃 없음)인 경우에도 자신의 Edge는 생성되어 할당됨.
     }
 
-    // [4단계] 파괴 로직 (외부에서 호출)
+    private void ProcessEdge(Tile currentTile, Direction currentDir, GridCoords neighborPos, Direction neighborDir)
+    {
+        // 내 타일의 Edge 정보 가져오기
+        SavedEdgeInfo info = currentTile.TempSavedEdges[(int)currentDir];
+
+        // 런타임 객체 생성
+        RuntimeEdge edge = new RuntimeEdge(info.Type, info.Cover, info.MaxHP, info.CurrentHP);
+
+        // 나에게 설정
+        currentTile.SetSharedEdge(currentDir, edge);
+
+        // 이웃에게 설정 (공유)
+        Tile neighbor = _mapManager.GetTile(neighborPos);
+        if (neighbor != null)
+        {
+            neighbor.SetSharedEdge(neighborDir, edge);
+        }
+    }
+
     public void DamageWallAt(GridCoords coords, Direction dir, float damage)
     {
         Tile tile = _mapManager.GetTile(coords);
         if (tile == null) return;
 
         RuntimeEdge edge = tile.GetEdge(dir);
-        if (edge == null || edge.Type == EdgeType.Open) return;
-
-        // 데미지 적용 (공유 객체이므로 연결된 반대편 타일 데이터도 즉시 바뀜)
-        edge.TakeDamage(damage);
-
-        // 만약 파괴되었다면, 양쪽 타일의 캐시(이동 가능 여부)를 갱신해야 함
-        if (edge.IsBroken)
+        if (edge != null && edge.Type != EdgeType.Open)
         {
-            // 1. 내 타일 갱신
-            tile.UpdateCache();
-
-            // 2. 반대편 이웃 타일 갱신
-            GridCoords neighborCoords = GridUtils.GetNeighbor(coords, dir);
-            Tile neighbor = _mapManager.GetTile(neighborCoords);
-            if (neighbor != null)
-            {
-                neighbor.UpdateCache();
-            }
-
-            Debug.Log($"[EnvManager] Wall Destroyed at {coords} ({dir})");
-
-            // TODO: 추후 여기에 비주얼 파괴 이벤트(Event) 호출 추가
+            edge.TakeDamage(damage);
+            // 필요 시 시각적 갱신 로직 추가
         }
     }
 }

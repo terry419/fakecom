@@ -99,7 +99,8 @@ public class Tile
     {
         if (occupant == null) return;
 
-        // 유닛은 중복 방지를 위해 별도 변수로도 추적
+        bool isTarget = (Coordinate.x == 18 && Coordinate.z == 6 && Coordinate.y == 0);
+
         if (occupant.Type == OccupantType.Unit)
         {
             if (_primaryUnit != null)
@@ -109,13 +110,17 @@ public class Tile
 
         _occupants.Add(occupant);
 
-        // 점유자의 상태(차단 여부)가 변하면 내 캐시도 갱신하도록 구독
+        if (isTarget)
+        {
+            Debug.Log($"<color=magenta>[Tile {Coordinate}] Occupant Added. Type: {occupant.Type}, Blocking: {occupant.IsBlockingMovement}</color>");
+        }
+
         occupant.OnBlockingChanged += HandleOccupantStateChange;
 
-        UpdateCache();
+        UpdateCache(); // 여기서 IsWalkable이 갱신되어야 함
+
         occupant.OnAddedToTile(this);
     }
-
     public void RemoveOccupant(ITileOccupant occupant)
     {
         if (occupant == null) return;
