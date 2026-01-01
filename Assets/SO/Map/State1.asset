@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MapID: 123
   DisplayName: 123
-  GridSize: {x: 3, y: 5}
-  BasePosition: {x: 0, y: 0}
+  GridSize: {x: 3, y: 3}
+  BasePosition: {x: 18, y: 6}
   MapPrefabRef:
     m_AssetGUID: 
     m_SubObjectName: 
@@ -30,7 +30,7 @@ MonoBehaviour:
       y: 0
     FloorID: 2
     PillarID: 0
-    CurrentPillarHP: 0
+    CurrentPillarHP: 0.16
     Edges:
     - Type: 0
       Cover: 0

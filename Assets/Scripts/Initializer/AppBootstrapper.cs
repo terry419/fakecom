@@ -151,4 +151,14 @@ public static class AppBootstrapper
             logBuilder.AppendLine($"- {managerName} Init: OK");
         }
     }
+
+    private static void ValidateCatalogAsset(MapCatalogSO catalog)
+    {
+        // [개선 8] 부팅 시점에 데이터 무결성 검증
+        if (!catalog.ValidateAllPools(out string errorMsg))
+        {
+            // 데이터 오류는 치명적이므로 부팅 중단
+            throw new BootstrapException($"[MapCatalog] Validation Failed:\n{errorMsg}");
+        }
+    }
 }
