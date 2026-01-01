@@ -27,6 +27,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89c2979eee624484e8a0d2cdbb578879
+    m_Address: Assets/SO/Map/MapCatalog.asset
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ed91cb3fbf8279d46bc8844ce423a49f
     m_Address: Assets/SO/Tile/TileRegistry.asset
     m_ReadOnly: 0

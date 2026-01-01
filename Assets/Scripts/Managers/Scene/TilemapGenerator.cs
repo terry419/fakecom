@@ -161,6 +161,9 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                 : Quaternion.Euler(0, 90, 0);
         }
 
+        // [Fix] 오브젝트의 최하단을 찾아 타일 표면(pos.y)에 맞춤
+        AlignToGround(instance, pos.y);
+
         instance.name = isPillar ? $"Pillar_{coords}" : $"Wall_{coords}_{dir}";
 
         var structure = instance.GetComponent<StructureObj>();
@@ -168,10 +171,9 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         structure.Initialize(coords, dir, hp, isPillar);
 
-        // 구조물에도 Collider 확인
+        // 필요 시 Collider 확인
         if (instance.GetComponent<Collider>() == null)
         {
-            // 모델 모양에 따라 다르겠지만 일단 BoxCollider 추가
             instance.AddComponent<BoxCollider>();
         }
 
@@ -179,6 +181,29 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
         if (layer > -1) instance.layer = layer;
 
         _spawnedObjects.Add(instance);
+    }
+
+    // [New] 오브젝트의 Bounds.min.y를 계산하여 타겟 Y위치로 끌어올리는 헬퍼 함수
+    private void AlignToGround(GameObject obj, float targetY)
+    {
+        var renderers = obj.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+
+        // 1. 모든 자식 렌더러를 포함한 통합 Bounds 계산
+        Bounds combinedBounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            combinedBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        // 2. 현재 오브젝트의 최하단 Y좌표
+        float currentMinY = combinedBounds.min.y;
+
+        // 3. 목표 높이와의 차이만큼 이동
+        float diff = targetY - currentMinY;
+
+        // *주의* : transform.position을 직접 수정해야 함
+        obj.transform.position += new Vector3(0, diff, 0);
     }
 
     public void ClearMap()

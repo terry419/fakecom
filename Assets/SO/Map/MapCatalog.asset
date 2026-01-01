@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af324b8bb872c184abdd67eaa3030830, type: 3}
   m_Name: MapCatalog
   m_EditorClassIdentifier: 
-  <DifficultyPools>k__BackingField: []
+  <DifficultyPools>k__BackingField:
+  - {fileID: 11400000, guid: bfc3a070c4c174a4187092c7a096d447, type: 2}

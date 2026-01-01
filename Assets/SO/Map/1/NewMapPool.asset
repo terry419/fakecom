@@ -13,4 +13,15 @@ MonoBehaviour:
   m_Name: NewMapPool
   m_EditorClassIdentifier: 
   <TargetDifficulty>k__BackingField: 1
-  <Entries>k__BackingField: []
+  <Entries>k__BackingField:
+  - MapID: 123
+    DisplayName: 123
+    Type: 0
+    Size: 0
+    Description: 
+    Tags: []
+    MapDataRef:
+      m_AssetGUID: bd0534775d402514c87980ef43763968
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_EditorAssetChanged: 0

@@ -22,6 +22,11 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
+  MapCatalogRef:
+    m_AssetGUID: 89c2979eee624484e8a0d2cdbb578879
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
   TileRegistryRef:
     m_AssetGUID: ed91cb3fbf8279d46bc8844ce423a49f
     m_SubObjectName: 
@@ -44,11 +49,6 @@ MonoBehaviour:
     m_EditorAssetChanged: 0
   SaveManagerRef:
     m_AssetGUID: 675ec267342fded43b7a3e7095ad5ba0
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
-  EdgeDataManagerRef:
-    m_AssetGUID: 7943a248cbfbd484f9a61f64b5a86da6
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 
-// [Refactoring Phase 2] Registry 기반 전환 및 높이 자동 보정 적용 완료
+// [리팩토링 2단계] Registry 기반 변환 및 로직 구현 완료
 public class MapEditorAction
 {
     private readonly MapEditorContext _context;
@@ -14,26 +14,26 @@ public class MapEditorAction
         UpdateParentReferences();
     }
 
-    // --- 1. Tile Logic ---
+    // --- 1. 타일 로직 (Tile Logic) ---
 
     public void HandleCreateTile(GridCoords coords)
     {
         if (_context.Registry == null)
         {
-            Debug.LogError("Registry is missing in Context!");
+            Debug.LogError("Context에 Registry가 없습니다!");
             return;
         }
 
-        // 이미 타일이 있으면 생성하지 않음 (중복 방지)
+        // 이미 타일이 존재하는지 확인 (중복 생성 방지)
         if (_context.GetTile(coords) != null) return;
 
         UpdateParentReferences();
 
-        // Registry에서 현재 선택된 바닥 타입의 프리팹 가져오기
+        // Registry에서 선택된 타일 정보 가져오기
         var floorEntry = _context.Registry.GetFloor(_context.SelectedFloorType);
         if (floorEntry.Prefab == null)
         {
-            Debug.LogError($"Prefab missing for floor type: {_context.SelectedFloorType}");
+            Debug.LogError($"해당 바닥 타입의 프리팹이 없습니다: {_context.SelectedFloorType}");
             return;
         }
 
@@ -58,11 +58,11 @@ public class MapEditorAction
         var tile = _context.GetTile(coords);
         if (tile != null)
         {
-            // 타일 삭제 시 위에 있는 기둥, 연결된 벽도 같이 처리해야 깔끔함
+            // 타일이 존재할 경우 안전하게 삭제 처리
             SafeDestroy(tile.gameObject);
         }
 
-        // 해당 좌표의 벽들도 삭제
+        // 해당 좌표의 사방 벽면(Edge)들도 함께 삭제
         for (int i = 0; i < 4; i++)
         {
             var wall = _context.GetWall(coords, (Direction)i);
@@ -72,11 +72,11 @@ public class MapEditorAction
         _context.InvalidateCache();
     }
 
-    // --- 2. Pillar Logic ---
+    // --- 2. 기둥 로직 (Pillar Logic) ---
 
     public void HandleCreatePillar(GridCoords coords)
     {
-        // 타일이 없으면 타일 먼저 생성
+        // 바닥이 없으면 바닥부터 생성
         var tile = _context.GetTile(coords);
         if (tile == null)
         {
@@ -89,28 +89,28 @@ public class MapEditorAction
             Undo.RecordObject(tile, "Set Pillar");
             tile.PillarID = _context.SelectedPillarType;
 
-            // 시각적 갱신
+            // 시각적 모델 갱신
             RebuildPillarVisual(tile);
             EditorUtility.SetDirty(tile);
         }
     }
 
-    // --- 3. Edge Logic ---
+    // --- 3. 에지 로직 (Edge Logic - 벽, 창문 등) ---
 
     public void HandleModifyEdge(GridCoords coords, Direction dir)
     {
         var tile = _context.GetTile(coords);
-        // 타일이 있어야 벽을 세울 수 있음
+        // 타일이 있어야만 에지 설치 가능
         if (tile == null) return;
 
-        // Context에서 선택된 타입으로 데이터 생성
+        // Context의 현재 선택값을 기반으로 에지 정보 생성
         SavedEdgeInfo newEdgeInfo = CreateEdgeInfoFromSelection();
 
         Undo.RecordObject(tile, "Modify Edge");
         tile.Edges[(int)dir] = newEdgeInfo;
         EditorUtility.SetDirty(tile);
 
-        // 시각적 갱신 (기존 벽 삭제 -> 새 벽 생성)
+        // 시각적 모델 교체 (기존 삭제 -> 신규 생성)
         ReplaceEdgeVisuals(coords, dir, newEdgeInfo);
 
         _context.InvalidateCache();
@@ -133,7 +133,7 @@ public class MapEditorAction
                 return SavedEdgeInfo.CreateDoor();
 
             case EdgeType.Fence:
-                // [Fix] Fence 선택 시 Fence 타입이 들어가도록 명시적 할당
+                // [수정] Fence는 낮은 엄폐물을 기본으로 생성
                 info = SavedEdgeInfo.CreateWall(100f, CoverType.Low);
                 info.Type = EdgeType.Fence;
                 return info;
@@ -143,7 +143,7 @@ public class MapEditorAction
         }
     }
 
-    // --- 4. Load & Visual Helpers ---
+    // --- 4. 로드 및 시각화 도우미 (Load & Visual Helpers) ---
 
     public void LoadMapFromData(MapDataSO data)
     {
@@ -169,23 +169,23 @@ public class MapEditorAction
             var editorTile = obj.GetComponent<EditorTile>();
             if (editorTile != null)
             {
-                // 데이터 복원
+                // 데이터 할당
                 editorTile.Coordinate = tileData.Coords;
                 editorTile.FloorID = tileData.FloorID;
                 editorTile.PillarID = tileData.PillarID;
 
-                // Edge 데이터 깊은 복사
+                // 에지 데이터 복사
                 if (tileData.Edges != null && tileData.Edges.Length == 4)
                     editorTile.Edges = (SavedEdgeInfo[])tileData.Edges.Clone();
                 else
                     editorTile.Edges = new SavedEdgeInfo[4];
 
-                // 기둥 비주얼 복원
+                // 기둥 모델 복구
                 if (editorTile.PillarID != PillarType.None)
                     RebuildPillarVisual(editorTile);
             }
 
-            // 2. 벽 생성 (Visual)
+            // 2. 벽면 시각화 생성
             for (int i = 0; i < 4; i++)
             {
                 if (editorTile == null) break;
@@ -199,56 +199,60 @@ public class MapEditorAction
 
         Undo.CollapseUndoOperations(group);
         _context.InvalidateCache();
-        Debug.Log($"[MapEditor] Map Loaded: {data.name}");
+        Debug.Log($"[MapEditor] 맵 로드 완료: {data.name}");
     }
 
     private void RebuildPillarVisual(EditorTile tile)
     {
-        // 기존 기둥 제거
+        // 기존 비주얼 삭제
         var oldPillar = tile.transform.Find("Visual_Pillar");
         if (oldPillar != null) SafeDestroy(oldPillar.gameObject);
 
-        // 기본 바닥(Top_White) 숨김/표시 처리
+        // 기본 바닥(Top_White) 켜기/끄기 처리
         var floorVisual = tile.transform.Find("Top_White");
         if (tile.PillarID == PillarType.None)
         {
             if (floorVisual != null) floorVisual.gameObject.SetActive(true);
-            return; // 기둥 없으면 종료
+            return; // 기둥 없음
         }
 
         if (floorVisual != null) floorVisual.gameObject.SetActive(false);
 
-        // 새 기둥 생성 (Registry 사용)
+        // 새 기둥 프리팹 생성 (Registry 참조)
         var pillarEntry = _context.Registry.GetPillar(tile.PillarID);
         if (pillarEntry.Prefab != null)
         {
             var pObj = (GameObject)PrefabUtility.InstantiatePrefab(pillarEntry.Prefab, tile.transform);
             Undo.RegisterCreatedObjectUndo(pObj, "Pillar Visual");
             pObj.name = "Visual_Pillar";
+
+            // [Fix] 기둥도 바닥 높이에 맞춰 정렬 (기존에는 이 부분이 없어서 묻힘)
+            // 타일의 Y 위치를 기준으로 정렬합니다.
+            AlignToGround(pObj, tile.transform.position.y);
         }
     }
 
     private void CreateWallVisual(GridCoords coords, Direction dir, SavedEdgeInfo info)
     {
-        // 타입에 맞는 프리팹 선정 (Registry 사용)
+        // 타입에 맞는 프리팹 가져오기
         var edgeEntry = _context.Registry.GetEdge(info.Type);
         if (edgeEntry.Prefab == null) return;
 
         var wObj = (GameObject)PrefabUtility.InstantiatePrefab(edgeEntry.Prefab, _edgeParent);
         Undo.RegisterCreatedObjectUndo(wObj, "Create Wall");
 
-        // 위치/회전 설정
+        // 위치 및 회전 설정
         var pos = GridUtils.GetEdgeWorldPosition(coords, dir);
 
-        // 1. 일단 정위치에 배치
+        // 1. 기본 위치 설정
         wObj.transform.position = pos;
 
-        // 2. 회전 적용
+        // 2. 방향에 따른 회전 (북/남은 정방향, 동/서는 90도 회전)
         wObj.transform.rotation = (dir == Direction.North || dir == Direction.South)
             ? Quaternion.identity
             : Quaternion.Euler(0, 90, 0);
 
-        // 3. [Fix] 자동 높이 보정 (BoundsMin을 바닥에 맞춤)
+        // 3. [수정] 지면 높이 자동 정렬 (모델의 하단 피벗을 바닥에 맞춤)
         AlignToGround(wObj, pos.y);
 
         var ew = wObj.GetComponent<EditorWall>();
@@ -256,8 +260,8 @@ public class MapEditorAction
     }
 
     /// <summary>
-    /// [핵심 기능] 모델의 렌더러 Bounds를 계산하여, 최하단(min.y)을 목표 높이(targetY)에 딱 맞춥니다.
-    /// 프리팹 피벗이 중앙이든, 위든, 아래든 상관없이 바닥에 붙게 만듭니다.
+    /// [수정된 로직] 렌더러의 Bounds를 사용하여 모델의 최하단(min.y)이 목표 높이(targetY)에 오도록 보정합니다.
+    /// 모델마다 피벗 위치가 다르더라도 항상 바닥 위에 정확히 배치되게 합니다.
     /// </summary>
     private void AlignToGround(GameObject obj, float targetY)
     {
@@ -271,13 +275,10 @@ public class MapEditorAction
             combinedBounds.Encapsulate(renderers[i].bounds);
         }
 
-        // 현재 모델의 가장 낮은 지점
+        // 현재 최하단 Y값과 목표 Y값의 차이만큼 이동
         float currentMinY = combinedBounds.min.y;
-
-        // 목표 높이와의 차이 계산
         float diff = targetY - currentMinY;
 
-        // 위치 보정 적용
         obj.transform.position += new Vector3(0, diff, 0);
     }
 
@@ -292,12 +293,12 @@ public class MapEditorAction
         }
     }
 
-    // [SafeDestroy] 인스펙터 참조 오류 방지용
+    // [SafeDestroy] Undo를 지원하고 선택 상태를 관리하는 삭제 함수
     private void SafeDestroy(GameObject go)
     {
         if (go == null) return;
 
-        // 현재 선택된 오브젝트가 삭제하려는 오브젝트 자신이거나, 그 자식이라면 선택을 해제합니다.
+        // 현재 선택된 객체가 삭제될 대상이거나 그 자식일 경우 선택 해제
         if (Selection.activeGameObject != null)
         {
             if (Selection.activeGameObject == go || Selection.activeGameObject.transform.IsChildOf(go.transform))
