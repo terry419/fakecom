@@ -29,7 +29,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
     public async UniTask GenerateAsync()
     {
         Debug.Log("[TilemapGenerator] Start generating visuals (Async)...");
-
         MapManager mapManager = null;
         TileDataManager tileDataManager = null;
 
@@ -54,20 +53,20 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         int spawnedCount = 0;
 
-        // [핵심 수정] BasePosition을 가져옵니다. (예: 18, 6)
+        // [수정 핵심] MapManager.BasePosition이 GridCoords(x, z, y)로 변경되었습니다.
+        // 기존: mapManager.BasePosition.y (Vector2Int 시절, y가 깊이였음)
+        // 변경: mapManager.BasePosition.z (GridCoords, z가 깊이임)
         int baseX = mapManager.BasePosition.x;
-        int baseZ = mapManager.BasePosition.y; // Vector2Int에서 y가 Z축(Depth) 역할
+        int baseZ = mapManager.BasePosition.z;
 
-        // MapManager의 그리드 크기만큼 순회
+        // MapManager 그리드 크기만큼 순회
         for (int x = 0; x < mapManager.GridWidth; x++)
         {
             for (int z = 0; z < mapManager.GridDepth; z++)
             {
                 for (int y = 0; y < mapManager.LayerCount; y++)
                 {
-                    // [핵심 수정] Local Index(x,z)에 BasePosition을 더해 World 좌표로 복구합니다.
-                    // 기존 코드: new GridCoords(x, z, ...) -> 틀림 (0,0 호출됨)
-                    // 수정 코드: new GridCoords(baseX + x, baseZ + z, ...) -> 맞음 (18,6 호출됨)
+                    // Local Index(x,z) + BasePosition => World Grid Coordinates
                     GridCoords coords = new GridCoords(baseX + x, baseZ + z, mapManager.MinLevel + y);
 
                     Tile tile = mapManager.GetTile(coords);
@@ -88,12 +87,13 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                         if (pillarEntry.Prefab != null)
                         {
                             float hp = tile.InitialPillarHP > 0 ? tile.InitialPillarHP : pillarEntry.MaxHP;
+                            // 기둥은 Direction 의미 없음 (North 기본값)
                             CreateStructureVisual(pillarEntry.Prefab, coords, Direction.North, hp, true);
                             spawnedCount++;
                         }
                     }
 
-                    // 3. 벽 (Edge) 생성
+                    // 3. 벽/창문 (Edge) 생성
                     if (tile.TempSavedEdges != null)
                     {
                         for (int i = 0; i < 4; i++)
@@ -112,7 +112,7 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
                         }
                     }
 
-                    // 프레임 드랍 방지 (100개마다 대기)
+                    // 비동기 부하 분산 (100개마다 프레임 양보)
                     if (spawnedCount % 100 == 0)
                     {
                         await UniTask.Yield();
@@ -134,10 +134,9 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
             instance.transform.position = worldPos;
             instance.name = $"Tile_{coords.x}_{coords.z}_{coords.y}";
 
-            // 바닥에는 Collider가 있어야 Raycast가 됩니다. 프리팹 확인 필요.
             if (instance.GetComponent<Collider>() == null)
             {
-                instance.AddComponent<BoxCollider>(); // 임시 조치
+                instance.AddComponent<BoxCollider>();
             }
 
             _spawnedObjects.Add(instance);
@@ -156,12 +155,13 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         if (!isPillar)
         {
+            // 벽 회전 처리 (East/West는 90도 회전)
             instance.transform.rotation = (dir == Direction.North || dir == Direction.South)
                 ? Quaternion.identity
                 : Quaternion.Euler(0, 90, 0);
         }
 
-        // [Fix] 오브젝트의 최하단을 찾아 타일 표면(pos.y)에 맞춤
+        // 높이 보정
         AlignToGround(instance, pos.y);
 
         instance.name = isPillar ? $"Pillar_{coords}" : $"Wall_{coords}_{dir}";
@@ -171,7 +171,6 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
 
         structure.Initialize(coords, dir, hp, isPillar);
 
-        // 필요 시 Collider 확인
         if (instance.GetComponent<Collider>() == null)
         {
             instance.AddComponent<BoxCollider>();
@@ -183,26 +182,19 @@ public class TilemapGenerator : MonoBehaviour, IInitializable
         _spawnedObjects.Add(instance);
     }
 
-    // [New] 오브젝트의 Bounds.min.y를 계산하여 타겟 Y위치로 끌어올리는 헬퍼 함수
     private void AlignToGround(GameObject obj, float targetY)
     {
         var renderers = obj.GetComponentsInChildren<Renderer>();
         if (renderers.Length == 0) return;
 
-        // 1. 모든 자식 렌더러를 포함한 통합 Bounds 계산
         Bounds combinedBounds = renderers[0].bounds;
         for (int i = 1; i < renderers.Length; i++)
         {
             combinedBounds.Encapsulate(renderers[i].bounds);
         }
 
-        // 2. 현재 오브젝트의 최하단 Y좌표
         float currentMinY = combinedBounds.min.y;
-
-        // 3. 목표 높이와의 차이만큼 이동
         float diff = targetY - currentMinY;
-
-        // *주의* : transform.position을 직접 수정해야 함
         obj.transform.position += new Vector3(0, diff, 0);
     }
 

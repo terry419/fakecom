@@ -25,13 +25,13 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
 
         Debug.Log("[EnvironmentManager] Start Building Features...");
 
-        // MapManager의 모든 타일을 직접 순회 (좌표 계산 로직 제거)
+        // MapManager의 모든 타일 순회 (전수 조사)
         foreach (Tile tile in _mapManager.GetAllTiles())
         {
-            // 1. 기둥 생성
+            // 1. 기둥(Pillar) 처리
             ProcessPillar(tile);
 
-            // 2. 벽/창문 연결 (North, East 방향만 처리하여 중복 방지)
+            // 2. 벽/창문 처리 (North, East 방향만 처리하여 중복 생성 방지)
             LinkEdgesForTile(tile);
         }
 
@@ -42,17 +42,17 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
     {
         if (tile.InitialPillarID == PillarType.None) return;
 
-        // [Fix CS0019] 구조체는 null이 될 수 없으므로 null 체크 제거
+        // [Fix CS0019] 데이터 유무 확인 및 null 체크 수행
         var pillarData = _tileDataManager.GetPillarData(tile.InitialPillarID);
 
-        // 데이터 무결성 체크 (Prefab 존재 여부 확인)
+        // 유효성 체크 (Prefab 존재 여부 확인)
         if (pillarData.Prefab == null)
         {
             Debug.LogError($"[EnvManager] Pillar Data missing/invalid for ID: {tile.InitialPillarID}");
             return;
         }
 
-        // 디버그: (18, 6, 0) 타일 확인용
+        // 특정 좌표 디버깅: (18, 6, 0) 타일 로드 확인용
         if (tile.Coordinate.x == 18 && tile.Coordinate.z == 6)
         {
             Debug.Log($"<color=green>[EnvManager] Creating Pillar at {tile.Coordinate}: {tile.InitialPillarID}</color>");
@@ -66,10 +66,10 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
     {
         GridCoords pos = currentTile.Coordinate;
 
-        // [Fix] GridCoords 생성자 순서 (x, z, y) 준수
+        // [Fix] GridCoords 좌표계 (x, z, y) 해석 기준 적용
 
-        // 1. North Check (Z + 1)
-        // 생성자 2번째 인자가 z이므로 여기에 pos.z + 1 전달
+        // 1. North Check (Z + 1 방향 확인)
+        // 2번째 인자가 z이므로 여기에 pos.z + 1 대입
         GridCoords northPos = new GridCoords(pos.x, pos.z + 1, pos.y);
 
         if (_mapManager.HasTile(northPos))
@@ -77,8 +77,8 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
             ProcessEdge(currentTile, Direction.North, northPos, Direction.South);
         }
 
-        // 2. East Check (X + 1)
-        // 생성자 1번째 인자가 x이므로 여기에 pos.x + 1 전달
+        // 2. East Check (X + 1 방향 확인)
+        // 1번째 인자가 x이므로 여기에 pos.x + 1 대입
         GridCoords eastPos = new GridCoords(pos.x + 1, pos.z, pos.y);
 
         if (_mapManager.HasTile(eastPos))
@@ -89,16 +89,16 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
 
     private void ProcessEdge(Tile currentTile, Direction currentDir, GridCoords neighborPos, Direction neighborDir)
     {
-        // 내 타일의 Edge 정보 가져오기
+        // 현재 타일의 저장된 Edge 정보 가져오기
         SavedEdgeInfo info = currentTile.TempSavedEdges[(int)currentDir];
 
-        // 런타임 객체 생성
+        // 런타임용 Edge 객체 생성
         RuntimeEdge edge = new RuntimeEdge(info.Type, info.Cover, info.MaxHP, info.CurrentHP);
 
-        // 나에게 설정
+        // 현재 타일에 설정
         currentTile.SetSharedEdge(currentDir, edge);
 
-        // 이웃에게 설정 (공유)
+        // 이웃 타일에도 동일한 Edge 공유 설정 (데이터 동기화)
         Tile neighbor = _mapManager.GetTile(neighborPos);
         if (neighbor != null)
         {
@@ -115,7 +115,7 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
         if (edge != null && edge.Type != EdgeType.Open)
         {
             edge.TakeDamage(damage);
-            // 필요 시 시각적 갱신 로직 추가
+            // 필요 시 파괴 효과나 사운드 추가 가능
         }
     }
 }

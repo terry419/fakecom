@@ -1,10 +1,6 @@
 using UnityEngine;
-using System.Text.RegularExpressions;
-using System.Linq;
+using System.Collections.Generic;
 
-/// <summary>
-/// [Refactored] 좌표 파싱 의존성을 제거하고 수학적 계산(GridUtils)을 우선시한 개선된 테스터
-/// </summary>
 public class MapGameplayTester : MonoBehaviour
 {
     private MapManager _mapManager;
@@ -12,6 +8,9 @@ public class MapGameplayTester : MonoBehaviour
 
     private Camera _mainCamera;
     private Camera MainCamera => _mainCamera ?? (_mainCamera = Camera.main);
+
+    // [Fix 1] 누락되었던 레이어 마스크 변수 추가 (기본값: Everything)
+    [SerializeField] private LayerMask _layerMask = -1;
 
     private void Awake()
     {
@@ -31,32 +30,34 @@ public class MapGameplayTester : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.D)) TestDestruction();
     }
 
-    /// <summary>
-    /// [수정됨] 이름 파싱보다 GridUtils 수학 계산을 우선 사용하여 타일을 찾습니다.
-    /// </summary>
     private bool TryGetTileUnderCursor(out Tile tile)
     {
         tile = null;
-        Ray ray = MainCamera.ScreenPointToRay(Input.mousePosition);
+        var mapManager = ServiceLocator.Get<MapManager>();
+        if (mapManager == null) return false;
 
-        // 1. Raycast 실행
-        bool originalQueriesHitTriggers = Physics.queriesHitTriggers;
-        Physics.queriesHitTriggers = true; // 트리거(타일 바닥 등)도 감지
-        bool didHit = Physics.Raycast(ray, out RaycastHit hit, 1000f);
-        Physics.queriesHitTriggers = originalQueriesHitTriggers;
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, _layerMask))
+        {
+            // 월드 좌표 -> 그리드 좌표 변환
+            var gridCoords = mapManager.BasePosition.WorldToGridCoords(hit.point);
 
-        if (!didHit) return false;
+            // 1차 시도: 정확한 좌표 검색
+            tile = mapManager.GetTile(gridCoords);
 
-        // 2. [변경] 충돌 지점의 월드 좌표를 그리드 좌표로 변환 (가장 정확함)
-        // 이름 파싱은 비주얼 객체 이름이 변경되면 깨지므로, 수학적 계산을 우선합니다.
-        GridCoords targetCoords = GridUtils.WorldToGrid(hit.point);
+            // [Fix] 2차 시도: 만약 타일이 없고 높이(y)가 0보다 크다면, 바로 아래 칸을 검색
+            // (이유: 기둥이나 벽의 윗부분을 클릭하면 y값이 1 높게 나올 수 있음)
+            if (tile == null && gridCoords.y > mapManager.MinLevel)
+            {
+                var belowCoords = new GridCoords(gridCoords.x, gridCoords.z, gridCoords.y - 1);
+                tile = mapManager.GetTile(belowCoords);
 
-        // 3. 해당 좌표에 타일이 실제로 존재하는지 확인
-        tile = MapManager.GetTile(targetCoords);
-
-        // 4. (보정) 만약 null이라면, 혹시 벽면을 클릭했는지 확인하기 위해 
-        //    hit.normal을 이용해 인접 타일도 체크해볼 수 있으나, 현재는 정직하게 반환.
-
+                if (tile != null)
+                {
+                    Debug.Log($"[Tester] Raycast 보정됨: {gridCoords} -> {belowCoords} (구조물 상단 클릭 감지)");
+                }
+            }
+        }
         return tile != null;
     }
 
@@ -65,7 +66,7 @@ public class MapGameplayTester : MonoBehaviour
     private void PerformRaycastDiagnosis()
     {
         Ray ray = MainCamera.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
+        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _layerMask))
         {
             var coords = GridUtils.WorldToGrid(hit.point);
             Tile tile = MapManager.GetTile(coords);
@@ -87,23 +88,19 @@ public class MapGameplayTester : MonoBehaviour
     {
         if (TryGetTileUnderCursor(out Tile tile))
         {
-            // 상세 진단 로직 추가
             bool isWalkable = tile.IsWalkable;
             bool hasPillarData = tile.InitialPillarID != PillarType.None;
 
-            // 시각적(Log)으로 원인 분석
             string statusColor = isWalkable ? "green" : "red";
             string log = $"<color={statusColor}>[Walk Test] Coord: {tile.Coordinate}</color>\n" +
                          $" - <b>IsWalkable:</b> {isWalkable}\n" +
                          $" - <b>FloorID:</b> {tile.FloorID}\n" +
                          $" - <b>InitialPillarID:</b> {tile.InitialPillarID} (Data)\n";
 
-            // [핵심] 기둥 데이터는 있는데 Walkable이 true라면? -> EnvironmentManager가 일을 안 한 것.
             if (hasPillarData && isWalkable)
             {
                 log += $"<color=orange> [WARNING] 기둥 데이터({tile.InitialPillarID})가 존재하나 이동 가능합니다.\n" +
-                       $"EnvironmentManager.BuildMapFeatures()가 실행되었는지, \n" +
-                       $"혹은 기둥의 HP가 0인지 확인하십시오.</color>";
+                       $"EnvironmentManager.BuildMapFeatures()가 실행되었는지 확인하십시오.</color>";
             }
 
             Debug.Log(log);
@@ -118,13 +115,11 @@ public class MapGameplayTester : MonoBehaviour
     {
         if (TryGetTileUnderCursor(out Tile tile))
         {
-            // ... 기존 로직 유지 ...
             var envManager = ServiceLocator.Get<EnvironmentManager>();
             if (envManager != null)
             {
-                // 임시 테스트용 파괴 호출
-                Debug.Log($"Destruction Test at {tile.Coordinate}");
-                // 실제 구현 시: envManager.DamageStructureAt(...)
+                // 기둥 파괴 테스트
+
             }
         }
     }

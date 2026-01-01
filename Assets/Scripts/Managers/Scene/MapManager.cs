@@ -7,6 +7,9 @@ public class MapManager : MonoBehaviour, IInitializable
     private MapCatalogManager _catalogManager;
     private TilemapGenerator _tilemapGenerator;
 
+    // 초기화 여부 체크 변수
+    private bool _isInitialized = false;
+
     private Tile[,,] _tiles;
     public int GridWidth { get; private set; }
     public int GridDepth { get; private set; }
@@ -18,6 +21,7 @@ public class MapManager : MonoBehaviour, IInitializable
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Scene);
+        // 여기서 GetComponent를 하지 않습니다. (다른 오브젝트에 있을 수 있음)
     }
 
     private void OnDestroy()
@@ -25,15 +29,32 @@ public class MapManager : MonoBehaviour, IInitializable
         ServiceLocator.Unregister<MapManager>(ManagerScope.Scene);
     }
 
-    // [CS1998 해결] async 제거, 완료된 Task 반환
-    public UniTask Initialize(InitializationContext context)
+    public async UniTask Initialize(InitializationContext context)
     {
-        _catalogManager = ServiceLocator.Get<MapCatalogManager>();
-        _tilemapGenerator = ServiceLocator.Get<TilemapGenerator>();
-        return UniTask.CompletedTask;
+        if(_isInitialized==true) return;
+        // 1. MapCatalogManager 가져오기
+        if (!ServiceLocator.TryGet(out _catalogManager))
+        {
+            Debug.LogError("[MapManager] MapCatalogManager를 찾을 수 없습니다!");
+        }
+
+        // [Fix] TilemapGenerator는 SceneInitializer에 의해 이미 등록되어 있으므로
+        // ServiceLocator를 통해 가져옵니다. (AddComponent 방지)
+        if (!ServiceLocator.TryGet(out _tilemapGenerator))
+        {
+            Debug.LogError("[MapManager] TilemapGenerator가 ServiceLocator에 등록되지 않았습니다! SceneInitializer를 확인하세요.");
+            // 비상시가 아니면 AddComponent 하지 않음 (중복 등록 방지)
+        }
+
+        // 기존 로직 수행
+        if (context.MapData != null)
+        {
+            await LoadMap(context.MapData);
+        }
+
+        _isInitialized = true;
     }
 
-    // [CS1998 해결] async 제거
     public UniTask LoadMap(MapDataSO mapData)
     {
         if (mapData == null)
@@ -48,23 +69,18 @@ public class MapManager : MonoBehaviour, IInitializable
         MinLevel = mapData.MinLevel;
         LayerCount = (mapData.MaxLevel - mapData.MinLevel) + 1;
 
-        // [GridCoords 순서 확정] (x, z, y)
-        // MapDataSO.BasePosition은 Vector2Int(x, y)이므로, y값을 z 인자에 넣습니다.
-        // 3번째 인자(Height)에는 MinLevel을 넣습니다.
+        // BasePosition 설정
         BasePosition = new GridCoords(mapData.BasePosition.x, mapData.BasePosition.y, MinLevel);
 
         _tiles = new Tile[GridWidth, GridDepth, LayerCount];
 
-        // 2. 논리적 타일 데이터 생성
+        // 2. 타일 데이터 로드
         foreach (var tileData in mapData.Tiles)
         {
-            // [좌표 변환] BasePosition 오프셋 차감
-            // GridCoords의 필드: x, z(Depth), y(Height)
             int localX = tileData.Coords.x - BasePosition.x;
             int localZ = tileData.Coords.z - BasePosition.z;
             int localY = tileData.Coords.y - BasePosition.y;
 
-            // 배열 범위 체크
             if (localX >= 0 && localX < GridWidth &&
                 localZ >= 0 && localZ < GridDepth &&
                 localY >= 0 && localY < LayerCount)
@@ -75,6 +91,11 @@ public class MapManager : MonoBehaviour, IInitializable
             }
         }
 
+        // [Fix] 맵 로드 후, 맵 생성기(Visual) 실행 요청
+        // SetupState가 직접 호출하지 않고 여기서 호출하거나, 
+        // 혹은 SetupState가 TilemapGenerator를 호출하도록 구조를 유지해도 됩니다.
+        // 여기서는 데이터 로드만 담당하고, 비주얼 생성은 SetupState나 TilemapGenerator가 담당하는 것이 깔끔합니다.
+
         Debug.Log($"[MapManager] Map Loaded Successfully: {mapData.name}");
         return UniTask.CompletedTask;
     }
@@ -83,7 +104,6 @@ public class MapManager : MonoBehaviour, IInitializable
     {
         if (_tiles == null) return null;
 
-        // Global Coords -> Local Indices
         int localX = coords.x - BasePosition.x;
         int localZ = coords.z - BasePosition.z;
         int localY = coords.y - BasePosition.y;
@@ -95,13 +115,8 @@ public class MapManager : MonoBehaviour, IInitializable
         return _tiles[localX, localZ, localY];
     }
 
-    // 좌표 유효성 검사 헬퍼
-    public bool HasTile(GridCoords coords)
-    {
-        return GetTile(coords) != null;
-    }
+    public bool HasTile(GridCoords coords) => GetTile(coords) != null;
 
-    // [최적화] IEnumerable을 사용하여 GC Alloc 최소화
     public IEnumerable<Tile> GetAllTiles()
     {
         if (_tiles == null) yield break;
@@ -110,7 +125,6 @@ public class MapManager : MonoBehaviour, IInitializable
         int depth = _tiles.GetLength(1);
         int height = _tiles.GetLength(2);
 
-        // 3차원 배열 순회
         for (int x = 0; x < width; x++)
         {
             for (int z = 0; z < depth; z++)
@@ -118,10 +132,7 @@ public class MapManager : MonoBehaviour, IInitializable
                 for (int y = 0; y < height; y++)
                 {
                     Tile tile = _tiles[x, z, y];
-                    if (tile != null)
-                    {
-                        yield return tile;
-                    }
+                    if (tile != null) yield return tile;
                 }
             }
         }
