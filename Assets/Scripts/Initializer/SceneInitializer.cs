@@ -15,66 +15,75 @@ public class SceneInitializer : MonoBehaviour, IInitializable
     {
         bootLog.AppendLine("\n-- Scene Initialization Sequence --");
 
-        // 1. 자식 매니저 탐색
+        // 1. 매니저 탐색
         var sceneManagers = GetComponentsInChildren<IInitializable>(true)
             .Where(m => (UnityEngine.Object)m != this)
             .ToList();
 
-        if (sceneManagers.Count == 0)
-        {
-            bootLog.AppendLine("No scene managers found. Skipping.");
-            return;
-        }
-
-        // 2. 의존성 정렬
         var sortedManagers = SortManagersByDependency(sceneManagers);
 
-        // 3. 미션 정보 획득 (MissionManager)
+        // 2. [수정] 미션 정보 획득 로직 변경
         var missionMgr = ServiceLocator.Get<MissionManager>();
-        MapEntry entry;
 
-        if (missionMgr.SelectedMission.HasValue)
+        MapDataSO mapData = null;
+        TileRegistrySO biomeRegistry = null;
+
+        // A. 정식 미션이 선택된 경우 (MissionManager에 데이터가 있음)
+        if (missionMgr.SelectedMission != null) // [Fix] HasValue 제거, null 체크로 변경
         {
-            entry = missionMgr.SelectedMission.Value;
-            bootLog.AppendLine($"Mission Selected: {entry.MapID}");
+            var mission = missionMgr.SelectedMission;
+            bootLog.AppendLine($"Mission Selected: {mission.MissionName}");
+
+            // MissionDataSO가 이미 MapDataSO를 들고 있으므로 바로 사용
+            mapData = mission.MapData;
+
+            // MissionDataSO에 Biome 정보가 있다면 여기서 가져옴 (현재 구조상 없으면 null 처리)
+            // 추후 MissionDataSO에 TileRegistrySO 필드도 추가하는 것을 권장
         }
+        // B. 미션이 없는 경우 (테스트/Fallback) - 기존 MapEntry 방식 유지 (Catalog 사용)
         else
         {
-            bootLog.AppendLine("No mission selected. Attempting fallback...");
+            bootLog.AppendLine("No mission selected. Attempting fallback via Catalog...");
             var catalog = ServiceLocator.Get<MapCatalogManager>();
-            if (!catalog.TryGetRandomMapByDifficulty(1, out entry))
+
+            if (catalog.TryGetRandomMapByDifficulty(1, out MapEntry entry))
             {
-                throw new BootstrapException("Failed to find any fallback map in Catalog.");
+                bootLog.AppendLine($"Fallback Map Entry Found: {entry.MapID}");
+                bootLog.AppendLine($"- Loading Assets via Addressables...");
+
+                // Addressable 로드
+                var mapLoadTask = entry.MapDataRef.LoadAssetAsync().ToUniTask();
+                var biomeLoadTask = (entry.BiomeRegistryRef != null && entry.BiomeRegistryRef.RuntimeKeyIsValid())
+                    ? entry.BiomeRegistryRef.LoadAssetAsync().ToUniTask()
+                    : UniTask.FromResult<TileRegistrySO>(null);
+
+                var results = await UniTask.WhenAll(mapLoadTask, biomeLoadTask);
+                mapData = results.Item1;
+                biomeRegistry = results.Item2;
             }
-            bootLog.AppendLine($"Fallback Map Loaded: {entry.MapID}");
+            else
+            {
+                // Catalog에도 없으면 MissionManager의 Inspector Fallback 확인
+                // (이 부분은 MissionManager.Start에서 처리하므로 여기선 에러일 수 있음)
+                // 하지만 로직 안전을 위해 null 체크 후 진행
+            }
         }
 
-        // 4. [Fix] 맵 데이터 & 타일셋 병렬 로드 (에러 수정됨)
-        bootLog.AppendLine($"- Loading Assets for {entry.MapID}...");
-
-        var mapLoadTask = entry.MapDataRef.LoadAssetAsync().ToUniTask();
-
-        // BiomeRegistryRef가 있으면 로드, 없으면 null 리턴 태스크
-        UniTask<TileRegistrySO> biomeLoadTask = UniTask.FromResult<TileRegistrySO>(null);
-        if (entry.BiomeRegistryRef != null && entry.BiomeRegistryRef.RuntimeKeyIsValid())
+        // 3. 맵 데이터 검증
+        if (mapData == null)
         {
-            biomeLoadTask = entry.BiomeRegistryRef.LoadAssetAsync().ToUniTask();
+            throw new BootstrapException("Failed to load MapData! No Mission selected and no Fallback found.");
         }
 
-        // [핵심 수정] WhenAll의 결과를 튜플로 한 번에 받습니다. (개별 Task 재접근 금지)
-        var (mapData, biomeRegistry) = await UniTask.WhenAll(mapLoadTask, biomeLoadTask);
-
-        if (mapData == null) throw new BootstrapException($"Failed to load MapData for {entry.MapID}");
-
-        // 5. 씬 컨텍스트 생성
+        // 4. 씬 컨텍스트 생성
         var sceneContext = new InitializationContext
         {
             Scope = ManagerScope.Scene,
             MapData = mapData,
-            Registry = biomeRegistry // TileDataManager로 전달됨 (null일 수도 있음)
+            Registry = biomeRegistry // null일 경우 기본값 사용됨
         };
 
-        // 6. 매니저 초기화 루프
+        // 5. 매니저 초기화 루프
         foreach (var manager in sortedManagers)
         {
             var managerName = manager.GetType().Name;
@@ -89,10 +98,15 @@ public class SceneInitializer : MonoBehaviour, IInitializable
                 throw new BootstrapException($"Failed to initialize scene manager '{managerName}'.", ex);
             }
         }
+
+        // 6. [중요] MissionManager에게 "준비 끝, 미션 시작해" 신호 보내기 (옵션)
+        // missionMgr.StartMissionAsync().Forget(); // 이미 Start()에서 호출되므로 생략 가능하나 순서상 여기가 맞음
     }
 
+    // ... SortManagersByDependency는 기존 유지 ...
     private List<IInitializable> SortManagersByDependency(List<IInitializable> managers)
     {
+        // (기존 코드와 동일)
         var managerMap = managers.ToDictionary(m => m.GetType(), m => m);
         var graph = managerMap.Keys.ToDictionary(t => t, t => new List<Type>());
         var inDegree = managerMap.Keys.ToDictionary(t => t, t => 0);
@@ -127,7 +141,7 @@ public class SceneInitializer : MonoBehaviour, IInitializable
             }
         }
 
-        if (sortedList.Count != managers.Count) return managers; // 순환 의존성 시 원본 반환
+        if (sortedList.Count != managers.Count) return managers;
         return sortedList;
     }
 }

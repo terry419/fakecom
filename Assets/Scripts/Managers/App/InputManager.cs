@@ -1,103 +1,113 @@
-using UnityEngine;
 using System;
+using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.EventSystems;
-using Cysharp.Threading.Tasks;
+using UnityEngine.EventSystems; // Issue #3 해결을 위해 추가
 
-public class InputManager : MonoBehaviour, IInitializable, GameInput.IPlayerActions
+public class InputManager : MonoBehaviour, IInitializable
 {
-    // ========================================================================
-    // 1. 이벤트 정의 (Naming Collision 해결)
-    // ========================================================================
-    public event Action<Vector2> OnSelectInput;   // 좌클릭
-    public event Action<Vector2> OnCommandInput;  // 우클릭
-    public event Action OnCancelInput;            // 취소
+    // [GDD 6.1] 하드웨어 입력을 게임 Action으로 변환하여 전파
+    public event Action<Vector2> OnCommandInput; // 클릭/선택 (좌표 포함)
+    public event Action<Vector2> OnMouseMove;    // 마우스 이동
 
-    // 내부 변수
-    private GameInput _gameInput;
-    private bool _isPointerOverUI = false; // [Fix 5] UI 상태 캐싱
+    // New Input System 액션 정의
+    private InputAction _clickAction;
+    private InputAction _pointAction; // 마우스 포인터 위치
 
-    // ========================================================================
-    // 2. 초기화 및 생명주기 (Dispose 추가)
-    // ========================================================================
+    private bool _isInputActive = false; // 초기값 false (Initialize에서 켜짐)
+
     private void Awake()
     {
+        if (ServiceLocator.IsRegistered<InputManager>())
+        {
+            Destroy(gameObject);
+            return;
+        }
         ServiceLocator.Register(this, ManagerScope.Global);
-        _gameInput = new GameInput();
-        _gameInput.Player.SetCallbacks(this);
     }
-
-    private void OnEnable() => _gameInput.Player.Enable();
-    private void OnDisable() => _gameInput.Player.Disable();
 
     private void OnDestroy()
     {
-        // [Fix 4] 메모리 누수 방지
-        _gameInput?.Dispose();
-        ServiceLocator.Unregister<InputManager>(ManagerScope.Global);
+        // 액션 해제 및 메모리 정리
+        _clickAction?.Dispose();
+        _pointAction?.Dispose();
+
+        if (ServiceLocator.IsRegistered<InputManager>())
+            ServiceLocator.Unregister<InputManager>(ManagerScope.Global);
     }
 
-    public UniTask Initialize(InitializationContext context) => UniTask.CompletedTask;
+    public Cysharp.Threading.Tasks.UniTask Initialize(InitializationContext context)
+    {
+        SetupInputActions();
 
-    // ========================================================================
-    // 3. UI 상태 캐싱 (Performance Optimization)
-    // ========================================================================
+        // [Issue #1 해결] Setup에서는 정의만 하고, 여기서 명시적으로 활성화
+        ResumeInput();
+
+        Debug.Log("[InputManager] Initialized with New Input System.");
+        return Cysharp.Threading.Tasks.UniTask.CompletedTask;
+    }
+
+    private void SetupInputActions()
+    {
+        // 1. 클릭 액션 (PC 좌클릭 + 게임패드 A버튼)
+        _clickAction = new InputAction(name: "Click", type: InputActionType.Button);
+        _clickAction.AddBinding("<Mouse>/leftButton");
+        _clickAction.AddBinding("<Gamepad>/buttonSouth"); // Xbox 'A'
+
+        // 2. 포인터 위치 액션 (마우스 좌표)
+        _pointAction = new InputAction(name: "Point", type: InputActionType.Value);
+        _pointAction.AddBinding("<Mouse>/position");
+
+        // 3. 이벤트 연결
+        _clickAction.performed += OnClickPerformed;
+
+        // [Issue #1 해결] 여기서 .Enable()을 호출하지 않음. SetInputActive에서 관리.
+    }
+
     private void Update()
     {
-        // [Fix 5] 매 입력마다 EventSystem을 호출하지 않고, 프레임당 1회만 체크
-        if (EventSystem.current != null)
-        {
-            _isPointerOverUI = EventSystem.current.IsPointerOverGameObject();
-        }
+        if (!_isInputActive) return;
+
+        // 마우스 이동 이벤트 매 프레임 발생
+        // [Issue #4] PointAction은 Value 타입이므로 ReadValue가 효율적
+        OnMouseMove?.Invoke(_pointAction.ReadValue<Vector2>());
     }
 
-    // ========================================================================
-    // 4. GameInput 인터페이스 구현 (Callback)
-    // ========================================================================
-
-    // [Fix 1] 메서드 이름(OnSelect)과 이벤트 이름(OnSelectInput) 분리
-    public void OnSelect(InputAction.CallbackContext context)
+    private void OnClickPerformed(InputAction.CallbackContext ctx)
     {
-        if (context.performed && !_isPointerOverUI)
+        if (!_isInputActive) return;
+
+        // [Issue #3 해결] Null 조건 연산자(?.)로 EventSystem 체크 간소화
+        if (EventSystem.current?.IsPointerOverGameObject() == true)
         {
-            OnSelectInput?.Invoke(GetPointerPosition());
+            return;
         }
+
+        // 클릭 시점의 좌표 가져오기
+        Vector2 mousePos = _pointAction.ReadValue<Vector2>();
+        Debug.Log($"[InputManager] Command Input Detected at {mousePos}");
+
+        OnCommandInput?.Invoke(mousePos);
     }
 
-    public void OnCommand(InputAction.CallbackContext context)
+    // [Issue #2 해결] API 명확화: Pause / Resume 제공
+    public void PauseInput() => SetInputActive(false);
+    public void ResumeInput() => SetInputActive(true);
+
+    private void SetInputActive(bool active)
     {
-        if (context.performed && !_isPointerOverUI)
-        {
-            OnCommandInput?.Invoke(GetPointerPosition());
-        }
-    }
+        // [Issue #1 해결] 상태가 변할 때만 Enable/Disable 수행
+        if (_isInputActive == active) return;
 
-    public void OnCancel(InputAction.CallbackContext context)
-    {
-        if (context.performed)
+        _isInputActive = active;
+        if (active)
         {
-            OnCancelInput?.Invoke();
+            _clickAction?.Enable();
+            _pointAction?.Enable();
         }
-    }
-
-    // ========================================================================
-    // 5. 안전한 포인터 위치 가져오기
-    // ========================================================================
-    private Vector2 GetPointerPosition()
-    {
-        // [Fix 2] Mouse.current가 null일 경우(패드 연결 등) 대비
-        if (Mouse.current != null)
+        else
         {
-            return Mouse.current.position.ReadValue();
+            _clickAction?.Disable();
+            _pointAction?.Disable();
         }
-
-        // 터치나 펜 등 다른 포인터 장치 시도
-        if (Pointer.current != null)
-        {
-            return Pointer.current.position.ReadValue();
-        }
-
-        // 아무것도 없으면 화면 중앙 반환 (예외 방지)
-        return new Vector2(Screen.width / 2f, Screen.height / 2f);
     }
 }

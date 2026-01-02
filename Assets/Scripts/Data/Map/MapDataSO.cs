@@ -1,9 +1,8 @@
-// 파일: Assets/Scripts/Data/Map/MapDataSO.cs
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-[CreateAssetMenu(fileName = "NewMapData", menuName = "Data/Map/MapData")]
+[CreateAssetMenu(fileName = "NewMapData", menuName = "YCOM/Data/MapData")]
 public class MapDataSO : ScriptableObject
 {
     [Header("1. Environment")]
@@ -16,12 +15,10 @@ public class MapDataSO : ScriptableObject
     public int MaxLevel = 5;
 
     [Header("2. Tile Data")]
+    // 기존 구조 유지: TileSaveData 안에 RoleTag가 포함되어 있음
     public List<TileSaveData> Tiles = new List<TileSaveData>();
 
-    // [Deprecated] SpawnPoints는 더 이상 사용하지 않음 (RoleTag로 대체)
-    [HideInInspector]
-    public List<SpawnPointData> SpawnPoints;
-
+    // [Validation] 기존 로직 유지 (중복 태그 검사 포함)
     public bool Validate(out string error)
     {
         if (Tiles == null || Tiles.Count == 0)
@@ -35,7 +32,7 @@ public class MapDataSO : ScriptableObject
             return false;
         }
 
-        // [New] RoleTag 중복 검증 필수
+        // RoleTag 중복 검증 (필수)
         var roleTagSet = new HashSet<string>();
         foreach (var tile in Tiles)
         {
@@ -53,19 +50,25 @@ public class MapDataSO : ScriptableObject
         return true;
     }
 
-    // [New] 메서드명 명확화: 유일한 Role 위치 반환
-    public bool TryGetRoleLocation(string roleTag, out Vector2Int coordinate)
-    {
-        coordinate = Vector2Int.zero;
-        if (string.IsNullOrEmpty(roleTag)) return false;
+    // ========================================================================
+    // [추가] MissionManager가 사용할 좌표 조회 메서드
+    // ========================================================================
 
-        // 리스트 순회 (RoleTag는 유일하므로 찾으면 즉시 반환)
+    /// <summary>
+    /// 특정 RoleTag를 가진 타일의 GridCoords를 반환합니다.
+    /// </summary>
+    public bool TryGetTaggedCoords(string tag, out GridCoords coords)
+    {
+        coords = default;
+        if (string.IsNullOrEmpty(tag) || Tiles == null) return false;
+
+        // Tiles 리스트에서 RoleTag가 일치하는 녀석을 찾음
         foreach (var tile in Tiles)
         {
-            if (tile.RoleTag == roleTag)
+            if (tile.RoleTag == tag)
             {
-                // [주석 명확화] GridCoords는 3D (x, y, z)인데, y는 높이이므로 무시하고 xz 평면 좌표만 사용
-                coordinate = new Vector2Int(tile.Coords.x, tile.Coords.z);
+                // TileSaveData의 좌표(Vector3Int)를 GridCoords로 변환
+                coords = new GridCoords(tile.Coords.x, tile.Coords.z, tile.Coords.y);
                 return true;
             }
         }

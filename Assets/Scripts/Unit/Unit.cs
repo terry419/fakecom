@@ -1,10 +1,8 @@
-using Cysharp.Threading.Tasks; // UniTask 사용
+using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
-// [Body] 데이터와 행동 수행만 담당 (판단 로직 X)
 public class Unit : MonoBehaviour, ITileOccupant
 {
     // ========================================================================
@@ -17,14 +15,21 @@ public class Unit : MonoBehaviour, ITileOccupant
     public int CurrentAP { get; private set; }
     public int MaxAP { get; private set; }
 
-    // 영혼(Controller) 참조
+    // 턴 내에서 현재 남아있는 이동력
+    public int CurrentMobility { get; private set; }
+    // 이번 턴에 이동 행동을 개시했는지 여부
+    public bool HasStartedMoving { get; private set; }
+
+    public int Mobility => Data != null ? Data.Mobility : 5;
+
     private IUnitController _controller;
     public IUnitController Controller => _controller;
 
     private Collider _collider;
 
-    [Header("Settings")]
-    [SerializeField] private float _moveSpeed = 5.0f;
+    [Header("Movement Settings")]
+    [SerializeField] private float _moveSpeed = 3.0f;
+    [SerializeField] private float _rotateSpeed = 15.0f;
 
     // ========================================================================
     // 2. ITileOccupant 구현
@@ -33,8 +38,8 @@ public class Unit : MonoBehaviour, ITileOccupant
     public bool IsBlockingMovement => true;
     public bool IsCover => false;
 
-    public event Action<bool> OnBlockingChanged;
-    public event Action<bool> OnCoverChanged;
+    public event Action<bool> OnBlockingChanged = delegate { };
+    public event Action<bool> OnCoverChanged = delegate { };
 
     // ========================================================================
     // 3. 초기화 및 스폰
@@ -54,8 +59,15 @@ public class Unit : MonoBehaviour, ITileOccupant
         {
             CurrentHP = Data.MaxHP;
             MaxAP = Data.MaxAP;
-            CurrentAP = 0;
+            CurrentAP = MaxAP;
         }
+        else
+        {
+            MaxAP = 2;
+            CurrentAP = 2;
+        }
+
+        ResetState();
     }
 
     public void SpawnOnMap(GridCoords coords)
@@ -68,62 +80,23 @@ public class Unit : MonoBehaviour, ITileOccupant
             throw new ArgumentException($"[{nameof(Unit)}] Invalid Spawn Coords: {coords}");
 
         tile.AddOccupant(this);
+
+        Vector3 worldPos = GridUtils.GridToWorld(coords);
+        float targetY = GetTargetHeight(worldPos.y);
+        transform.position = new Vector3(worldPos.x, targetY, worldPos.z);
     }
 
     public void OnAddedToTile(Tile tile)
     {
         Coordinate = tile.Coordinate;
-
-        // 1. 기본 위치 이동 (XZ 기준)
-        Vector3 targetPos = GridUtils.GridToWorld(tile.Coordinate);
-        transform.position = targetPos;
-
-        // 2. 높이 정밀 보정 (Surface Snap)
-        AdjustVerticalPosition(targetPos.y);
-
         if (Data != null)
             gameObject.name = $"{Data.UnitName}_{Coordinate}";
-    }
-
-    // 콜라이더 크기에 맞춰 발바닥을 바닥(surfaceY)에 딱 붙이는 로직
-    private void AdjustVerticalPosition(float surfaceY)
-    {
-        if (_collider == null) return;
-
-        float bottomOffset = 0f;
-
-        if (_collider is BoxCollider box)
-        {
-            bottomOffset = (box.center.y - box.size.y * 0.5f) * transform.lossyScale.y;
-        }
-        else if (_collider is CapsuleCollider capsule)
-        {
-            bottomOffset = (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y;
-        }
-
-        // 목표 위치 = 표면 높이 - 발바닥 오프셋
-        float targetY = surfaceY - bottomOffset;
-        transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
-    }
-
-    // 이동 중에 목표 Y값을 계산하는 헬퍼 (AdjustVerticalPosition과 동일 로직)
-    private float GetTargetHeight(float surfaceY)
-    {
-        if (_collider == null) return surfaceY + 0.05f; // 콜라이더 없으면 살짝 띄움
-
-        float bottomOffset = 0f;
-        if (_collider is BoxCollider box)
-            bottomOffset = (box.center.y - box.size.y * 0.5f) * transform.lossyScale.y;
-        else if (_collider is CapsuleCollider capsule)
-            bottomOffset = (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y;
-
-        return surfaceY - bottomOffset;
     }
 
     public void OnRemovedFromTile(Tile tile) { }
 
     // ========================================================================
-    // 5. 컨트롤러 연결 (빙의 시스템 핵심)
+    // 4. 컨트롤러 연결
     // ========================================================================
 
     public void SetController(IUnitController controller)
@@ -135,58 +108,92 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public async UniTask OnTurnStart()
     {
+        ResetAP();
         if (_controller != null) await _controller.OnTurnStart();
     }
+
     public void OnTurnEnd() => _controller?.OnTurnEnd();
 
     // ========================================================================
-    // 6. 상태 관리
+    // 5. 이동 및 행동 로직
     // ========================================================================
+
+    // [Issue #1] 로직 중복 제거를 위한 Helper 메서드
+    public int GetAvailableMoveDistance()
+    {
+        if (HasStartedMoving)
+            return CurrentMobility;
+        else
+            return (CurrentAP >= 1) ? Mobility : 0;
+    }
 
     public async UniTask MovePathAsync(List<GridCoords> path, MapManager mapManager)
     {
         if (path == null || path.Count == 0) return;
 
+        // 1. 이동 시작 전 AP 선불 차감 처리
+        if (!HasStartedMoving)
+        {
+            if (CurrentAP < 1)
+            {
+                Debug.LogWarning("Not enough AP to start moving.");
+                return;
+            }
+            ConsumeAP(1);
+            HasStartedMoving = true;
+        }
+
+        // 2. [Issue #2] 거리 검증 추가 (Critical)
+        int distance = path.Count;
+        if (distance > CurrentMobility)
+        {
+            Debug.LogError($"[Unit] Invalid Move: Path distance ({distance}) > Current Mobility ({CurrentMobility}). Move rejected.");
+            return;
+        }
+
+        // 3. 이동력 차감
+        CurrentMobility -= distance;
+
+        float speed = _moveSpeed > 0 ? _moveSpeed : 3.0f;
+
         foreach (var nextCoords in path)
         {
-            // [Priority 3] 이동 경로상 장애물(다른 유닛 등) 체크
             Tile nextTile = mapManager.GetTile(nextCoords);
-            // Tile.Occupants가 IReadOnlyList로 변경되었으므로 .Count 사용 가능
-            if (nextTile != null && nextTile.Occupants.Count > 0)
-            {
-                Debug.LogWarning($"Path blocked at {nextCoords}");
-                break;
-            }
-
-            // 1. 점유 상태 갱신
             Tile currentTile = mapManager.GetTile(Coordinate);
-            if (currentTile != null)
-            {
-                try { currentTile.RemoveOccupant(this); }
-                catch { /* 로그 생략 */ }
-            }
 
+            if (currentTile != null) currentTile.RemoveOccupant(this);
             if (nextTile != null) nextTile.AddOccupant(this);
 
-            Coordinate = nextCoords;
-
-            // 2. 물리적 이동 (애니메이션)
             Vector3 targetPos = GridUtils.GridToWorld(nextCoords);
-
-            // [Fix] 하드코딩(0.05f) 대신 콜라이더 기준 높이 계산 적용
             targetPos.y = GetTargetHeight(targetPos.y);
 
-            // 부드러운 이동
+            Vector3 direction = (targetPos - transform.position).normalized;
+            if (direction != Vector3.zero)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+                RotateTo(targetRot).Forget();
+            }
+
             while (Vector3.Distance(transform.position, targetPos) > 0.05f)
             {
-                transform.position = Vector3.MoveTowards(transform.position, targetPos, _moveSpeed * Time.deltaTime);
+                transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
                 await UniTask.Yield();
             }
-            transform.position = targetPos; // 오차 보정
-
-            // 3. AP 차감
-            ConsumeAP(1);
+            transform.position = targetPos;
         }
+    }
+
+    private async UniTaskVoid RotateTo(Quaternion targetRot)
+    {
+        float t = 0;
+        Quaternion startRot = transform.rotation;
+        while (t < 1f)
+        {
+            t += Time.deltaTime * _rotateSpeed;
+            transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
+            await UniTask.Yield();
+        }
+        transform.rotation = targetRot;
     }
 
     public void ConsumeAP(int amount)
@@ -196,7 +203,14 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public void ResetAP()
     {
-        CurrentAP = MaxAP > 0 ? MaxAP : 2; // 데이터 없으면 임시 2
+        CurrentAP = MaxAP > 0 ? MaxAP : 2;
+        ResetState();
+    }
+
+    private void ResetState()
+    {
+        CurrentMobility = Mobility;
+        HasStartedMoving = false;
     }
 
     public void TakeDamage(int damage)
@@ -207,6 +221,16 @@ public class Unit : MonoBehaviour, ITileOccupant
             Debug.Log($"Unit {name} died.");
             Destroy(gameObject);
         }
+    }
+
+    // ========================================================================
+    // 6. 유틸리티
+    // ========================================================================
+
+    private float GetTargetHeight(float surfaceY)
+    {
+        if (_collider == null) return surfaceY;
+        return surfaceY + _collider.bounds.extents.y;
     }
 
     private void OnDestroy()

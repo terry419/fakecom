@@ -1,9 +1,9 @@
-// 경로: Assets/Scripts/Controllers/PlayerController.cs
 using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.InputSystem; // New Input System
 
 public class PlayerController : MonoBehaviour, IUnitController
 {
@@ -13,6 +13,7 @@ public class PlayerController : MonoBehaviour, IUnitController
     private MapManager _mapManager;
     private InputManager _inputManager;
     private PathVisualizer _pathVisualizer;
+    private CameraController _cameraController;
 
     private bool _isMyTurn = false;
     private bool _turnEnded = false;
@@ -21,9 +22,12 @@ public class PlayerController : MonoBehaviour, IUnitController
     private HashSet<GridCoords> _cachedReachableTiles;
     private GridCoords _lastHoveredCoords;
 
-    // 경로를 두 개로 분리하여 관리
-    private List<GridCoords> _validPathStep;    // 갈 수 있는 길
-    private List<GridCoords> _invalidPathStep;  // AP 부족으로 못 가는 길
+    private List<GridCoords> _validPathStep;
+    private List<GridCoords> _invalidPathStep;
+
+    // [성능 최적화] 경로 계산 스로틀링용 변수
+    private float _lastPathCalcTime;
+    private const float PATH_CALC_INTERVAL = 0.1f;
 
     private void Awake()
     {
@@ -36,6 +40,16 @@ public class PlayerController : MonoBehaviour, IUnitController
         ServiceLocator.TryGet(out _mapManager);
         ServiceLocator.TryGet(out _inputManager);
         ServiceLocator.TryGet(out _pathVisualizer);
+
+        if (ServiceLocator.TryGet(out _cameraController))
+        {
+            _cameraController.SetTarget(unit.transform);
+        }
+        else
+        {
+            _cameraController = FindObjectOfType<CameraController>();
+            if (_cameraController != null) _cameraController.SetTarget(unit.transform);
+        }
 
         Debug.Log($"[PlayerController] Possessed Unit: {unit.name}");
     }
@@ -53,7 +67,7 @@ public class PlayerController : MonoBehaviour, IUnitController
     {
         if (PossessedUnit == null) return;
 
-        Debug.Log($"[PlayerController] Turn Start: {PossessedUnit.name} (AP: {PossessedUnit.CurrentAP})");
+        Debug.Log($"[PlayerController] Turn Start: {PossessedUnit.name}");
 
         _isMyTurn = true;
         _turnEnded = false;
@@ -64,29 +78,32 @@ public class PlayerController : MonoBehaviour, IUnitController
 
         await _turnCompletionSource.Task;
 
-        Debug.Log("[PlayerController] Turn Finished Task Awaited.");
+        Debug.Log("[PlayerController] Turn Finished.");
         DisconnectInput();
         CleanupVisuals();
     }
 
-    public void OnTurnEnd()
-    {
-        Debug.Log("[PlayerController] OnTurnEnd Called.");
-        _isMyTurn = false;
-    }
+    public void OnTurnEnd() => _isMyTurn = false;
 
     private void Update()
     {
         if (!_isMyTurn || _turnEnded || PossessedUnit == null) return;
-        UpdateMouseHover();
+
+        // [성능 최적화] 매 프레임 계산 방지 (0.1초 간격)
+        if (Time.time - _lastPathCalcTime < PATH_CALC_INTERVAL) return;
+        _lastPathCalcTime = Time.time;
+
+        // New Input System에서 마우스 위치 가져오기
+        Vector2 mousePos = Mouse.current.position.ReadValue();
+        UpdateMouseHover(mousePos);
     }
 
-    // [Hybrid Path Logic] AP 기준으로 경로를 파랑/빨강으로 나눔
-    private void UpdateMouseHover()
+    // [유연성 개선] 인자로 좌표를 받도록 수정
+    private void UpdateMouseHover(Vector2 screenPos)
     {
-        if (!GetGridFromScreen(Input.mousePosition, out GridCoords targetCoords))
+        // GetGridFromScreen도 인자를 받도록 변경됨
+        if (!GetGridFromScreen(screenPos, out GridCoords targetCoords))
         {
-            // 타일 밖으로 나감
             if (_validPathStep != null || _invalidPathStep != null)
             {
                 _validPathStep = null;
@@ -100,7 +117,6 @@ public class PlayerController : MonoBehaviour, IUnitController
         if (targetCoords.Equals(_lastHoveredCoords)) return;
         _lastHoveredCoords = targetCoords;
 
-        // 1. 전체 경로 계산
         List<GridCoords> fullPath = Pathfinder.FindPath(PossessedUnit.Coordinate, targetCoords, _mapManager);
 
         if (fullPath == null || fullPath.Count == 0)
@@ -109,16 +125,12 @@ public class PlayerController : MonoBehaviour, IUnitController
             return;
         }
 
-        // 2. AP 기준으로 경로 분할 (Hybrid Logic)
-        int currentAP = PossessedUnit.CurrentAP;
+        // [Issue #1] Unit에 위임한 로직 사용
+        int availableMove = PossessedUnit.GetAvailableMoveDistance();
 
-        // Take: 앞에서부터 AP만큼 (이동 가능)
-        _validPathStep = fullPath.Take(currentAP).ToList();
+        _validPathStep = fullPath.Take(availableMove).ToList();
+        _invalidPathStep = fullPath.Skip(availableMove).ToList();
 
-        // Skip: AP 이후 나머지 (이동 불가)
-        _invalidPathStep = fullPath.Skip(currentAP).ToList();
-
-        // 3. 시각화 요청
         _pathVisualizer?.ShowHybridPath(_validPathStep, _invalidPathStep);
     }
 
@@ -126,54 +138,40 @@ public class PlayerController : MonoBehaviour, IUnitController
     {
         if (_mapManager == null || PossessedUnit == null) return;
 
-        Debug.Log("[PlayerController] Calculating Reachable Area...");
-        _cachedReachableTiles = Pathfinder.GetReachableTiles(PossessedUnit.Coordinate, PossessedUnit.CurrentAP, _mapManager);
+        // [Issue #1] Unit에 위임한 로직 사용 (중복 제거)
+        int range = PossessedUnit.GetAvailableMoveDistance();
 
-        Debug.Log($"[PlayerController] Reachable Tiles Count: {_cachedReachableTiles?.Count ?? 0}");
+        Debug.Log($"[PlayerController] Calc Reachable. Range:{range}");
+
+        _cachedReachableTiles = Pathfinder.GetReachableTiles(PossessedUnit.Coordinate, range, _mapManager);
         _pathVisualizer?.ShowReachable(_cachedReachableTiles, excludeCoords: PossessedUnit.Coordinate);
     }
 
     private void ConnectInput()
     {
         if (_inputManager == null) return;
-        _inputManager.OnCommandInput -= HandleCommand; // 중복 방지
+        _inputManager.OnCommandInput -= HandleCommand;
         _inputManager.OnCommandInput += HandleCommand;
-        Debug.Log("[PlayerController] Input Connected.");
     }
 
     private void DisconnectInput()
     {
         if (_inputManager == null) return;
         _inputManager.OnCommandInput -= HandleCommand;
-        Debug.Log("[PlayerController] Input Disconnected.");
     }
 
     private void HandleCommand(Vector2 screenPos)
     {
-        if (!_isMyTurn || _turnEnded)
-        {
-            Debug.LogWarning("[PlayerController] Click ignored: Not my turn or turn ended.");
-            return;
-        }
+        if (!_isMyTurn || _turnEnded) return;
 
-        // 1. 클릭한 곳이 유효한 경로(파란색) 끝점인지 확인
-        //    (간단한 처리를 위해, 유효 경로가 존재하고 빨간 경로가 없을 때만 이동 허용)
         if (_validPathStep != null && _validPathStep.Count > 0)
         {
-            // 클릭한 지점이 '이동 불가' 영역에 포함되어 있다면?
-            // (즉, 마우스가 빨간 경로 위에 있다면 이동 불가 처리)
             if (_invalidPathStep != null && _invalidPathStep.Count > 0)
             {
-                Debug.Log("[PlayerController] Cannot move: Target is too far (Not enough AP).");
+                Debug.LogWarning("Target is too far!");
                 return;
             }
-
-            Debug.Log($"[PlayerController] Executing Move. Steps: {_validPathStep.Count}");
             ExecuteMove(_validPathStep).Forget();
-        }
-        else
-        {
-            Debug.Log("[PlayerController] No valid path to move.");
         }
     }
 
@@ -186,23 +184,20 @@ public class PlayerController : MonoBehaviour, IUnitController
 
             await PossessedUnit.MovePathAsync(path, _mapManager);
 
-            Debug.Log($"[PlayerController] Move Complete. Remaining AP: {PossessedUnit.CurrentAP}");
-
             if (PossessedUnit.CurrentAP <= 0)
             {
-                Debug.Log("[PlayerController] AP Depleted. Ending Turn.");
+                Debug.Log("AP Depleted -> Turn End");
                 EndTurn();
             }
             else
             {
-                // 아직 AP 남음 -> 다시 입력 대기
                 CalculateReachableArea();
                 ConnectInput();
             }
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[PlayerController] Move Error: {ex.Message}\n{ex.StackTrace}");
+            Debug.LogError($"[PlayerController] Move Error: {ex.Message}");
             EndTurn();
         }
     }
@@ -215,18 +210,16 @@ public class PlayerController : MonoBehaviour, IUnitController
         _pathVisualizer?.ClearAll();
     }
 
+    // [유연성 개선] 외부 인자(screenPos)를 받도록 롤백
     private bool GetGridFromScreen(Vector2 screenPos, out GridCoords coords)
     {
         coords = default;
         if (_mainCamera == null || _mapManager == null) return false;
 
         Ray ray = _mainCamera.ScreenPointToRay(screenPos);
-        // 레이어 마스크 제거 (모든 충돌체 검사)
+
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
         {
-            // Debug: 무엇에 맞았는지 확인하고 싶다면 주석 해제
-            // Debug.DrawLine(_mainCamera.transform.position, hit.point, Color.yellow, 0.1f);
-
             coords = GridUtils.WorldToGrid(hit.point);
             return _mapManager.HasTile(coords);
         }
