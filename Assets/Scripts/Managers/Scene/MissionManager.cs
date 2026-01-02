@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using UnityEngine;
-using YCOM.Mission; // [Fix] MissionDataSO 네임스페이스 참조
 
 public class MissionManager : MonoBehaviour, IInitializable
 {
@@ -41,15 +40,18 @@ public class MissionManager : MonoBehaviour, IInitializable
         }
 
         if (SelectedMission != null) StartMissionAsync().Forget();
-        else Debug.LogError("[MissionManager] No MissionDataSO assigned!");
+        else Debug.LogError("[MissionManager] MissionDataSO가 할당되지 않았습니다!");
     }
 
     public async UniTaskVoid StartMissionAsync()
     {
-        // 1. 필수 시스템 확보 (UnitManager, MapManager 등)
-        if (!ServiceLocator.TryGet(out _unitManager) || !ServiceLocator.TryGet(out _mapManager)) return;
+        // 1. 필수 시스템 확인
+        if (!ServiceLocator.TryGet(out _unitManager) || !ServiceLocator.TryGet(out _mapManager))
+        {
+            Debug.LogError("[MissionManager] 필수 매니저(Unit/Map) 누락.");
+            return;
+        }
 
-        // PlayerController/Camera 확보 (생략 - 기존 로직 유지)
         if (!ServiceLocator.TryGet(out _playerController))
         {
             _playerController = FindObjectOfType<PlayerController>();
@@ -57,16 +59,11 @@ public class MissionManager : MonoBehaviour, IInitializable
         }
         ServiceLocator.TryGet(out _cameraController);
 
-        // 2. 맵 데이터 확인
-        // MapManager는 이미 SceneInitializer에 의해 MapData를 로드하고 있어야 함.
-        // 정합성 체크: Mission이 요구하는 Map과 현재 로드된 Map이 같은지?
-        // (지금은 생략하지만, 추후 검증 필요)
-
-        // 3. 아군 스폰 (태그 기반)
+        // 2. 아군 스폰
         await SpawnAllies();
 
-        // 4. 적군 스폰 (태그 기반 - 추후 구현)
-        // await SpawnEnemies();
+        // 3. 적군 스폰
+        await SpawnEnemies();
 
         Debug.Log("--- [MissionManager] Mission Setup Complete ---");
     }
@@ -78,43 +75,76 @@ public class MissionManager : MonoBehaviour, IInitializable
 
         Unit firstUnit = null;
 
-        // 미션 데이터에 정의된 스폰 슬롯만큼 반복
         foreach (var spawnData in SelectedMission.PlayerSpawns)
         {
-            // A. 태그로 좌표 찾기 (MapDataSO에게 질문)
-            if (!SelectedMission.MapData.TryGetTaggedCoords(spawnData.spawnTag, out GridCoords coords))
+            // [핵심] MapDataSO의 RoleTag를 이용해 좌표 검색
+            if (!SelectedMission.MapData.TryGetRoleLocation(spawnData.spawnTag, out Vector2Int vPos))
             {
-                Debug.LogError($"[MissionManager] Spawn Tag '{spawnData.spawnTag}' not found in MapData!");
+                Debug.LogError($"[MissionManager] 아군 스폰 태그 '{spawnData.spawnTag}'를 맵에서 찾을 수 없습니다.");
                 continue;
             }
 
-            // B. 유닛 결정 (프리셋이 있으면 프리셋, 없으면 스쿼드 슬롯)
+            GridCoords coords = new GridCoords(vPos.x, vPos.y, 0);
+
             UnitDataSO unitToSpawn = spawnData.presetUnit;
-            if (unitToSpawn == null)
+            if (unitToSpawn == null && spawnData.squadSlotIndex < _testSquad.Count)
             {
-                if (spawnData.squadSlotIndex < _testSquad.Count)
-                    unitToSpawn = _testSquad[spawnData.squadSlotIndex];
+                unitToSpawn = _testSquad[spawnData.squadSlotIndex];
             }
 
             if (unitToSpawn == null) continue;
 
-            // C. 유효성 검사 및 스폰
-            if (!_mapManager.HasTile(coords) || _mapManager.GetTile(coords).Occupants.Count > 0)
-            {
-                Debug.LogWarning($"[MissionManager] Spawn failed at {coords} (Invalid/Occupied)");
-                continue;
-            }
-
-            Unit unit = await _unitManager.SpawnUnitAsync(unitToSpawn, coords);
+            Unit unit = await SpawnUnitSafe(unitToSpawn, coords);
             if (unit != null && firstUnit == null) firstUnit = unit;
         }
 
-        // 제어권 이양
         if (firstUnit != null)
         {
             firstUnit.SetController(_playerController);
             if (_cameraController != null) _cameraController.SetTarget(firstUnit.transform);
             await firstUnit.OnTurnStart();
         }
+    }
+
+    private async UniTask SpawnEnemies()
+    {
+        if (SelectedMission.EnemySpawns == null) return;
+
+        foreach (var enemySpawn in SelectedMission.EnemySpawns)
+        {
+            if (!SelectedMission.MapData.TryGetRoleLocation(enemySpawn.spawnTag, out Vector2Int vPos))
+            {
+                Debug.LogError($"[MissionManager] 적군 스폰 태그 '{enemySpawn.spawnTag}'를 맵에서 찾을 수 없습니다.");
+                continue;
+            }
+
+            GridCoords coords = new GridCoords(vPos.x, vPos.y, 0);
+
+            if (enemySpawn.enemyUnit != null)
+            {
+                Unit enemy = await SpawnUnitSafe(enemySpawn.enemyUnit, coords);
+                if (enemy != null)
+                {
+                    // 추후 AI 설정
+                    Debug.Log($"[MissionManager] 적군 '{enemy.name}' 스폰 완료 (Tag: {enemySpawn.spawnTag})");
+                }
+            }
+        }
+    }
+
+    private async UniTask<Unit> SpawnUnitSafe(UnitDataSO data, GridCoords coords)
+    {
+        if (!_mapManager.HasTile(coords))
+        {
+            Debug.LogWarning($"[MissionManager] 스폰 좌표 {coords}에 타일이 없습니다.");
+            return null;
+        }
+        if (_mapManager.GetTile(coords).Occupants.Count > 0)
+        {
+            Debug.LogWarning($"[MissionManager] 스폰 좌표 {coords}에 이미 다른 유닛이 있습니다.");
+            return null;
+        }
+
+        return await _unitManager.SpawnUnitAsync(data, coords);
     }
 }

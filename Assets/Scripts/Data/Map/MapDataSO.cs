@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-[CreateAssetMenu(fileName = "NewMapData", menuName = "YCOM/Data/MapData")]
+[CreateAssetMenu(fileName = "NewMapData", menuName = "Data/Map/MapData")]
 public class MapDataSO : ScriptableObject
 {
     [Header("1. Environment")]
@@ -15,10 +15,12 @@ public class MapDataSO : ScriptableObject
     public int MaxLevel = 5;
 
     [Header("2. Tile Data")]
-    // 기존 구조 유지: TileSaveData 안에 RoleTag가 포함되어 있음
     public List<TileSaveData> Tiles = new List<TileSaveData>();
 
-    // [Validation] 기존 로직 유지 (중복 태그 검사 포함)
+    // [Deprecated] SpawnPoints는 더 이상 사용하지 않음
+    [HideInInspector]
+    public List<SpawnPointData> SpawnPoints;
+
     public bool Validate(out string error)
     {
         if (Tiles == null || Tiles.Count == 0)
@@ -32,7 +34,7 @@ public class MapDataSO : ScriptableObject
             return false;
         }
 
-        // RoleTag 중복 검증 (필수)
+        // RoleTag 중복 검증
         var roleTagSet = new HashSet<string>();
         foreach (var tile in Tiles)
         {
@@ -51,24 +53,18 @@ public class MapDataSO : ScriptableObject
     }
 
     // ========================================================================
-    // [추가] MissionManager가 사용할 좌표 조회 메서드
+    // [핵심] MissionManager가 태그로 위치를 찾기 위해 호출하는 함수
     // ========================================================================
-
-    /// <summary>
-    /// 특정 RoleTag를 가진 타일의 GridCoords를 반환합니다.
-    /// </summary>
-    public bool TryGetTaggedCoords(string tag, out GridCoords coords)
+    public bool TryGetRoleLocation(string roleTag, out Vector2Int coordinate)
     {
-        coords = default;
-        if (string.IsNullOrEmpty(tag) || Tiles == null) return false;
+        coordinate = Vector2Int.zero;
+        if (string.IsNullOrEmpty(roleTag) || Tiles == null) return false;
 
-        // Tiles 리스트에서 RoleTag가 일치하는 녀석을 찾음
         foreach (var tile in Tiles)
         {
-            if (tile.RoleTag == tag)
+            if (tile.RoleTag == roleTag)
             {
-                // TileSaveData의 좌표(Vector3Int)를 GridCoords로 변환
-                coords = new GridCoords(tile.Coords.x, tile.Coords.z, tile.Coords.y);
+                coordinate = new Vector2Int(tile.Coords.x, tile.Coords.z);
                 return true;
             }
         }
