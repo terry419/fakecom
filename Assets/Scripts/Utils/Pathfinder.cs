@@ -1,103 +1,91 @@
-using System; // System.Math 사용을 위해 필수
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Core.DataStructures;
+using Core.DataStructures; // PriorityQueue
 
+/// <summary>
+/// [Optimization] Unity 단일 스레드 환경에 최적화된 Zero-Alloc 길찾기 연산기.
+/// 정적 캐시를 재사용하여 GC 발생을 억제합니다.
+/// </summary>
 public static class Pathfinder
 {
-    // 디버그 로그 출력 여부
-    public static bool ShowDebugLogs = true;
-
-    // [GC Optimization] 정적 캐싱
+    // [GC Optimization] 방향 배열 캐싱
     private static readonly Direction[] _directions =
         { Direction.North, Direction.East, Direction.South, Direction.West };
 
-    // BFS 캐시
-    private static readonly Dictionary<GridCoords, int> _bfsCostCache = new Dictionary<GridCoords, int>();
-    private static readonly Queue<GridCoords> _bfsQueueCache = new Queue<GridCoords>();
+    // [Static Cache] BFS용 (GetReachableTiles) - 재사용하여 할당 방지
+    private static readonly Queue<GridCoords> _bfsQueue = new Queue<GridCoords>();
+    private static readonly Dictionary<GridCoords, int> _bfsCost = new Dictionary<GridCoords, int>();
 
-    // A* 캐시
+    // [Static Cache] A*용 (FindPath)
     private static readonly PriorityQueue<GridCoords> _astarFrontier = new PriorityQueue<GridCoords>();
     private static readonly Dictionary<GridCoords, GridCoords> _astarCameFrom = new Dictionary<GridCoords, GridCoords>();
     private static readonly Dictionary<GridCoords, int> _astarCostSoFar = new Dictionary<GridCoords, int>();
 
     // ========================================================================
-    // 1. 이동 가능 범위 계산 (BFS)
+    // 1. 이동 가능 범위 계산 (GetReachableTiles)
     // ========================================================================
     public static HashSet<GridCoords> GetReachableTiles(GridCoords start, int maxAP, MapManager map)
     {
-        var result = new HashSet<GridCoords>();
-        FillReachableTiles(start, maxAP, map, result);
-        return result;
-    }
+        var results = new HashSet<GridCoords>(); // 반환용 컬렉션은 불가피하게 할당 (호출자가 관리)
 
-    public static void FillReachableTiles(GridCoords start, int maxAP, MapManager map, ICollection<GridCoords> outputResults)
-    {
-        if (map == null || outputResults == null) return;
+        if (map == null || !map.HasTile(start)) return results;
 
-        Tile startTile = map.GetTile(start);
-        if (startTile == null) return;
+        // [Performance] 캐시 초기화 (Clear는 내부 배열을 유지하므로 할당 없음)
+        _bfsQueue.Clear();
+        _bfsCost.Clear();
 
-        _bfsCostCache.Clear();
-        _bfsQueueCache.Clear();
+        _bfsQueue.Enqueue(start);
+        _bfsCost[start] = 0;
+        results.Add(start);
 
-        _bfsQueueCache.Enqueue(start);
-        _bfsCostCache[start] = 0;
-        outputResults.Add(start);
-
-        while (_bfsQueueCache.Count > 0)
+        while (_bfsQueue.Count > 0)
         {
-            GridCoords current = _bfsQueueCache.Dequeue();
-            int currentCost = _bfsCostCache[current];
+            GridCoords current = _bfsQueue.Dequeue();
+            int currentCost = _bfsCost[current];
 
             if (currentCost >= maxAP) continue;
 
-            // [Optimization] yield return 제거 -> 방향 배열 직접 순회
             for (int i = 0; i < _directions.Length; i++)
             {
                 Direction dir = _directions[i];
 
-                // 유효성 검사 (검증 로직 분리)
+                // 유효성 검사 (MapManager 의존성 주입)
                 if (!IsValidMove(current, dir, map, out GridCoords next)) continue;
 
                 int newCost = currentCost + 1;
 
                 if (newCost <= maxAP)
                 {
-                    if (!_bfsCostCache.ContainsKey(next) || newCost < _bfsCostCache[next])
+                    if (!_bfsCost.ContainsKey(next) || newCost < _bfsCost[next])
                     {
-                        _bfsCostCache[next] = newCost;
-                        outputResults.Add(next);
-                        _bfsQueueCache.Enqueue(next);
+                        _bfsCost[next] = newCost;
+                        results.Add(next);
+                        _bfsQueue.Enqueue(next);
                     }
                 }
             }
         }
+
+        return results;
     }
 
     // ========================================================================
-    // 2. 최단 경로 탐색 (A*)
+    // 2. 최단 경로 탐색 (FindPath)
     // ========================================================================
     public static List<GridCoords> FindPath(GridCoords start, GridCoords end, MapManager map)
     {
+        // [Issue #3 해결] 시작점과 도착점이 같으면 '이동 경로 없음(0칸)'으로 간주하여 빈 리스트 반환
         if (start.Equals(end)) return new List<GridCoords>();
 
-        // 층(Y) 체크
-        if (start.y != end.y)
-        {
-            if (ShowDebugLogs) Debug.LogWarning($"[Pathfinder] Diff Level: {start} -> {end}");
-            return null;
-        }
-
+        // 층간 이동 불가 등 기본 검사
+        if (start.y != end.y) return null;
         if (map == null) return null;
 
         Tile endTile = map.GetTile(end);
-        if (endTile == null || !endTile.IsWalkable)
-        {
-            if (ShowDebugLogs) Debug.LogWarning($"[Pathfinder] Invalid End: {end}");
-            return null;
-        }
+        if (endTile == null || !endTile.IsWalkable) return null;
 
+        // [Performance] 캐시 초기화
         _astarFrontier.Clear();
         _astarCameFrom.Clear();
         _astarCostSoFar.Clear();
@@ -106,22 +94,18 @@ public static class Pathfinder
         _astarCameFrom[start] = start;
         _astarCostSoFar[start] = 0;
 
-        int processedNodes = 0;
+        bool found = false;
 
         while (_astarFrontier.Count > 0)
         {
             GridCoords current = _astarFrontier.Dequeue();
-            processedNodes++;
 
             if (current.Equals(end))
             {
-                var path = RetracePath(_astarCameFrom, start, end);
-                if (ShowDebugLogs)
-                    Debug.Log($"<color=cyan>[Pathfinder] Success:</color> Len:{path.Count}, Checked:{processedNodes}");
-                return path;
+                found = true;
+                break;
             }
 
-            // [Optimization] yield return 제거 -> 방향 배열 직접 순회
             for (int i = 0; i < _directions.Length; i++)
             {
                 Direction dir = _directions[i];
@@ -140,45 +124,33 @@ public static class Pathfinder
             }
         }
 
-        if (ShowDebugLogs) Debug.LogWarning($"<color=red>[Pathfinder] Fail:</color> No path {start}->{end}");
-        return null;
+        return found ? RetracePath(_astarCameFrom, start, end) : null;
     }
 
     // ========================================================================
-    // 3. 내부 유틸리티
+    // 3. 내부 헬퍼
     // ========================================================================
-
-    /// <summary>
-    /// [Core Logic] 현재 타일에서 특정 방향으로 이동이 가능한지 판별하고, 좌표를 반환합니다.
-    /// 메모리 할당 없음.
-    /// </summary>
     private static bool IsValidMove(GridCoords current, Direction dir, MapManager map, out GridCoords nextCoords)
     {
         nextCoords = GridUtils.GetNeighbor(current, dir);
 
-        // 1. 맵 범위 / 타일 존재 체크
-        // HasTile을 호출하지 않고 GetTile null 체크로 통합 (중복 조회 방지)
         Tile nextTile = map.GetTile(nextCoords);
         if (nextTile == null) return false;
 
-        // 2. 현재 타일 정보 가져오기
+        // 1. 현재 타일의 벽 체크
         Tile currentTile = map.GetTile(current);
-        if (currentTile == null) return false; // 이론상 발생 안 함
+        if (currentTile != null && currentTile.IsPathBlockedByEdge(dir)) return false;
 
-        // 3. 보행 가능 여부 (바닥, 중앙 장애물)
+        // 2. 다음 타일 보행 가능 여부
         if (!nextTile.IsWalkable) return false;
 
-        // 4. 벽 판정 (나가는 곳)
-        if (currentTile.IsPathBlockedByEdge(dir)) return false;
-
-        // 5. 벽 판정 (들어오는 곳)
+        // 3. 다음 타일의 맞은편 벽 체크
         Direction oppositeDir = GridUtils.GetOppositeDirection(dir);
         if (nextTile.IsPathBlockedByEdge(oppositeDir)) return false;
 
         return true;
     }
 
-    // [Optimization] System.Math.Abs 사용 (정수 연산)
     private static int GetHeuristic(GridCoords a, GridCoords b)
     {
         return Math.Abs(a.x - b.x) + Math.Abs(a.z - b.z);
@@ -192,15 +164,8 @@ public static class Pathfinder
         while (!current.Equals(start))
         {
             path.Add(current);
-
-            if (!cameFrom.TryGetValue(current, out GridCoords parent))
-            {
-                Debug.LogError("[Pathfinder] Path linkage broken.");
-                break;
-            }
-            current = parent;
+            current = cameFrom[current];
         }
-
         path.Reverse();
         return path;
     }

@@ -5,6 +5,7 @@ using UnityEngine;
 
 // [Refactoring Phase 3] 데이터 컨테이너 및 상태 집계자 (State Aggregator)
 // 책임: "내 위에 무엇이 있는가?", "그래서 지나갈 수 있는가?" 판단만 수행.
+[System.Serializable]
 public class Tile
 {
     // ========================================================================
@@ -15,8 +16,6 @@ public class Tile
 
     // [Loading] EnvironmentManager에게 넘겨줄 임시 데이터들
     public PillarType InitialPillarID { get; private set; }
-
-    // [Fix] 누락되었던 변수 추가: 저장된 기둥 체력을 임시 보관
     public float InitialPillarHP { get; private set; }
 
     // ========================================================================
@@ -32,7 +31,9 @@ public class Tile
     // 점유자 목록 (유닛, 아이템, 그리고 승격된 기둥 객체)
     private ITileOccupant _primaryUnit;
     private List<ITileOccupant> _occupants = new List<ITileOccupant>();
-    public IEnumerable<ITileOccupant> Occupants => _occupants;
+
+    // [Fix] Unit.cs에서 .Count를 쓰기 위해 IEnumerable 대신 IReadOnlyList로 변경
+    public IReadOnlyList<ITileOccupant> Occupants => _occupants;
 
     // ========================================================================
     // 3. 캐싱된 상태 (State Cache)
@@ -62,11 +63,11 @@ public class Tile
         Coordinate = saveData.Coords;
         FloorID = saveData.FloorID;
 
-        // 기둥 데이터 임시 저장 (실제 객체 생성은 EnvironmentManager가 수행)
+        // 기둥 데이터 임시 저장
         InitialPillarID = saveData.PillarID;
-        InitialPillarHP = saveData.CurrentPillarHP; // [Fix] 저장된 체력 값 로드
+        InitialPillarHP = saveData.CurrentPillarHP;
 
-        // 엣지 데이터는 바로 적용하지 않고 임시 저장 (이웃과 공유 연결을 위해)
+        // 엣지 데이터는 바로 적용하지 않고 임시 저장
         if (saveData.Edges != null && saveData.Edges.Length == 4)
         {
             TempSavedEdges = saveData.Edges;
@@ -84,7 +85,6 @@ public class Tile
     // 5. 환경 설정 (EnvironmentManager 전용)
     // ========================================================================
 
-    // [Wiring] EnvironmentManager가 공유된 엣지 객체를 꽂아주는 메서드
     public void SetSharedEdge(Direction dir, RuntimeEdge edge)
     {
         _edges[(int)dir] = edge;
@@ -99,8 +99,7 @@ public class Tile
     public void AddOccupant(ITileOccupant occupant)
     {
         if (occupant == null) return;
-
-        bool isTarget = (Coordinate.x == 18 && Coordinate.z == 6 && Coordinate.y == 0);
+        if (_occupants.Contains(occupant)) return;
 
         if (occupant.Type == OccupantType.Unit)
         {
@@ -111,17 +110,12 @@ public class Tile
 
         _occupants.Add(occupant);
 
-        if (isTarget)
-        {
-            Debug.Log($"<color=magenta>[Tile {Coordinate}] Occupant Added. Type: {occupant.Type}, Blocking: {occupant.IsBlockingMovement}</color>");
-        }
-
         occupant.OnBlockingChanged += HandleOccupantStateChange;
-
-        UpdateCache(); // 여기서 IsWalkable이 갱신되어야 함
+        UpdateCache(); // 여기서 IsWalkable이 갱신됨
 
         occupant.OnAddedToTile(this);
     }
+
     public void RemoveOccupant(ITileOccupant occupant)
     {
         if (occupant == null) return;
@@ -154,7 +148,7 @@ public class Tile
         }
         else
         {
-            // 2. 점유자 중 하나라도 길을 막고 있으면 불가 (기둥 객체 포함)
+            // 2. 점유자 중 하나라도 길을 막고 있으면 불가
             bool isBlocked = _occupants.Any(o => o.IsBlockingMovement);
             _cachedIsWalkable = !isBlocked;
         }
@@ -169,7 +163,7 @@ public class Tile
     public bool IsPathBlockedByEdge(Direction dir)
     {
         var edge = GetEdge(dir);
-        if (edge == null) return false; // 엣지 데이터 없으면 통과 가능
+        if (edge == null) return false;
 
         return edge.IsBlocking; // 벽이 있고, 안 부서졌으면 True
     }

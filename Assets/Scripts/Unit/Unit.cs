@@ -1,6 +1,8 @@
-using UnityEngine;
-using System;
 using Cysharp.Threading.Tasks; // UniTask 사용
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 // [Body] 데이터와 행동 수행만 담당 (판단 로직 X)
 public class Unit : MonoBehaviour, ITileOccupant
@@ -15,11 +17,14 @@ public class Unit : MonoBehaviour, ITileOccupant
     public int CurrentAP { get; private set; }
     public int MaxAP { get; private set; }
 
-    // [New] 영혼(Controller) 참조
+    // 영혼(Controller) 참조
     private IUnitController _controller;
     public IUnitController Controller => _controller;
 
     private Collider _collider;
+
+    [Header("Settings")]
+    [SerializeField] private float _moveSpeed = 5.0f;
 
     // ========================================================================
     // 2. ITileOccupant 구현
@@ -73,37 +78,46 @@ public class Unit : MonoBehaviour, ITileOccupant
         Vector3 targetPos = GridUtils.GridToWorld(tile.Coordinate);
         transform.position = targetPos;
 
-        // 2. [New] 높이 정밀 보정 (Surface Snap)
+        // 2. 높이 정밀 보정 (Surface Snap)
         AdjustVerticalPosition(targetPos.y);
 
         if (Data != null)
             gameObject.name = $"{Data.UnitName}_{Coordinate}";
     }
+
+    // 콜라이더 크기에 맞춰 발바닥을 바닥(surfaceY)에 딱 붙이는 로직
     private void AdjustVerticalPosition(float surfaceY)
     {
         if (_collider == null) return;
 
-        // [Fix] bounds 대신 로컬 데이터 사용 (Physics Latency 해결)
+        float bottomOffset = 0f;
+
         if (_collider is BoxCollider box)
         {
-            // 피벗에서 발바닥까지의 거리 계산
-            // (Center.y - Size.y/2) * Scale.y
-            float bottomOffset = (box.center.y - box.size.y * 0.5f) * transform.lossyScale.y;
-
-            // 목표 위치 = 표면 높이 - 발바닥 오프셋
-            float targetY = surfaceY - bottomOffset;
-
-            transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
+            bottomOffset = (box.center.y - box.size.y * 0.5f) * transform.lossyScale.y;
         }
         else if (_collider is CapsuleCollider capsule)
         {
-            // 캡슐의 경우 (보통 Center가 중앙, Height가 전체 키)
-            float bottomOffset = (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y;
-            float targetY = surfaceY - bottomOffset;
-
-            transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
+            bottomOffset = (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y;
         }
-        // 기타 콜라이더는 기존 방식 사용 (필요 시)
+
+        // 목표 위치 = 표면 높이 - 발바닥 오프셋
+        float targetY = surfaceY - bottomOffset;
+        transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
+    }
+
+    // 이동 중에 목표 Y값을 계산하는 헬퍼 (AdjustVerticalPosition과 동일 로직)
+    private float GetTargetHeight(float surfaceY)
+    {
+        if (_collider == null) return surfaceY + 0.05f; // 콜라이더 없으면 살짝 띄움
+
+        float bottomOffset = 0f;
+        if (_collider is BoxCollider box)
+            bottomOffset = (box.center.y - box.size.y * 0.5f) * transform.lossyScale.y;
+        else if (_collider is CapsuleCollider capsule)
+            bottomOffset = (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y;
+
+        return surfaceY - bottomOffset;
     }
 
     public void OnRemovedFromTile(Tile tile) { }
@@ -112,9 +126,6 @@ public class Unit : MonoBehaviour, ITileOccupant
     // 5. 컨트롤러 연결 (빙의 시스템 핵심)
     // ========================================================================
 
-    /// <summary>
-    /// 이 유닛을 제어할 컨트롤러(영혼)를 설정합니다.
-    /// </summary>
     public void SetController(IUnitController controller)
     {
         if (_controller != null) _controller.Unpossess();
@@ -131,8 +142,62 @@ public class Unit : MonoBehaviour, ITileOccupant
     // ========================================================================
     // 6. 상태 관리
     // ========================================================================
-    public void ResetAP() => CurrentAP = MaxAP;
-    public void ConsumeAP(int amount) => CurrentAP = Mathf.Max(0, CurrentAP - amount);
+
+    public async UniTask MovePathAsync(List<GridCoords> path, MapManager mapManager)
+    {
+        if (path == null || path.Count == 0) return;
+
+        foreach (var nextCoords in path)
+        {
+            // [Priority 3] 이동 경로상 장애물(다른 유닛 등) 체크
+            Tile nextTile = mapManager.GetTile(nextCoords);
+            // Tile.Occupants가 IReadOnlyList로 변경되었으므로 .Count 사용 가능
+            if (nextTile != null && nextTile.Occupants.Count > 0)
+            {
+                Debug.LogWarning($"Path blocked at {nextCoords}");
+                break;
+            }
+
+            // 1. 점유 상태 갱신
+            Tile currentTile = mapManager.GetTile(Coordinate);
+            if (currentTile != null)
+            {
+                try { currentTile.RemoveOccupant(this); }
+                catch { /* 로그 생략 */ }
+            }
+
+            if (nextTile != null) nextTile.AddOccupant(this);
+
+            Coordinate = nextCoords;
+
+            // 2. 물리적 이동 (애니메이션)
+            Vector3 targetPos = GridUtils.GridToWorld(nextCoords);
+
+            // [Fix] 하드코딩(0.05f) 대신 콜라이더 기준 높이 계산 적용
+            targetPos.y = GetTargetHeight(targetPos.y);
+
+            // 부드러운 이동
+            while (Vector3.Distance(transform.position, targetPos) > 0.05f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, targetPos, _moveSpeed * Time.deltaTime);
+                await UniTask.Yield();
+            }
+            transform.position = targetPos; // 오차 보정
+
+            // 3. AP 차감
+            ConsumeAP(1);
+        }
+    }
+
+    public void ConsumeAP(int amount)
+    {
+        CurrentAP = Mathf.Max(0, CurrentAP - amount);
+    }
+
+    public void ResetAP()
+    {
+        CurrentAP = MaxAP > 0 ? MaxAP : 2; // 데이터 없으면 임시 2
+    }
 
     public void TakeDamage(int damage)
     {

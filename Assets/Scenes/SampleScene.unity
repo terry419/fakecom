@@ -393,6 +393,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5388799354946296420, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
+      propertyPath: _pathPrefab
+      value: 
+      objectReference: {fileID: -7205169565919825848, guid: 03ad7ff298e29264d99c80c734df5b57, type: 3}
+    - target: {fileID: 5388799354946296420, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
+      propertyPath: _reachablePrefab
+      value: 
+      objectReference: {fileID: 9065994994303359569, guid: bc3380e3cfe766644a35fb94226a766b, type: 3}
+    - target: {fileID: 5388799354946296420, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
+      propertyPath: _unreachablePrefab
+      value: 
+      objectReference: {fileID: -7205169565919825848, guid: 081267bf600dd3f488d315195147e5ad, type: 3}
     - target: {fileID: 6051140353520375680, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.05144024

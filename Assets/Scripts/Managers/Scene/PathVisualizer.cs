@@ -1,3 +1,4 @@
+// 경로: Assets/Scripts/Managers/Scene/PathVisualizer.cs
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
@@ -5,46 +6,39 @@ using System.Collections.Generic;
 public class PathVisualizer : MonoBehaviour, IInitializable
 {
     [Header("Visual Resources")]
-    [SerializeField] private PoolItem _reachablePrefab;   // 녹색 타일 (이동 가능 범위)
-    [SerializeField] private PoolItem _pathPrefab;        // 파란색 타일 (이동 경로)
-    [SerializeField] private PoolItem _unreachablePrefab; // 빨간색 타일 (이동 불가/초과)
+    [SerializeField] private PoolItem _reachablePrefab;   // 녹색 (Inspector 할당)
+    [SerializeField] private PoolItem _pathPrefab;        // 파란색 (Inspector 할당)
+    [SerializeField] private PoolItem _unreachablePrefab; // 빨간색 (Inspector 할당)
 
     [Header("Settings")]
     [SerializeField] private float _verticalOffset = 0.05f;
     [SerializeField] private int _initialPoolSize = 50;
 
-    // --- Object Pooling ---
     private Transform _poolRoot;
 
-    // 대기열 (Pool)
+    // 풀
     private Queue<PoolItem> _reachablePool = new Queue<PoolItem>();
     private Queue<PoolItem> _pathPool = new Queue<PoolItem>();
     private Queue<PoolItem> _unreachablePool = new Queue<PoolItem>();
 
-    // 활성 리스트 (Active List)
-    private List<PoolItem> _activeReachables = new List<PoolItem>();
-    private List<PoolItem> _activePaths = new List<PoolItem>(); // 파랑/빨강 섞임
+    // 활성 리스트
+    private List<PoolItem> _activeReachableItems = new List<PoolItem>();
+    private List<PoolItem> _activePathItems = new List<PoolItem>(); // 파랑/빨강 경로 모두 관리
 
     private void Awake()
     {
-        // [핵심 수정] 다른 매니저들처럼 Awake 등록. 
-        // 단, 중복 생성된 경우(SceneInitializer 충돌 방지) 스스로 파괴.
         if (ServiceLocator.IsRegistered<PathVisualizer>())
         {
-            Debug.LogWarning("[PathVisualizer] 중복 발견됨. 이 오브젝트를 파괴합니다.");
             Destroy(gameObject);
             return;
         }
-
         ServiceLocator.Register(this, ManagerScope.Scene);
     }
 
     private void OnDestroy()
     {
         if (ServiceLocator.IsRegistered<PathVisualizer>())
-        {
             ServiceLocator.Unregister<PathVisualizer>(ManagerScope.Scene);
-        }
     }
 
     public async UniTask Initialize(InitializationContext context)
@@ -53,7 +47,6 @@ public class PathVisualizer : MonoBehaviour, IInitializable
         root.transform.SetParent(transform);
         _poolRoot = root.transform;
 
-        // 풀링 초기화
         ExpandPool(_reachablePool, _reachablePrefab, _initialPoolSize, PoolItem.PoolType.Reachable);
         ExpandPool(_pathPool, _pathPrefab, _initialPoolSize / 2, PoolItem.PoolType.Path);
         ExpandPool(_unreachablePool, _unreachablePrefab, 10, PoolItem.PoolType.Unreachable);
@@ -61,135 +54,114 @@ public class PathVisualizer : MonoBehaviour, IInitializable
         await UniTask.CompletedTask;
     }
 
-    // ========================================================================
-    // 1. 이동 가능 범위 (녹색)
-    // ========================================================================
-    public void ShowReachableTiles(IEnumerable<GridCoords> coords)
+    // [이동 가능 범위 표시] - 녹색
+    public void ShowReachable(IEnumerable<GridCoords> coords, GridCoords? excludeCoords = null)
     {
         ClearReachable();
 
-        if (coords == null || _reachablePrefab == null) return;
+        if (coords == null) return;
 
         foreach (var c in coords)
         {
-            SpawnItem(_reachablePool, _reachablePrefab, _activeReachables, c, 0);
+            if (excludeCoords.HasValue && c.Equals(excludeCoords.Value)) continue;
+            SpawnItem(_reachablePool, _activeReachableItems, c, 0, PoolItem.PoolType.Reachable);
         }
     }
 
-    public void ClearReachable()
+    // [Hybrid Path 표시] - 유효(파랑) + 무효(빨강) 동시 표시
+    public void ShowHybridPath(List<GridCoords> validPath, List<GridCoords> invalidPath)
     {
-        foreach (var item in _activeReachables)
+        ClearPath(); // 기존 경로 삭제 (녹색은 유지)
+
+        // 1. 유효 경로 (파란색)
+        if (validPath != null)
         {
-            if (item != null)
+            foreach (var c in validPath)
             {
-                item.gameObject.SetActive(false);
-                _reachablePool.Enqueue(item);
+                SpawnItem(_pathPool, _activePathItems, c, 1, PoolItem.PoolType.Path);
             }
         }
-        _activeReachables.Clear();
-    }
 
-    // ========================================================================
-    // 2. 경로 표시 (파랑/빨강)
-    // ========================================================================
-    public void ShowPath(List<GridCoords> path, int currentAP)
-    {
-        ClearPath(); // 기존 경로 정리
-
-        if (path == null || path.Count == 0) return;
-
-        for (int i = 0; i < path.Count; i++)
+        // 2. 무효 경로 (빨간색)
+        if (invalidPath != null)
         {
-            GridCoords c = path[i];
-
-            // [로직] 인덱스(거리)가 현재 AP보다 작으면 파랑, 같거나 크면 빨강
-            // 예: AP 5일 때, index 0~4(5칸)는 파랑, index 5(6번째 칸)부터 빨강
-            bool isReachable = (i < currentAP);
-
-            var targetPool = isReachable ? _pathPool : _unreachablePool;
-            var targetPrefab = isReachable ? _pathPrefab : _unreachablePrefab;
-
-            SpawnItem(targetPool, targetPrefab, _activePaths, c, 1);
-        }
-    }
-
-    public void ClearPath()
-    {
-        // [중요] 섞여 있는 아이템들을 제집(Type) 찾아 반납
-        foreach (var item in _activePaths)
-        {
-            if (item == null) continue;
-
-            item.gameObject.SetActive(false);
-
-            switch (item.Type)
+            foreach (var c in invalidPath)
             {
-                case PoolItem.PoolType.Path:
-                    _pathPool.Enqueue(item);
-                    break;
-                case PoolItem.PoolType.Unreachable:
-                    _unreachablePool.Enqueue(item);
-                    break;
-                default:
-                    Destroy(item.gameObject);
-                    break;
+                SpawnItem(_unreachablePool, _activePathItems, c, 1, PoolItem.PoolType.Unreachable);
             }
         }
-        _activePaths.Clear();
     }
 
-    // ========================================================================
-    // 3. Pooling Internals
-    // ========================================================================
-    private void SpawnItem(Queue<PoolItem> pool, PoolItem prefab, List<PoolItem> activeList, GridCoords coords, int layerIndex)
+    public void ClearAll()
     {
-        PoolItem item = GetFromPool(pool, prefab);
-        if (item == null) return;
+        ClearReachable();
+        ClearPath();
+    }
 
-        Vector3 pos = GridUtils.GridToWorld(coords);
-        pos.y += _verticalOffset + (layerIndex * 0.01f); // 겹침 방지
+    public void ClearPath() // Public으로 열어서 Controller에서 호출 가능하게 함
+    {
+        foreach (var item in _activePathItems)
+        {
+            ReturnToPool(item);
+        }
+        _activePathItems.Clear();
+    }
 
-        item.transform.position = pos;
+    private void ClearReachable()
+    {
+        foreach (var item in _activeReachableItems)
+        {
+            ReturnToPool(item);
+        }
+        _activeReachableItems.Clear();
+    }
+
+    private void ReturnToPool(PoolItem item)
+    {
+        item.gameObject.SetActive(false);
+        switch (item.Type)
+        {
+            case PoolItem.PoolType.Reachable: _reachablePool.Enqueue(item); break;
+            case PoolItem.PoolType.Path: _pathPool.Enqueue(item); break;
+            case PoolItem.PoolType.Unreachable: _unreachablePool.Enqueue(item); break;
+            default: Destroy(item.gameObject); break;
+        }
+    }
+
+    private void SpawnItem(Queue<PoolItem> pool, List<PoolItem> activeList, GridCoords coords, int layerIndex, PoolItem.PoolType type)
+    {
+        Vector3 worldPos = GridUtils.GridToWorld(coords);
+        PoolItem item = GetFromPool(pool, type);
+
+        // Z-Fighting 방지
+        worldPos.y += _verticalOffset + (layerIndex * 0.01f);
+
+        item.transform.position = worldPos;
         item.gameObject.SetActive(true);
 
         activeList.Add(item);
     }
 
-    private PoolItem GetFromPool(Queue<PoolItem> pool, PoolItem prefab)
+    private PoolItem GetFromPool(Queue<PoolItem> pool, PoolItem.PoolType type)
     {
-        if (prefab == null) return null;
+        if (pool.Count > 0) return pool.Dequeue();
 
-        if (pool.Count > 0)
-        {
-            var item = pool.Dequeue();
-            if (item != null) return item;
-        }
+        PoolItem prefab = type == PoolItem.PoolType.Reachable ? _reachablePrefab :
+                          type == PoolItem.PoolType.Path ? _pathPrefab : _unreachablePrefab;
 
-        return CreateNewItem(prefab);
+        var newItem = Instantiate(prefab, _poolRoot);
+        newItem.Type = type;
+        return newItem;
     }
 
     private void ExpandPool(Queue<PoolItem> pool, PoolItem prefab, int count, PoolItem.PoolType type)
     {
-        if (prefab == null) return;
         for (int i = 0; i < count; i++)
         {
-            var item = CreateNewItem(prefab);
+            var item = Instantiate(prefab, _poolRoot);
             item.Type = type;
+            item.gameObject.SetActive(false);
             pool.Enqueue(item);
         }
-    }
-
-    private PoolItem CreateNewItem(PoolItem prefab)
-    {
-        var item = Instantiate(prefab, _poolRoot);
-        item.name = prefab.name;
-        item.gameObject.SetActive(false);
-
-        // 생성 시 타입 확정
-        if (prefab == _pathPrefab) item.Type = PoolItem.PoolType.Path;
-        else if (prefab == _unreachablePrefab) item.Type = PoolItem.PoolType.Unreachable;
-        else item.Type = PoolItem.PoolType.Reachable;
-
-        return item;
     }
 }
