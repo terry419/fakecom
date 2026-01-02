@@ -2,31 +2,12 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 
 [CreateAssetMenu(fileName = "NewEnemyUnit", menuName = "Data/Unit/EnemyUnit")]
-public class EnemyUnitDataSO : ScriptableObject
+public class EnemyUnitDataSO : UnitDataSO
 {
-    [Header("1. Identity")]
-    public string UnitID;
-    public string UnitName;
 
     [Tooltip("적의 등급 (Normal, Elite, Boss)")]
     public EnemyUnitType EnemyType;
 
-    [Tooltip("적의 병과 (Sniper, Assault 등) - AI 행동 패턴 결정")]
-    public ClassType Role; // [추가] Role 누락 수정
-
-    [Header("2. Visual")]
-    public AssetReferenceGameObject ModelPrefab;
-    public AssetReferenceGameObject HitVFX;
-
-    [Header("3. Base Stats")]
-    public int MaxHP;
-    public int Mobility;
-    public int Agility;
-    public int Aim;
-    public int Evasion;
-
-    [Range(0f, 100f)] // [추가] Player와 동일하게 Range 속성 적용
-    public float CritChance = 0f;
 
     [Header("4. Loadout")] // [추가] 장비 슬롯 신설
     [Tooltip("적 주무기 (사거리/데미지 결정)")]
@@ -45,8 +26,4 @@ public class EnemyUnitDataSO : ScriptableObject
     [Header("6. Drops")]
     public LootTableSO DropTable;
 
-    [Header("7. Neural Sync")]
-    public float BaseSurvivalChance = 0f;
-    public float BaseNeuralSync = 100f;
-    public float BaseOverclockChance = 0f;
 }

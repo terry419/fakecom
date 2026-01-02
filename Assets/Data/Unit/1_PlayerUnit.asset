@@ -16,18 +16,24 @@ MonoBehaviour:
   UnitName: 1_PlayerUnit
   Role: 1
   ModelPrefab:
+    m_AssetGUID: fafe13c03091abd4d8a99c5de9503184
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_EditorAssetChanged: 0
+  HitVFX:
     m_AssetGUID: 
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
   MaxHP: 100
+  MaxAP: 2
   Mobility: 5
   Agility: 5
   Aim: 80
   Evasion: 10
   CritChance: 5
-  MainWeapon: {fileID: 11400000, guid: 762dfb9bee5f956438bcd4db8fc22bf7, type: 2}
-  BodyArmor: {fileID: 11400000, guid: d406acdf31c50a245ac88784f55831eb, type: 2}
   BaseSurvivalChance: 5
   BaseNeuralSync: 100
   BaseOverclockChance: 5
+  MainWeapon: {fileID: 11400000, guid: 762dfb9bee5f956438bcd4db8fc22bf7, type: 2}
+  BodyArmor: {fileID: 11400000, guid: d406acdf31c50a245ac88784f55831eb, type: 2}

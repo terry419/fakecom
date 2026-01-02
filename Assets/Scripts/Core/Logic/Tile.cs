@@ -32,6 +32,7 @@ public class Tile
     // 점유자 목록 (유닛, 아이템, 그리고 승격된 기둥 객체)
     private ITileOccupant _primaryUnit;
     private List<ITileOccupant> _occupants = new List<ITileOccupant>();
+    public IEnumerable<ITileOccupant> Occupants => _occupants;
 
     // ========================================================================
     // 3. 캐싱된 상태 (State Cache)

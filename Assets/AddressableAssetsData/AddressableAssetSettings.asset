@@ -15,7 +15,7 @@ MonoBehaviour:
   m_DefaultGroup: cfa6d96333108bf41a202744f6c34c37
   m_currentHash:
     serializedVersion: 2
-    Hash: 5a7814e4bb76bdccd38ddca6775b8185
+    Hash: 9782ff76dd4fb23e15fc924a2eacb5ee
   m_OptimizeCatalogSize: 0
   m_BuildRemoteCatalog: 0
   m_BundleLocalCatalog: 0
@@ -50,6 +50,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 67368c2b826af07449412ed0d6ffe783, type: 2}
   - {fileID: 11400000, guid: a2204e2e21ba04d4f8a2ef829a6eedbb, type: 2}
   - {fileID: 11400000, guid: f3c11dcef9888a749a3bc15bd899a3ad, type: 2}
+  - {fileID: 11400000, guid: 1015d7773f23a0d438e51b56109c80e5, type: 2}
   - {fileID: 11400000, guid: dae505f0161468c41a72abb00979b529, type: 2}
   m_BuildSettings:
     m_CompileScriptsInVirtualMode: 0
@@ -98,6 +99,7 @@ MonoBehaviour:
     - EdgeData
     - TileData
     - MapData
+    - UnitData
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: 4fdb9d024e188e744aced5fc35e7fd35, type: 2}

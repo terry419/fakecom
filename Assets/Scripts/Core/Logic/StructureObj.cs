@@ -39,14 +39,14 @@ public class StructureObj : MonoBehaviour
     {
         Debug.Log($"Structure Destroyed at {Coords}");
 
-        // 1. EnvironmentManager에게 파괴 사실 통보 (로직 동기화)
+        // 1. EnvironmentManager에 파괴 정보 전달 (동기화)
         var envManager = ServiceLocator.Get<EnvironmentManager>();
         if (envManager != null)
         {
             if (IsPillar)
             {
-                // 기둥 파괴 메서드 (EnvironmentManager에 추가 필요)
-                // envManager.DamagePillarAt(Coords, 9999); 
+                // [Fix] 주석 해제하여 로직 연결 [cite: 177]
+                envManager.DamagePillarAt(Coords, 9999);
             }
             else
             {
@@ -54,7 +54,7 @@ public class StructureObj : MonoBehaviour
             }
         }
 
-        // 2. 자기 자신 삭제 (또는 잔해 모델로 교체)
+        // 2. 자기 자신(껍데기) 제거
         Destroy(gameObject);
     }
 }

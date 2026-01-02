@@ -118,4 +118,20 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
             // 필요 시 파괴 효과나 사운드 추가 가능
         }
     }
+    public void DamagePillarAt(GridCoords coords, float damage)
+    {
+        Tile tile = _mapManager.GetTile(coords);
+        if (tile == null) return;
+
+        // 타일의 점유자들 중에서 PillarInfo를 찾아서 데미지 적용
+        foreach (var occupant in tile.Occupants)
+        {
+            if (occupant is PillarInfo pillar)
+            {
+                pillar.TakeDamage(damage);
+                // 기둥은 타일당 하나라고 가정하고 찾으면 즉시 종료
+                break;
+            }
+        }
+    }
 }

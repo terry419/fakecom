@@ -46,9 +46,9 @@
 * 작전 통제실 (Operations Center)  
   * 월드맵을 통해 다음 수행할 미션(난이도, 보상, 적 유형)을 선택.  
   * **구현 로직**:  
-    * `MissionManager`가 `CampaignDataSO`(전체 미션 덱)에서 규칙에 따라 여러 개의 `StageDataSO`(미션 패키지)를 추출하여 선택 리스트 구성.  
-    * 플레이어가 미션 선택 시, 해당 `StageDataSO`의 `MapPool` 내에서 하나의 `MapDataSO`를 랜덤 결정.  
-    * 최종 선택된 `MapDataSO`는 `InitializationContext`에 할당되어 전투 세션으로 전달됨.  
+    * `MapCatalogManager`가 전역 `MapCatalogSO`를 참조하여 난이도별 풀(`DifficultyPools`)에서 미션 후보들을 인덱싱하여 선택 리스트를 구성함..  
+    * 플레이어가 미션을 선택하면 `MissionManager`는 해당 미션의 `MapEntry` 정보를 보관함. `MapDataSO`를 랜덤 결정.  
+    * 전투 씬 진입 시 `SceneInitializer`가 이 정보를 바탕으로 실제 `MapDataSO`를 비동기 로드하고, `InitializationContext`에 담아 각 시스템에 주입함.  
 * 수리공방 (Repair Shop)  
   *  **역할:** 전투에서 획득한 '손상된 장비'를 수리하여 사용 가능한 상태로 복구하는 시설.  
   * **기능:** 루팅된 무기는 기본적으로 '파손(Damaged)' 상태이며, 일정 자재(Junk)와 자금을 소모하여 수리해야 유닛에게 장착할 수 있습니다.
@@ -56,7 +56,7 @@
 2\. 출격 준비 (Provision)
 
 * 미션 시작 직전, 상점이 열리며 소모품(탄약, 수류탄, 회복약 등) 구매 및 **\[원정대 가방\]** 보관.  
-* **시스템 초기화**: `BootManager`가 `AppBootstrapper`와 `SceneInitializer`를 실행. `SceneInitializer`는 `MapManager`의 `Initialize(context)`를 호출하여 로드된 `MapDataSO`의 스폰 포인트 데이터를 전달하고 유닛을 배치함.
+* **시스템 초기화**: `BootManager`가 전역 및 씬 시스템을 부팅함. `UnitManager`는 `MapDataSO`를 순회하며 `RoleTag`가 설정된 타일을 찾아 해당 위치에 지정된 팀의 유닛을 생성 및 배치함.
 
 3\. 전술 전투 (Tactical Combat)
 
@@ -71,7 +71,7 @@
   * 원정대 가방에 남은 \*\*모든 소모품(탄약, 치료제, 수류탄 등)\*\*은 기지로 복귀하는 즉시 **자동으로 판매** 처리된다.  
   * **환불액:** 구매가의 \*\*30%\*\*에 해당하는 자금이 반환된다. (다키스트 던전 식 소모품 관리 방식 채택)
 
-  #### 2.2. 마이크로 루프 (Micro Loop: 전투 턴 흐름)
+  ### **2.2. 마이크로 루프 (Micro Loop: 전투 턴 흐름)**
 
 유니티의 TurnManager가 처리하게 될 1개 단위 턴의 로직 흐름.
 
@@ -343,8 +343,9 @@
 * **센터 (Center):**  
   * **FloorID (Enum):** 바닥재 재질. **\[예외 처리\]** 이 값이 None이거나 Null일 경우, 해당 좌표는 물리적으로 뚫려있는 구멍으로 간주하며, 유닛 진입 시 추락(Fall) 판정이 발생한다.  
   * **점유 슬롯 (Occupancy Slots) \- *변수 분리*:**  
-    * **PrimaryUnit (Unit):** 타일을 점유 중인 유닛 혹은 파괴 가능한 장애물(Object). 이동 불가 판정의 기준이 되며 **단 하나만 존재**한다.  
-    * **LootItems (List\<Item\>):** 바닥에 떨어진 아이템 목록. (이동 가능, 겹치기 가능).  
+    * **PrimaryUnit (Unit):** 타일을 점유 중인 유닛 혹은 장애물 객체  
+    * **RoleTag (string):** 타일 자체에 부여된 역할 식별자 (예: "PlayerSpawn", "EnemySpawn\_Elite"). 별도의 스폰 포인트 오브젝트 없이 타일 데이터만으로 배치 로직을 수행하는 SSOT(Single Source of Truth) 방식임.  
+    * **LootItems (List\<Item\>):** 바닥에 떨어진 아이템 목록.  
   * **캐싱 (Caching):** 매번 리스트를 검사하지 않고, PrimaryUnit의 상태에 따라 IsWalkable 프로퍼티를 자동 갱신하여 길찾기 연산 속도를 보장한다.  
 * **엣지 (Edge \- North/East/South/West):**  
   * 타일의 사방 경계에 종속되는 데이터.  
@@ -356,12 +357,15 @@
     * **목적:** 로드 시 파괴된 벽이 복구되거나, 콘크리트 벽이 투명 벽으로 변하는 데이터 무결성 오류를 원천 차단함.  
   * **데이터 무결성 (Data Integrity \- Sync Rule):**  
     * 엣지 데이터는 인접한 두 타일이 공유하는 물리적 벽면이므로, **반드시 양방향 동기화**되어야 한다.  
-    * **규칙:** 좌표 (C, R)의 **North** 벽을 생성/파괴할 경우, 인접한 (C, R+1) 좌표의 **South** 벽 데이터도 동일한 값으로 갱신해야 한다. MapManager는 이를 강제하는 메서드(SyncEdge 혹은 SetEdge)를 통해 데이터를 조작한다.
+    * **규칙:** **참조형 클래스(RuntimeEdge) 활용:**   
+      * 런타임에서는 엣지 정보를 구조체가 아닌 `RuntimeEdge` \*\*클래스(Class)\*로 관리함.  
+      * **공유 메커니즘:** `EnvironmentManager`가 초기화 시 인접한 두 타일에 \*\*동일한 `RuntimeEdge` 객체 참조를 주입(Wiring)\*\*함. 이를 통해 한쪽 타일에서 벽을 파괴(데미지 적용)하면 연결된 반대편 타일의 엣지 상태도 별도의 복사 과정 없이 실시간으로 동기화됨.
 
 (2) 기둥 셀 및 PillarInfo (Pillar Cell & Logic)
 
 * **PillarID (Enum):** 기둥의 외형 및 내구도 정보 식별.  
-* **PillarInfo 객체:** 타일 점유와 HP를 관리하는 논리 클래스. `ITileOccupant`를 상속받음.  
+* **PillarInfo 객체:** 단순 데이터가 아닌 `ITileOccupant` 인터페이스를 구현한 **논리 점유 객체**임.  
+* **점유 시스템 연동:** 타일 생성 시 `AddOccupant(PillarInfo)`를 통해 등록되며, 기둥의 HP가 0이 되어 파괴될 경우 `OnBlockingChanged` 이벤트를 발생시켜 타일의 `IsWalkable` 상태를 즉시 `True`로 전환함.  
 * **논리적 구축:** `MapManager` 초기화 시 기둥 데이터를 읽어 `PillarInfo`를 생성하고, 타일의 `AddOccupant()`로 등록함. 등록 시 타일의 `UpdateCache()`가 실행되어 해당 타일의 `_cachedIsWalkable`을 `false`로 자동 확정함.  
 * **특성:**  
   * 엣지(Edge) 데이터를 가지지 않으며, 좌표 전체를 물리적으로 점유함.  
@@ -405,12 +409,14 @@
 
 1. **서비스 로케이터 (Service Locator):** 모든 매니저 클래스는 싱글톤(Instance) 변수를 가지지 않으며, 오직 `ServiceLocator`를 통해서만 접근 가능하다.  
 2. **하이브리드 등록 (Hybrid Registration): Global 매니저는 자신의 Awake()에서 스스로를 등록한다(자가 등록). 반면, 씬의 생명주기에 종속적인 Session 및 Scene 매니저는 SceneInitializer에 의해 중앙에서 등록을 관리한다(중앙 등록). 이를 통해 각 스코프의 특성에 맞는 등록 방식을 사용한다.**  
-3. **2단계 초기화 (Two-Phase Initialization):**  
-   *  **1단계 (등록 \- Awake): 모든 매니저는 Awake()에서 ServiceLocator에 등록하는 작업 외에는 아무것도 하지 않는다. 다른 매니저를 참조하거나 사용하는 코드는 절대 금지한다.**  
-   * **2단계 (의존성 주입 및 초기화 \- Initialize): 모든 매니저가 등록된 후, Initializer(AppInitializer 또는 SceneInitializer)가 각  매니저의 Initialize(context) 메서드를 호출한다. 이 단계에서 비로소 ServiceLocator.Get\<T\>()을 통해 다른 매니저를 안전하게 참조하고 필요한 로직을 초기화한다.**  
-4. **인터페이스 기반 비동기 초기화:** 초기화가 필요한 모든 매니저는 `IInitializable`을 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 메인 스레드 블로킹(`WaitForCompletion`)은 어떠한 경우에도 금지한다.  
-5. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.  
-6. 대규모 맵 로딩 전략 (Loading Strategy):  
+3.   
+4. **2단계 초기화 (Two-Phase Initialization):**  
+   * **1단계 (등록 \- Awake): 모든 매니저는 `Awake()`에서 `ServiceLocator`에 자신을 등록하며, 타 시스템 참조는 금지함.**  
+   * **2단계 (컨텍스트 주입 \- Initialize): `BootManager`에 의해 트리거된 Initializer가 `InitializationContext`를 생성하여 각 매니저의 `Initialize(context)`를 호출함**  
+   * **데이터 일관성: `InitializationContext`는 실행 시점에 필요한 `GlobalSettings`, `TileRegistry`, `MapData` 등을 한꺼번에 담아 전달함으로써 매니저 간 데이터 불일치를 방지함**  
+5. **인터페이스 기반 비동기 초기화:** 초기화가 필요한 모든 매니저는 `IInitializable`을 구현하며, 반환 타입은 반드시 \*\*`UniTask`\*\*여야 한다. 메인 스레드 블로킹(`WaitForCompletion`)은 어떠한 경우에도 금지한다.  
+6. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.  
+7. 대규모 맵 로딩 전략 (Loading Strategy):  
    * **시간 할당제 스트리밍 (Time-Sliced Streaming):** 130x130 이상의 대규모 맵 로딩 시, 타일 생성 루프가 메인 스레드를 독점하여 화면이 멈추는(Freezing) 현상을 방지한다. 타일 생성 시 '개수' 기준이 아닌 \*\*"프레임당 16ms(0.016초) 제한"\*\*을 두어, 시간이 초과되면 작업을 일시 중단(`await UniTask.Yield`)하고 제어권을 OS에 넘긴다. 이를 통해 로딩 중에도 UI 애니메이션과 터치 반응성을 유지한다.  
    * **온디맨드 생성 (On-Demand Generation):** 초기화 시 `new Tile()`을 맵 전체에 수행하지 않는다. `MapData`에 유효한 정보가 존재하는 좌표에 대해서만 객체를 생성하여 런타임 메모리 스파이크를 방지한다.
 
@@ -450,6 +456,8 @@
 | **DataManager** | **DB** | 게임 내 모든 정적 데이터(SO) 및 세이브 데이터 로드/캐싱. |
 | **InputManager** | **입력** | 하드웨어 입력을 게임 Action으로 변환 및 레이어(UI/Game) 제어. |
 | **GlobalSettingsSO** | **설정** | 해상도, 사운드 볼륨 등 전역 설정 데이터 컨테이너. |
+| **MapCatalogManager** |  | `MapCatalogSO`를 인덱싱하여 난이도/태그별 맵 검색 API를 제공하는 DB 역할 |
+| **MissionManager** |  | 플레이어가 선택한 미션 정보(`MapEntry`)를 관리하고 전투 세션으로 전달 |
 
 ### **(2) Scene Scope (Session Lifetime)**
 
@@ -468,6 +476,7 @@
 | **Visual** | **TilemapGenerator** | MapManager의 논리 데이터를 기반으로 실제 프리팹을 월드에 비동기(GenerateAsync) 스폰 및 배치. |
 |  | **DamageTextMgr** | • 데미지 플로팅 텍스트 연출. |
 | **System** | **EnvironmentManager** | • **환경 변화 중계:** 벽/기둥 파괴 이벤트를 수신하여 데이터와 비주얼 간의 동기화 명령 하달. 333  • **논리 갱신 트리거:** 구조물 제거 시 Tile.UpdateCache()를 호출하여 이동 가능 여부 및 시야를 실시간 재계산하게 함.   • **상태 변환 관리:** 바닥 타일의 파손 상태(FloorType 변경)와 그에 따른 이동 비용(Cost) 가중치 적용 관리.  |
+| **TileDataManager** |  | `TileRegistry`를 보유하며, 런타임에 필요한 타일/벽/기둥의 프리팹과 속성 데이터를 공급함. |
 
 ### **(3) Scene Scope (Non-Battle)**
 
@@ -477,6 +486,7 @@
 | :---- | :---- | :---- |
 | **Base** | **BaseManager** | • 기지 내 UI 메뉴(연구, 병영, 정비) 네비게이션 처리. • SquadManager와 연동하여 대원 치료/훈련 로직 수행. |
 | **World** | **MissionManager** | • 랜덤 미션 생성 및 지역별 보상 데이터 관리. • 선택된 미션 정보를 Battle 씬으로 전달(MapDataSO). |
+|  |  |  |
 
 ### **6.3. 핵심 시스템 구현 로직 (Core Implementation Logic)**
 
@@ -914,6 +924,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 | **Min/MaxLevel** | int | 맵의 유효한 층수 범위 (Y축). |
 | **MapPrefabRef** | AssetReference | 맵의 배경이 되는 3D 환경 모델 프리팹 (Visual Only). |
 | **Tiles** | List\<TileSaveData\> | **\[희소 배열\]** 실제 데이터(바닥, 벽, 기둥)가 존재하는 타일 정보 리스트. |
+| **TryGetRoleLocation** | (Method) | **특정 `RoleTag`를 가진 타일의 좌표를 검색하는 기능을 내장하여 별도의 스폰 포인트 리스트 관리를 대체함** |
 
 ### **8.9. MapEditorSettingsSO (맵 에디터 공통 설정)**
 
