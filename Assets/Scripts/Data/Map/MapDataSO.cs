@@ -1,3 +1,4 @@
+// 파일: Assets/Scripts/Data/Map/MapDataSO.cs
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,7 @@ public class MapDataSO : ScriptableObject
     [Header("2. Tile Data")]
     public List<TileSaveData> Tiles = new List<TileSaveData>();
 
-    // [Deprecated] SpawnPoints는 더 이상 사용하지 않음
+    // [Deprecated] SpawnPoints는 더 이상 사용하지 않음 (RoleTag로 대체)
     [HideInInspector]
     public List<SpawnPointData> SpawnPoints;
 
@@ -34,7 +35,7 @@ public class MapDataSO : ScriptableObject
             return false;
         }
 
-        // RoleTag 중복 검증
+        // [New] RoleTag 중복 검증 필수
         var roleTagSet = new HashSet<string>();
         foreach (var tile in Tiles)
         {
@@ -52,18 +53,18 @@ public class MapDataSO : ScriptableObject
         return true;
     }
 
-    // ========================================================================
-    // [핵심] MissionManager가 태그로 위치를 찾기 위해 호출하는 함수
-    // ========================================================================
+    // [New] 메서드명 명확화: 유일한 Role 위치 반환
     public bool TryGetRoleLocation(string roleTag, out Vector2Int coordinate)
     {
         coordinate = Vector2Int.zero;
-        if (string.IsNullOrEmpty(roleTag) || Tiles == null) return false;
+        if (string.IsNullOrEmpty(roleTag)) return false;
 
+        // 리스트 순회 (RoleTag는 유일하므로 찾으면 즉시 반환)
         foreach (var tile in Tiles)
         {
             if (tile.RoleTag == roleTag)
             {
+                // [주석 명확화] GridCoords는 3D (x, y, z)인데, y는 높이이므로 무시하고 xz 평면 좌표만 사용
                 coordinate = new Vector2Int(tile.Coords.x, tile.Coords.z);
                 return true;
             }

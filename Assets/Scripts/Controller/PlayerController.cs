@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.InputSystem; // New Input System
 
 public class PlayerController : MonoBehaviour, IUnitController
 {
@@ -24,10 +23,6 @@ public class PlayerController : MonoBehaviour, IUnitController
 
     private List<GridCoords> _validPathStep;
     private List<GridCoords> _invalidPathStep;
-
-    // [성능 최적화] 경로 계산 스로틀링용 변수
-    private float _lastPathCalcTime;
-    private const float PATH_CALC_INTERVAL = 0.1f;
 
     private void Awake()
     {
@@ -67,7 +62,7 @@ public class PlayerController : MonoBehaviour, IUnitController
     {
         if (PossessedUnit == null) return;
 
-        Debug.Log($"[PlayerController] Turn Start: {PossessedUnit.name}");
+        Debug.Log($"[PlayerController] Turn Start: {PossessedUnit.name} (AP: {PossessedUnit.CurrentAP})");
 
         _isMyTurn = true;
         _turnEnded = false;
@@ -88,21 +83,12 @@ public class PlayerController : MonoBehaviour, IUnitController
     private void Update()
     {
         if (!_isMyTurn || _turnEnded || PossessedUnit == null) return;
-
-        // [성능 최적화] 매 프레임 계산 방지 (0.1초 간격)
-        if (Time.time - _lastPathCalcTime < PATH_CALC_INTERVAL) return;
-        _lastPathCalcTime = Time.time;
-
-        // New Input System에서 마우스 위치 가져오기
-        Vector2 mousePos = Mouse.current.position.ReadValue();
-        UpdateMouseHover(mousePos);
+        UpdateMouseHover();
     }
 
-    // [유연성 개선] 인자로 좌표를 받도록 수정
-    private void UpdateMouseHover(Vector2 screenPos)
+    private void UpdateMouseHover()
     {
-        // GetGridFromScreen도 인자를 받도록 변경됨
-        if (!GetGridFromScreen(screenPos, out GridCoords targetCoords))
+        if (!GetGridFromScreen(out GridCoords targetCoords))
         {
             if (_validPathStep != null || _invalidPathStep != null)
             {
@@ -125,8 +111,19 @@ public class PlayerController : MonoBehaviour, IUnitController
             return;
         }
 
-        // [Issue #1] Unit에 위임한 로직 사용
-        int availableMove = PossessedUnit.GetAvailableMoveDistance();
+        // [Logic] 이동 가능 거리 계산 (선불제 로직 반영)
+        int availableMove = 0;
+
+        if (PossessedUnit.HasStartedMoving)
+        {
+            // 이미 이동 중이면 남은 이동력만큼만 더 갈 수 있음
+            availableMove = PossessedUnit.CurrentMobility;
+        }
+        else
+        {
+            // 아직 이동 안 했으면, AP가 1 이상 있어야 전체 Mobility만큼 이동 가능
+            availableMove = (PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0;
+        }
 
         _validPathStep = fullPath.Take(availableMove).ToList();
         _invalidPathStep = fullPath.Skip(availableMove).ToList();
@@ -138,10 +135,20 @@ public class PlayerController : MonoBehaviour, IUnitController
     {
         if (_mapManager == null || PossessedUnit == null) return;
 
-        // [Issue #1] Unit에 위임한 로직 사용 (중복 제거)
-        int range = PossessedUnit.GetAvailableMoveDistance();
+        // [Logic] 이동 가능 범위 계산 (선불제 로직 반영)
+        // 위 UpdateMouseHover와 동일한 로직
+        int range = 0;
 
-        Debug.Log($"[PlayerController] Calc Reachable. Range:{range}");
+        if (PossessedUnit.HasStartedMoving)
+        {
+            range = PossessedUnit.CurrentMobility;
+        }
+        else
+        {
+            range = (PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0;
+        }
+
+        Debug.Log($"[PlayerController] Calc Reachable. AP:{PossessedUnit.CurrentAP}, Moved:{PossessedUnit.HasStartedMoving}, Range:{range}");
 
         _cachedReachableTiles = Pathfinder.GetReachableTiles(PossessedUnit.Coordinate, range, _mapManager);
         _pathVisualizer?.ShowReachable(_cachedReachableTiles, excludeCoords: PossessedUnit.Coordinate);
@@ -166,6 +173,7 @@ public class PlayerController : MonoBehaviour, IUnitController
 
         if (_validPathStep != null && _validPathStep.Count > 0)
         {
+            // 빨간색 경로(이동 불가)가 포함되어 있으면 이동 금지
             if (_invalidPathStep != null && _invalidPathStep.Count > 0)
             {
                 Debug.LogWarning("Target is too far!");
@@ -184,6 +192,9 @@ public class PlayerController : MonoBehaviour, IUnitController
 
             await PossessedUnit.MovePathAsync(path, _mapManager);
 
+            // 이동 후 턴 종료 조건 체크
+            // 1. AP가 아예 0이 되면 종료
+            // 2. 이동력까지 다 써버리면? (보통은 턴 종료 안 하고 공격 기회 줌. 여기선 AP 기준)
             if (PossessedUnit.CurrentAP <= 0)
             {
                 Debug.Log("AP Depleted -> Turn End");
@@ -191,6 +202,7 @@ public class PlayerController : MonoBehaviour, IUnitController
             }
             else
             {
+                // AP 남았으면 (또는 이동력 남았으면) 다시 입력 대기
                 CalculateReachableArea();
                 ConnectInput();
             }
@@ -210,13 +222,14 @@ public class PlayerController : MonoBehaviour, IUnitController
         _pathVisualizer?.ClearAll();
     }
 
-    // [유연성 개선] 외부 인자(screenPos)를 받도록 롤백
-    private bool GetGridFromScreen(Vector2 screenPos, out GridCoords coords)
+    private bool GetGridFromScreen(out GridCoords coords)
     {
         coords = default;
         if (_mainCamera == null || _mapManager == null) return false;
 
-        Ray ray = _mainCamera.ScreenPointToRay(screenPos);
+        // InputManager를 통해야 하지만 Raycast용으로 직접 읽음
+        Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+        Ray ray = _mainCamera.ScreenPointToRay(mousePos);
 
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
         {

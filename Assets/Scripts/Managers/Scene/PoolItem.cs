@@ -3,7 +3,7 @@ using UnityEngine;
 public class PoolItem : MonoBehaviour
 {
     public Renderer MainRenderer;
-    public PoolType Type; // 생성 시 자동 할당
+    public PoolType Type; //
 
     public enum PoolType { Reachable, Path, Unreachable }
 

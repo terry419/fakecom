@@ -15,9 +15,9 @@ public class Unit : MonoBehaviour, ITileOccupant
     public int CurrentAP { get; private set; }
     public int MaxAP { get; private set; }
 
-    // 턴 내에서 현재 남아있는 이동력
+    // [New] 턴 내에서 현재 남아있는 이동력 (끊어 가기용)
     public int CurrentMobility { get; private set; }
-    // 이번 턴에 이동 행동을 개시했는지 여부
+    // [New] 이번 턴에 이동 행동을 개시했는지 여부 (AP 선불 차감용)
     public bool HasStartedMoving { get; private set; }
 
     public int Mobility => Data != null ? Data.Mobility : 5;
@@ -28,6 +28,7 @@ public class Unit : MonoBehaviour, ITileOccupant
     private Collider _collider;
 
     [Header("Movement Settings")]
+    [Tooltip("초당 이동 거리 (Inspector에서 조절 가능)")]
     [SerializeField] private float _moveSpeed = 3.0f;
     [SerializeField] private float _rotateSpeed = 15.0f;
 
@@ -38,8 +39,8 @@ public class Unit : MonoBehaviour, ITileOccupant
     public bool IsBlockingMovement => true;
     public bool IsCover => false;
 
-    public event Action<bool> OnBlockingChanged = delegate { };
-    public event Action<bool> OnCoverChanged = delegate { };
+    public event Action<bool> OnBlockingChanged;
+    public event Action<bool> OnCoverChanged;
 
     // ========================================================================
     // 3. 초기화 및 스폰
@@ -67,7 +68,9 @@ public class Unit : MonoBehaviour, ITileOccupant
             CurrentAP = 2;
         }
 
-        ResetState();
+        // 초기화 시 이동력 풀충전
+        CurrentMobility = Mobility;
+        HasStartedMoving = false;
     }
 
     public void SpawnOnMap(GridCoords coords)
@@ -115,23 +118,15 @@ public class Unit : MonoBehaviour, ITileOccupant
     public void OnTurnEnd() => _controller?.OnTurnEnd();
 
     // ========================================================================
-    // 5. 이동 및 행동 로직
+    // 5. 이동 로직 (선불제 AP 시스템 적용)
     // ========================================================================
-
-    // [Issue #1] 로직 중복 제거를 위한 Helper 메서드
-    public int GetAvailableMoveDistance()
-    {
-        if (HasStartedMoving)
-            return CurrentMobility;
-        else
-            return (CurrentAP >= 1) ? Mobility : 0;
-    }
 
     public async UniTask MovePathAsync(List<GridCoords> path, MapManager mapManager)
     {
         if (path == null || path.Count == 0) return;
 
-        // 1. 이동 시작 전 AP 선불 차감 처리
+        // [Logic] 선불제 AP 처리
+        // 아직 이동을 시작하지 않았다면 -> 1 AP 차감 (이동 개시 비용)
         if (!HasStartedMoving)
         {
             if (CurrentAP < 1)
@@ -143,16 +138,10 @@ public class Unit : MonoBehaviour, ITileOccupant
             HasStartedMoving = true;
         }
 
-        // 2. [Issue #2] 거리 검증 추가 (Critical)
+        // 실제 이동한 거리만큼 CurrentMobility 차감
+        // (path.Count는 목적지까지의 칸 수)
         int distance = path.Count;
-        if (distance > CurrentMobility)
-        {
-            Debug.LogError($"[Unit] Invalid Move: Path distance ({distance}) > Current Mobility ({CurrentMobility}). Move rejected.");
-            return;
-        }
-
-        // 3. 이동력 차감
-        CurrentMobility -= distance;
+        CurrentMobility = Mathf.Max(0, CurrentMobility - distance);
 
         float speed = _moveSpeed > 0 ? _moveSpeed : 3.0f;
 
@@ -167,6 +156,7 @@ public class Unit : MonoBehaviour, ITileOccupant
             Vector3 targetPos = GridUtils.GridToWorld(nextCoords);
             targetPos.y = GetTargetHeight(targetPos.y);
 
+            // 회전
             Vector3 direction = (targetPos - transform.position).normalized;
             if (direction != Vector3.zero)
             {
@@ -174,6 +164,7 @@ public class Unit : MonoBehaviour, ITileOccupant
                 RotateTo(targetRot).Forget();
             }
 
+            // 이동 (부드럽게)
             while (Vector3.Distance(transform.position, targetPos) > 0.05f)
             {
                 transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
@@ -204,13 +195,8 @@ public class Unit : MonoBehaviour, ITileOccupant
     public void ResetAP()
     {
         CurrentAP = MaxAP > 0 ? MaxAP : 2;
-        ResetState();
-    }
-
-    private void ResetState()
-    {
-        CurrentMobility = Mobility;
-        HasStartedMoving = false;
+        CurrentMobility = Mobility; // 이동력 리셋
+        HasStartedMoving = false;   // 이동 상태 리셋
     }
 
     public void TakeDamage(int damage)

@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 public class CameraController : MonoBehaviour, IInitializable
 {
     [Header("Settings")]
-    //[SerializeField] private float _moveSpeed = 5f;        // 카메라 추적 속도
+    [SerializeField] private float _moveSpeed = 5f;        // 카메라 추적 속도
     [SerializeField] private float _smoothTime = 0.2f;     // 부드러움 정도 (낮을수록 빠름)
 
     [Header("View Config")]
