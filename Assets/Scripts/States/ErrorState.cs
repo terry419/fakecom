@@ -4,11 +4,11 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // [State] 치명적 오류 처리 상태
-public class ErrorState : SessionStateBase
+public class ErrorState : BattleStateBase
 {
-    public override SessionState StateID => SessionState.Error;
+    public override BattleState StateID => BattleState.Error;
 
-    public ErrorState(SessionContext context) { } // Context는 필요 없을 수도 있지만 일관성을 위해 받음
+    public ErrorState(BattleContext context) { } // Context는 필요 없을 수도 있지만 일관성을 위해 받음
 
     public override async UniTask Enter(StatePayload payload, CancellationToken cancellationToken)
     {

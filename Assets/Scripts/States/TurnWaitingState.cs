@@ -3,12 +3,12 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // [State] 다음 턴 계산 대기
-public class TurnWaitingState : SessionStateBase
+public class TurnWaitingState : BattleStateBase
 {
-    public override SessionState StateID => SessionState.TurnWaiting;
-    private readonly SessionContext _context;
+    public override BattleState StateID => BattleState.TurnWaiting;
+    private readonly BattleContext _context;
 
-    public TurnWaitingState(SessionContext context)
+    public TurnWaitingState(BattleContext context)
     {
         _context = context;
     }

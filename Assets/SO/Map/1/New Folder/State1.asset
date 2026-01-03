@@ -18,233 +18,8 @@ MonoBehaviour:
   MaxLevel: 3
   Tiles:
   - Coords:
-      x: 15
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 15
-      z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 15
+      x: 20
       z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 15
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 15
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 15
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 18
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 19
-      z: 3
       y: 0
     FloorID: 2
     PillarID: 0
@@ -269,357 +44,7 @@ MonoBehaviour:
     RoleTag: 
   - Coords:
       x: 20
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
-      z: 3
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
       z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 23
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 22
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
-      z: 4
       y: 0
     FloorID: 2
     PillarID: 0
@@ -644,7 +69,82 @@ MonoBehaviour:
     RoleTag: 
   - Coords:
       x: 20
-      z: 4
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 4
+      Cover: 1
+      MaxHP: 100
+      CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 19
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 2
+      Cover: 1
+      MaxHP: 30
+      CurrentHP: 30
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 18
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 1
+      Cover: 2
+      MaxHP: 100
+      CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 18
+      z: 7
       y: 0
     FloorID: 2
     PillarID: 0
@@ -669,307 +169,7 @@ MonoBehaviour:
     RoleTag: 
   - Coords:
       x: 19
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 18
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
-      z: 4
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
       z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 16
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 17
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 18
-      z: 5
       y: 0
     FloorID: 2
     PillarID: 0
@@ -994,132 +194,7 @@ MonoBehaviour:
     RoleTag: 
   - Coords:
       x: 19
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 20
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
-      z: 5
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
       z: 6
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
-      z: 7
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 21
-      z: 8
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1168,7 +243,57 @@ MonoBehaviour:
       CurrentHP: 0
     RoleTag: 
   - Coords:
-      x: 19
+      x: 21
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 21
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 21
       z: 6
       y: 0
     FloorID: 2
@@ -1193,8 +318,58 @@ MonoBehaviour:
       CurrentHP: 0
     RoleTag: 
   - Coords:
+      x: 21
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 20
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
       x: 19
-      z: 7
+      z: 5
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1219,7 +394,7 @@ MonoBehaviour:
     RoleTag: 
   - Coords:
       x: 18
-      z: 7
+      z: 5
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1243,83 +418,8 @@ MonoBehaviour:
       CurrentHP: 0
     RoleTag: 
   - Coords:
-      x: 18
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 1
-      Cover: 2
-      MaxHP: 100
-      CurrentHP: 100
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 19
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 2
-      Cover: 1
-      MaxHP: 30
-      CurrentHP: 30
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 20
-      z: 8
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 4
-      Cover: 1
-      MaxHP: 100
-      CurrentHP: 100
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-  - Coords:
-      x: 20
-      z: 7
+      x: 17
+      z: 5
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1343,8 +443,908 @@ MonoBehaviour:
       CurrentHP: 0
     RoleTag: 
   - Coords:
-      x: 20
+      x: 17
       z: 6
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 17
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 17
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 6
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 17
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 18
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 19
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 20
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 21
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 6
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 8
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 6
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 23
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 22
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 21
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 20
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 19
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 18
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 17
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 16
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 3
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 4
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 5
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 6
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 7
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+  - Coords:
+      x: 15
+      z: 8
       y: 0
     FloorID: 2
     PillarID: 0

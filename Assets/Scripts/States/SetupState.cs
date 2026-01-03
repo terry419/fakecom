@@ -4,16 +4,16 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // [State] 맵/유닛 배치 및 전투 시작 대기
-public class SetupState : SessionStateBase
+public class SetupState : BattleStateBase
 {
     // [Fix 1] 부모의 abstract 프로퍼티 구현
-    public override SessionState StateID => SessionState.Setup;
+    public override BattleState StateID => BattleState.Setup;
 
     // 생성자를 통해 SessionContext 주입 (SessionStateFactory 구조 유지)
-    private readonly SessionContext _context;
+    private readonly BattleContext _context;
     private CancellationTokenSource _linkedCts;
 
-    public SetupState(SessionContext context)
+    public SetupState(BattleContext context)
     {
         _context = context;
     }
@@ -54,7 +54,7 @@ public class SetupState : SessionStateBase
             Debug.LogError($"[SetupState] Map generation failed: {ex.Message}");
 
             // 부모 클래스의 protected 메서드 사용 (이벤트 호출)
-            RequestTransition(SessionState.Error, new ErrorPayload(ex));
+            RequestTransition(BattleState.Error, new ErrorPayload(ex));
             return;
         }
 
@@ -99,7 +99,7 @@ public class SetupState : SessionStateBase
             }
 
             Debug.Log("[SetupState] Player Confirmed. Transitioning to TurnWaiting...");
-            RequestTransition(SessionState.TurnWaiting);
+            RequestTransition(BattleState.TurnWaiting);
         }
         catch (OperationCanceledException)
         {
@@ -108,7 +108,7 @@ public class SetupState : SessionStateBase
         catch (Exception ex)
         {
             Debug.LogError($"[SetupState] UI Error: {ex.Message}");
-            RequestTransition(SessionState.Error, new ErrorPayload(ex));
+            RequestTransition(BattleState.Error, new ErrorPayload(ex));
         }
     }
 
