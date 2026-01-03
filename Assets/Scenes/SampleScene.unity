@@ -405,6 +405,10 @@ PrefabInstance:
       propertyPath: _unreachablePrefab
       value: 
       objectReference: {fileID: 4002224012173158463, guid: ec1451339f3909545bc6f00c87339d23, type: 3}
+    - target: {fileID: 4647220188888504884, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
+      propertyPath: m_Name
+      value: BattleManager
+      objectReference: {fileID: 0}
     - target: {fileID: 6051140353520375680, guid: d135caeeb3aa16d408bff98a27e2b7c4, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.05144024

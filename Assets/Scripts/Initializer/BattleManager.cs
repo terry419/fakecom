@@ -1,9 +1,10 @@
+using Cysharp.Threading.Tasks;
 using System;
 using System.Threading;
-using Cysharp.Threading.Tasks;
+using UnityEditor;
 using UnityEngine;
 
-// [Scene Scope] 개별 전투의 흐름(FSM)을 총괄하는 관리자
+// FSM의 총괄 관리자
 public class BattleManager : MonoBehaviour, IInitializable
 {
     public BattleState CurrentStateID { get; private set; } = BattleState.None;
@@ -29,9 +30,9 @@ public class BattleManager : MonoBehaviour, IInitializable
     }
     private UIManagerMock _uiManagerMock;
 
+
     private void Awake()
     {
-        // 씬 스코프로 등록
         ServiceLocator.Register(this, ManagerScope.Scene);
         _cts = new CancellationTokenSource();
     }
@@ -39,11 +40,13 @@ public class BattleManager : MonoBehaviour, IInitializable
     private void OnDestroy()
     {
         _cts.Cancel();
-        // 비동기 정리 작업 시도
+        // OnDestroy는 동기 컨텍스트이므로, Exit의 비동기 완료를 기다릴 수 없습니다.
+        // Forget()으로 호출하여 마지막 정리 작업을 시도하게 합니다.
         _currentLogicState?.Exit(_cts.Token).Forget();
         _cts.Dispose();
 
         ServiceLocator.Unregister<BattleManager>(ManagerScope.Scene);
+        BootManager.OnBootComplete -= OnSystemBootFinished;
     }
 
     public async UniTask Initialize(InitializationContext context)
@@ -57,31 +60,45 @@ public class BattleManager : MonoBehaviour, IInitializable
             if (!ServiceLocator.TryGet(out TurnManager turnManager))
                 throw new Exception("TurnManager가 등록되지 않았습니다!");
 
-            // 임시 UIManager Mock 생성
+            // 임시 UIManager Mock 생성 및 Context에 전달
             _uiManagerMock = new UIManagerMock();
-            // 실제 UIManager가 생기면: ServiceLocator.Get<IUIManager>(); 로 대체
+            // 실제 UIManager 사용 시: ServiceLocator.Register<IUIManager>(_uiManagerMock, ManagerScope.Scene);
 
-            // [변경] BattleContext 생성 및 팩토리 초기화
-            var battleContext = new BattleContext(mapManager, turnManager, _uiManagerMock);
-            _stateFactory = new BattleStateFactory(battleContext);
+            // 의존성 컨테이너(SessionContext) 생성 및 팩토리 초기화
+            var BattleContext = new BattleContext(mapManager, turnManager, _uiManagerMock);
+            _stateFactory = new BattleStateFactory(BattleContext);
 
-            Debug.Log("[BattleManager] 초기화 완료. 전투 준비 상태(Setup)로 진입합니다.");
-
-            // (임시) 테스트를 위해 UI 자동 클릭 트리거
-            _uiManagerMock.AutoTriggerStartConfirmation();
-
-            // 즉시 Setup 상태로 전환 (BootManager 기다릴 필요 없음)
-            HandleTransitionRequest(BattleState.Setup, null);
+            BootManager.OnBootComplete += OnSystemBootFinished;
         }
         catch (Exception ex)
         {
+            // 초기화 실패 시 즉시 ErrorState로 전환
             Debug.LogError($"[BattleManager] 초기화 실패: {ex.Message}");
             CurrentStateID = BattleState.Error;
-            // 팩토리가 없을 수 있으므로 직접 에러 상태 생성
-            _currentLogicState = new ErrorState(null); // ErrorState는 Context가 없어도 동작하도록 설계 필요
+            // _stateFactory가 없을 수 있으므로 ErrorState를 직접 생성
+            _currentLogicState = new ErrorState(null);
             _currentLogicState.Enter(new ErrorPayload(ex), _cts.Token).Forget();
         }
         await UniTask.CompletedTask;
+    }
+
+    private void OnSystemBootFinished(bool isSuccess)
+    {
+        // 초기화 단계에서 이미 ErrorState로 전환되었다면 무시
+        if (CurrentStateID == BattleState.Error) return;
+
+        if (!isSuccess || _stateFactory == null)
+        {
+            HandleTransitionRequest(BattleState.Error, new ErrorPayload(new Exception("Boot failed or StateFactory not ready.")));
+            return;
+        }
+
+        Debug.Log("[BattleManager] 시스템 부팅 완료. Setup 상태 진입 요청.");
+
+        // (임시) Mock UI가 버튼을 자동으로 누르도록 하여 테스트 진행
+        _uiManagerMock.AutoTriggerStartConfirmation();
+
+        HandleTransitionRequest(BattleState.Setup, null);
     }
 
     private void HandleTransitionRequest(BattleState nextStateID, StatePayload payload)
@@ -107,8 +124,6 @@ public class BattleManager : MonoBehaviour, IInitializable
             }
 
             var oldID = CurrentStateID;
-
-            // [변경] BattleStateFactory 사용
             _currentLogicState = _stateFactory.GetOrCreate(nextStateID);
             CurrentStateID = _currentLogicState.StateID;
 
@@ -125,6 +140,7 @@ public class BattleManager : MonoBehaviour, IInitializable
         catch (Exception ex)
         {
             Debug.LogError($"[BattleManager] 상태 전환 중 치명적 오류 발생. ErrorState로 전환합니다.");
+            // 현재 전환 로직이 실패했으므로, 다시 이 메서드를 호출하지 않고 직접 ErrorState로 진입
             CurrentStateID = BattleState.Error;
             _currentLogicState = _stateFactory.GetOrCreate(BattleState.Error);
             _currentLogicState.Enter(new ErrorPayload(ex), _cts.Token).Forget();
@@ -145,7 +161,7 @@ public class BattleManager : MonoBehaviour, IInitializable
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[BattleManager] '{CurrentStateID}' 상태 Update 중 오류 발생.");
+            Debug.LogError($"[BattleManager] '{CurrentStateID}' 상태 Update 중 오류 발생. ErrorState로 전환합니다.");
             HandleTransitionRequest(BattleState.Error, new ErrorPayload(ex));
         }
     }

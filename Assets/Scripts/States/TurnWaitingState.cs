@@ -31,6 +31,6 @@ public class TurnWaitingState : BattleStateBase
 
         // 다음 상태(PlayerTurn)로 명시적 전환 요청
         // var nextPayload = new PlayerTurnPayload { TurnUnit = nextUnit }; // 필요한 경우 Payload와 함께
-        //RequestTransition(SessionState.PlayerTurn); // 임시로 Payload 없이 PlayerTurn으로 전환
+        //RequestTransition(BattleState.PlayerTurn); // 임시로 Payload 없이 PlayerTurn으로 전환
     }
 }

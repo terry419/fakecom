@@ -9,7 +9,7 @@ public class SetupState : BattleStateBase
     // [Fix 1] 부모의 abstract 프로퍼티 구현
     public override BattleState StateID => BattleState.Setup;
 
-    // 생성자를 통해 SessionContext 주입 (SessionStateFactory 구조 유지)
+    // 생성자를 통해 BattleContext 주입 (BattleStateFactory 구조 유지)
     private readonly BattleContext _context;
     private CancellationTokenSource _linkedCts;
 
