@@ -21,13 +21,14 @@ MonoBehaviour:
     MissionName: 
     Description: 
     Type: 0
-  PlayerSettings:
-    MaxPlayerCount: 1
-    PlayerSpawnTag: Spawn_Player
-  DefaultRoster:
-  - {fileID: 11400000, guid: 0964b9e991755534c845512d39e3d106, type: 2}
+    TurnLimit: 0
+  PlayerConfig:
+    SpawnSlots:
+    - RoleTag: Spawn_Player
+    DefaultSquad:
+    - {fileID: 11400000, guid: 0964b9e991755534c845512d39e3d106, type: 2}
   EnemySpawns:
-  - Unit: {fileID: 11400000, guid: 9d21199e9ddbfc047a905a9a87dc54b4, type: 2}
-    RoleTag: Spot_A
-    Count: 0
+  - RoleTag: Spot_A
+    UnitData: {fileID: 11400000, guid: 9d21199e9ddbfc047a905a9a87dc54b4, type: 2}
+  NeutralSpawns: []
   Rewards: []
