@@ -29,6 +29,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - TileData
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ed91cb3fbf8279d46bc8844ce423a49f
+    m_Address: Assets/SO/Tile/TileRegistry.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - TileData
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 6dab44de8aac0ed4199157ef46e50c4b, type: 2}
   m_SchemaSet:

@@ -2,7 +2,6 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
 using System.Text;
-using System.Collections.Generic; // List 사용을 위해 추가
 using YCOM.Utils;
 
 public class BootManager : MonoBehaviour
@@ -10,7 +9,6 @@ public class BootManager : MonoBehaviour
     public static event Action<bool> OnBootComplete;
     private StringBuilder _bootLog = new StringBuilder();
 
-    // 상수는 유지하되, 아래 로직에서 전처리기로 분기
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     private const bool AUTO_START_SESSION = true;
 #else
@@ -43,23 +41,22 @@ public class BootManager : MonoBehaviour
             // ----------------------------------------------------------------
             _bootLog.AppendLine("\n1.5. Session");
 
-            // [Fix] CS0162 경고 해결: 컴파일러가 코드를 아예 제외하도록 전처리기 사용
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (AUTO_START_SESSION)
             {
                 try
                 {
-                    if (!ServiceLocator.TryGet(out MapCatalogManager catalog))
-                        throw new BootstrapException("Catalog not found.");
+                    if (!ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
+                        throw new BootstrapException("CatalogManager not found.");
 
-                    if (!catalog.TryGetRandomMapByDifficulty(1, out MapEntry mapEntry))
-                        throw new BootstrapException("No map found in Catalog.");
+                    // [Fix] Factory 삭제 -> CatalogManager에서 진짜 미션 뽑아오기
+                    if (!catalogMgr.TryGetRandomMissionByDifficulty(1, out MissionDataSO selectedMission))
+                        throw new BootstrapException("No mission found for Difficulty 1.");
 
-                    var dummyMission = MissionDataFactory.CreateTestMission(mapEntry);
+                    // [Fix] 세션 시작 (ownsMission = false, 에셋 보호)
+                    await gameManager.StartSessionAsync(selectedMission, false);
 
-                    // true: ownsMission (GameManager가 파괴 책임)
-                    await gameManager.StartSessionAsync(dummyMission, true);
-                    _bootLog.AppendLine($"   ✓ Auto-started (Mission: {dummyMission.MissionSettings.MissionName})");
+                    _bootLog.AppendLine($"   ✓ Auto-started (Mission: {selectedMission.MissionSettings.MissionName})");
                 }
                 catch (Exception ex)
                 {
@@ -108,11 +105,19 @@ public class BootManager : MonoBehaviour
                     }
                 }
 
+                // [Fix] MapCatalogManager를 가져와서 SO를 꺼냄 (컴파일 에러 해결)
+                MapCatalogSO catalogSO = null;
+                if (ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
+                {
+                    catalogSO = catalogMgr.GetCatalogSO();
+                }
+
                 var sceneContext = new InitializationContext
                 {
                     Scope = ManagerScope.Scene,
                     GlobalSettings = globalSettings,
                     Registry = tileRegistry,
+                    MapCatalog = catalogSO, // [Fix] 가져온 CatalogSO 주입
                     MissionData = currentMission,
                     MapData = loadedMapData
                 };

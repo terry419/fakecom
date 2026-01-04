@@ -17,6 +17,12 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: f55f3a6923ea08a44a50f4e0c627b0bf
   m_SerializeEntries:
+  - m_GUID: 89c2979eee624484e8a0d2cdbb578879
+    m_Address: Assets/SO/Map/MapCatalog.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - MapData
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bd0534775d402514c87980ef43763968
     m_Address: State1
     m_ReadOnly: 0

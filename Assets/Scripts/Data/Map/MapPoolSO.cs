@@ -9,51 +9,44 @@ public class MapPoolSO : ScriptableObject
     [field: Range(1, 10)]
     public int TargetDifficulty { get; private set; } = 1;
 
-    [field: Header("Entries")]
-    [field: SerializeField]
-    public List<MapEntry> Entries { get; private set; } = new List<MapEntry>();
+    [Header("Missions")]
+    // [Fix] MapEntry(단순 정보) 대신 MissionDataSO(완성 미션)를 직접 관리
+    public List<MissionDataSO> Missions = new List<MissionDataSO>();
 
-    public bool TryGetRandomEntry(out MapEntry entry)
+    // [Fix] 랜덤한 '미션'을 반환하도록 수정
+    public bool TryGetRandomMission(out MissionDataSO mission)
     {
-        if (Entries == null || Entries.Count == 0)
+        if (Missions == null || Missions.Count == 0)
         {
-            entry = default;
+            mission = null;
             return false;
         }
 
-        int index = UnityEngine.Random.Range(0, Entries.Count);
-        entry = Entries[index];
-        return true;
+        int index = UnityEngine.Random.Range(0, Missions.Count);
+        mission = Missions[index];
+        return mission != null;
     }
 
     public bool Validate(out string errorMsg)
     {
-        if (Entries == null || Entries.Count == 0)
+        if (Missions == null || Missions.Count == 0)
         {
-            errorMsg = $"[Pool {name}] has no entries!";
+            errorMsg = $"[Pool {name}] has no missions!";
             return false;
         }
 
-        // [개선 4] Fail-Fast: 첫 에러에서 즉시 반환
-        HashSet<string> localIds = new HashSet<string>();
-        for (int i = 0; i < Entries.Count; i++)
+        // 미션 데이터 내부 검증 (MapRef가 있는지 등)
+        for (int i = 0; i < Missions.Count; i++)
         {
-            var e = Entries[i];
-
-            if (!e.Validate(out string entryErr))
+            if (Missions[i] == null)
             {
-                errorMsg = $"[Pool {name}] Entry {i} Error: {entryErr}";
+                errorMsg = $"[Pool {name}] Mission at index {i} is null!";
                 return false;
             }
-
-            if (!string.IsNullOrEmpty(e.MapID))
+            if (Missions[i].MapDataRef == null || !Missions[i].MapDataRef.RuntimeKeyIsValid())
             {
-                if (localIds.Contains(e.MapID))
-                {
-                    errorMsg = $"[Pool {name}] Duplicate MapID inside pool: {e.MapID}";
-                    return false;
-                }
-                localIds.Add(e.MapID);
+                errorMsg = $"[Pool {name}] Mission '{Missions[i].name}' has invalid MapDataRef!";
+                return false;
             }
         }
 

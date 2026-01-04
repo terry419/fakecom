@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2d715a55dddd74341bf2ee4f38f4e7ad, type: 3}
-  m_Name: Tes_Mission
+  m_Name: Test_Mission
   m_EditorClassIdentifier: 
   MapDataRef:
-    m_AssetGUID: 
+    m_AssetGUID: bd0534775d402514c87980ef43763968
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
@@ -22,7 +22,12 @@ MonoBehaviour:
     Description: 
     Type: 0
   PlayerSettings:
-    MaxPlayerCount: 0
-    PlayerSpawnTag: 
-  EnemySpawns: []
+    MaxPlayerCount: 1
+    PlayerSpawnTag: Spawn_Player
+  DefaultRoster:
+  - {fileID: 11400000, guid: 0964b9e991755534c845512d39e3d106, type: 2}
+  EnemySpawns:
+  - Unit: {fileID: 11400000, guid: 9d21199e9ddbfc047a905a9a87dc54b4, type: 2}
+    RoleTag: Spot_A
+    Count: 0
   Rewards: []

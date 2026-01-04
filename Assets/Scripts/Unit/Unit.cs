@@ -1,39 +1,37 @@
+using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 public class Unit : MonoBehaviour, ITileOccupant
 {
-    // ========================================================================
-    // 1. 데이터 및 상태
-    // ========================================================================
-    public UnitDataSO Data { get; private set; }
+    // [Fix] Faction 프로퍼티 (MapEnums의 Faction 사용)
+    public Faction Faction { get; private set; }
+
+    // [Fix] 좌표 프로퍼티 통합
     public GridCoords Coordinate { get; private set; }
+    public GridCoords Coords => Coordinate;
+
+    public UnitDataSO Data { get; private set; }
 
     public int CurrentHP { get; private set; }
     public int CurrentAP { get; private set; }
     public int MaxAP { get; private set; }
-
-    // [New] 턴 내에서 현재 남아있는 이동력 (끊어 가기용)
     public int CurrentMobility { get; private set; }
-    // [New] 이번 턴에 이동 행동을 개시했는지 여부 (AP 선불 차감용)
     public bool HasStartedMoving { get; private set; }
-
     public int Mobility => Data != null ? Data.Mobility : 5;
 
     private IUnitController _controller;
     public IUnitController Controller => _controller;
 
     private Collider _collider;
-
-    [Header("Movement Settings")]
-    [Tooltip("초당 이동 거리 (Inspector에서 조절 가능)")]
     [SerializeField] private float _moveSpeed = 3.0f;
     [SerializeField] private float _rotateSpeed = 15.0f;
 
+    private bool _isSpawned = false;
+
     // ========================================================================
-    // 2. ITileOccupant 구현
+    // ITileOccupant 구현
     // ========================================================================
     public OccupantType Type => OccupantType.Unit;
     public bool IsBlockingMovement => true;
@@ -42,18 +40,17 @@ public class Unit : MonoBehaviour, ITileOccupant
     public event Action<bool> OnBlockingChanged;
     public event Action<bool> OnCoverChanged;
 
-    // ========================================================================
-    // 3. 초기화 및 스폰
-    // ========================================================================
+    public event Action<Unit> OnUnitInitialized;
 
     private void Awake()
     {
         _collider = GetComponent<Collider>();
     }
 
-    public void Initialize(UnitDataSO data)
+    public void Initialize(UnitDataSO data, Faction faction)
     {
         Data = data;
+        Faction = faction;
         gameObject.name = Data != null ? $"{Data.UnitName}" : "Unit";
 
         if (Data != null)
@@ -68,11 +65,22 @@ public class Unit : MonoBehaviour, ITileOccupant
             CurrentAP = 2;
         }
 
-        // 초기화 시 이동력 풀충전
         CurrentMobility = Mobility;
         HasStartedMoving = false;
+
+        // 시각적 디버깅
+        var renderer = GetComponentInChildren<Renderer>();
+        if (renderer != null)
+        {
+            if (faction == Faction.Player) renderer.material.color = Color.blue;
+            else if (faction == Faction.Enemy) renderer.material.color = Color.red;
+            else renderer.material.color = Color.green;
+        }
+
+        OnUnitInitialized?.Invoke(this);
     }
 
+    // [Fix] 비주얼 위치 설정만 담당
     public void SpawnOnMap(GridCoords coords)
     {
         if (!ServiceLocator.TryGet(out MapManager mapManager))
@@ -82,25 +90,29 @@ public class Unit : MonoBehaviour, ITileOccupant
         if (tile == null)
             throw new ArgumentException($"[{nameof(Unit)}] Invalid Spawn Coords: {coords}");
 
-        tile.AddOccupant(this);
+        Coordinate = coords;
+        _isSpawned = true;
 
         Vector3 worldPos = GridUtils.GridToWorld(coords);
         float targetY = GetTargetHeight(worldPos.y);
         transform.position = new Vector3(worldPos.x, targetY, worldPos.z);
+
+        if (Data != null)
+            gameObject.name = $"{Data.UnitName}_{Coordinate} ({Faction})";
     }
 
+    // [Fix] CS0535 해결: 인터페이스 메서드 구현
     public void OnAddedToTile(Tile tile)
     {
         Coordinate = tile.Coordinate;
-        if (Data != null)
-            gameObject.name = $"{Data.UnitName}_{Coordinate}";
+        // 필요시 추가 로직
     }
 
-    public void OnRemovedFromTile(Tile tile) { }
-
-    // ========================================================================
-    // 4. 컨트롤러 연결
-    // ========================================================================
+    // [Fix] CS0535 해결: 인터페이스 메서드 구현
+    public void OnRemovedFromTile(Tile tile)
+    {
+        // 필요시 추가 로직
+    }
 
     public void SetController(IUnitController controller)
     {
@@ -117,33 +129,19 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public void OnTurnEnd() => _controller?.OnTurnEnd();
 
-    // ========================================================================
-    // 5. 이동 로직 (선불제 AP 시스템 적용)
-    // ========================================================================
-
     public async UniTask MovePathAsync(List<GridCoords> path, MapManager mapManager)
     {
         if (path == null || path.Count == 0) return;
 
-        // [Logic] 선불제 AP 처리
-        // 아직 이동을 시작하지 않았다면 -> 1 AP 차감 (이동 개시 비용)
         if (!HasStartedMoving)
         {
-            if (CurrentAP < 1)
-            {
-                Debug.LogWarning("Not enough AP to start moving.");
-                return;
-            }
+            if (CurrentAP < 1) return;
             ConsumeAP(1);
             HasStartedMoving = true;
         }
 
-        // 실제 이동한 거리만큼 CurrentMobility 차감
-        // (path.Count는 목적지까지의 칸 수)
         int distance = path.Count;
         CurrentMobility = Mathf.Max(0, CurrentMobility - distance);
-
-        float speed = _moveSpeed > 0 ? _moveSpeed : 3.0f;
 
         foreach (var nextCoords in path)
         {
@@ -153,10 +151,11 @@ public class Unit : MonoBehaviour, ITileOccupant
             if (currentTile != null) currentTile.RemoveOccupant(this);
             if (nextTile != null) nextTile.AddOccupant(this);
 
+            Coordinate = nextCoords;
+
             Vector3 targetPos = GridUtils.GridToWorld(nextCoords);
             targetPos.y = GetTargetHeight(targetPos.y);
 
-            // 회전
             Vector3 direction = (targetPos - transform.position).normalized;
             if (direction != Vector3.zero)
             {
@@ -164,10 +163,9 @@ public class Unit : MonoBehaviour, ITileOccupant
                 RotateTo(targetRot).Forget();
             }
 
-            // 이동 (부드럽게)
             while (Vector3.Distance(transform.position, targetPos) > 0.05f)
             {
-                transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
+                transform.position = Vector3.MoveTowards(transform.position, targetPos, _moveSpeed * Time.deltaTime);
                 await UniTask.Yield();
             }
             transform.position = targetPos;
@@ -187,31 +185,20 @@ public class Unit : MonoBehaviour, ITileOccupant
         transform.rotation = targetRot;
     }
 
-    public void ConsumeAP(int amount)
-    {
-        CurrentAP = Mathf.Max(0, CurrentAP - amount);
-    }
+    public void ConsumeAP(int amount) => CurrentAP = Mathf.Max(0, CurrentAP - amount);
 
     public void ResetAP()
     {
         CurrentAP = MaxAP > 0 ? MaxAP : 2;
-        CurrentMobility = Mobility; // 이동력 리셋
-        HasStartedMoving = false;   // 이동 상태 리셋
+        CurrentMobility = Mobility;
+        HasStartedMoving = false;
     }
 
     public void TakeDamage(int damage)
     {
         CurrentHP = Mathf.Max(0, CurrentHP - damage);
-        if (CurrentHP <= 0)
-        {
-            Debug.Log($"Unit {name} died.");
-            Destroy(gameObject);
-        }
+        if (CurrentHP <= 0) Destroy(gameObject);
     }
-
-    // ========================================================================
-    // 6. 유틸리티
-    // ========================================================================
 
     private float GetTargetHeight(float surfaceY)
     {
@@ -221,6 +208,8 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     private void OnDestroy()
     {
+        if (!_isSpawned) return;
+
         if (ServiceLocator.TryGet(out MapManager mapManager))
         {
             Tile tile = mapManager.GetTile(Coordinate);

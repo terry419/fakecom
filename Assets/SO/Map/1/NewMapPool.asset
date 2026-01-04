@@ -13,20 +13,5 @@ MonoBehaviour:
   m_Name: NewMapPool
   m_EditorClassIdentifier: 
   <TargetDifficulty>k__BackingField: 1
-  <Entries>k__BackingField:
-  - MapID: 123
-    DisplayName: 123
-    Type: 0
-    Size: 0
-    Description: 
-    Tags: []
-    MapDataRef:
-      m_AssetGUID: bd0534775d402514c87980ef43763968
-      m_SubObjectName: 
-      m_SubObjectType: 
-      m_EditorAssetChanged: 0
-    BiomeRegistryRef:
-      m_AssetGUID: ed91cb3fbf8279d46bc8844ce423a49f
-      m_SubObjectName: 
-      m_SubObjectType: 
-      m_EditorAssetChanged: 0
+  Missions:
+  - {fileID: 11400000, guid: 960e1f0876062f240959217c7ab9f010, type: 2}

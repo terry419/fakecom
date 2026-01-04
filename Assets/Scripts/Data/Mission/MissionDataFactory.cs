@@ -1,45 +1,65 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-// [New] 더미 적 스펙 정의 (유연성 확보)
+// [Fix] 누락되었던 PlayerSpawnerSpec 정의 추가
+public class PlayerSpawnerSpec
+{
+    public string UnitName;
+    public int HP;
+}
+
 public class EnemySpawnerSpec
 {
     public string RoleTag;
     public int Count;
     public int HP;
-    public string NamePrefix; // 예: "Goblin", "Orc"
+    public string NamePrefix;
 
     public EnemySpawnerSpec(string tag, int count, int hp, string prefix)
     {
-        RoleTag = tag;
-        Count = count;
-        HP = hp;
-        NamePrefix = prefix;
+        RoleTag = tag; Count = count; HP = hp; NamePrefix = prefix;
     }
 }
 
-// [Fix] Config 확장 (Spec 리스트 포함)
 public struct MissionDataFactoryConfig
 {
     public int MaxPlayerCount;
     public string PlayerSpawnTag;
-    public List<EnemySpawnerSpec> DummyEnemies; // 리스트로 변경하여 다중 타입 지원
+
+    public List<EnemySpawnerSpec> DummyEnemies;
+    public bool AddDummyEnemies;
+
+    public bool AddDummyNeutrals;
+    public List<EnemySpawnerSpec> DummyNeutrals;
+
+    public bool AddDummyPlayers;
+    public List<PlayerSpawnerSpec> DummyPlayers;
 }
 
 public static class MissionDataFactory
 {
-    // 기본값 생성 메서드
     public static MissionDataFactoryConfig GetDefaultConfig()
     {
         return new MissionDataFactoryConfig
         {
             MaxPlayerCount = 3,
             PlayerSpawnTag = "Spawn_Player",
+
+            AddDummyEnemies = true,
             DummyEnemies = new List<EnemySpawnerSpec>
             {
-                // 기본적으로 1종류의 더미 적 추가
                 new EnemySpawnerSpec("Spot_A", 2, 100, "Dummy_Grunt")
-            }
+            },
+
+            AddDummyPlayers = true,
+            DummyPlayers = new List<PlayerSpawnerSpec>
+            {
+                new PlayerSpawnerSpec { UnitName = "Hero_Alpha", HP = 150 },
+                new PlayerSpawnerSpec { UnitName = "Sniper_Bravo", HP = 100 }
+            },
+
+            AddDummyNeutrals = false,
+            DummyNeutrals = new List<EnemySpawnerSpec>()
         };
     }
 
@@ -48,40 +68,79 @@ public static class MissionDataFactory
         var cfg = config ?? GetDefaultConfig();
         var dummyMission = ScriptableObject.CreateInstance<MissionDataSO>();
 
-        dummyMission.name = $"TestMission_{mapEntry.MapID}";
         dummyMission.MapDataRef = mapEntry.MapDataRef;
-
         dummyMission.MissionSettings = new MissionSettings
         {
             MissionName = mapEntry.MapID,
-            Description = $"[Runtime Generated] {mapEntry.Description}",
             Type = MissionType.Exterminate
         };
 
-        dummyMission.PlayerSettings = new PlayerRosterSettings
+        // --------------------------------------------------------
+        // Player Config
+        // --------------------------------------------------------
+        dummyMission.PlayerConfig = new PlayerMissionConfig();
+        for (int i = 0; i < cfg.MaxPlayerCount; i++)
         {
-            MaxPlayerCount = cfg.MaxPlayerCount,
-            PlayerSpawnTag = cfg.PlayerSpawnTag
-        };
+            dummyMission.PlayerConfig.SpawnSlots.Add(new PlayerSpawnSlot { RoleTag = cfg.PlayerSpawnTag });
+        }
 
-        dummyMission.EnemySpawns = new List<EnemySpawnEntry>();
+        if (cfg.AddDummyPlayers && cfg.DummyPlayers != null)
+        {
+            foreach (var spec in cfg.DummyPlayers)
+            {
+                // [Fix] 개별 인스턴스 생성
+                var pData = ScriptableObject.CreateInstance<PlayerUnitDataSO>();
+                pData.name = spec.UnitName;
+                pData.BaseStats = new UnitStatBlock { MaxHP = spec.HP, Mobility = 6, Aim = 75 };
+                dummyMission.PlayerConfig.DefaultSquad.Add(pData);
+            }
+        }
 
-        // [Fix] Spec 리스트를 순회하며 더미 데이터 생성
-        if (cfg.DummyEnemies != null)
+        // --------------------------------------------------------
+        // Enemy Spawns (데이터 공유 방지)
+        // --------------------------------------------------------
+        dummyMission.EnemySpawns = new List<EnemySpawnDef>();
+        if (cfg.AddDummyEnemies && cfg.DummyEnemies != null)
         {
             foreach (var spec in cfg.DummyEnemies)
             {
-                var dummyUnit = ScriptableObject.CreateInstance<EnemyUnitDataSO>();
-                dummyUnit.name = $"{spec.NamePrefix}_Runtime";
-                dummyUnit.MaxHP = spec.HP;
-                // 필요한 경우 Mobility, Aim 등 추가 설정
-
-                dummyMission.EnemySpawns.Add(new EnemySpawnEntry
+                for (int i = 0; i < spec.Count; i++)
                 {
-                    RoleTag = spec.RoleTag,
-                    Count = spec.Count,
-                    Unit = dummyUnit
-                });
+                    // [Fix] 루프 안에서 CreateInstance -> 독립 데이터 보장
+                    var eData = ScriptableObject.CreateInstance<EnemyUnitDataSO>();
+                    eData.name = $"{spec.NamePrefix}_{i}";
+                    eData.MaxHP = spec.HP;
+
+                    dummyMission.EnemySpawns.Add(new EnemySpawnDef
+                    {
+                        RoleTag = spec.RoleTag,
+                        UnitData = eData
+                    });
+                }
+            }
+        }
+
+        // --------------------------------------------------------
+        // Neutral Spawns (데이터 공유 방지)
+        // --------------------------------------------------------
+        dummyMission.NeutralSpawns = new List<NeutralSpawnDef>();
+        if (cfg.AddDummyNeutrals && cfg.DummyNeutrals != null)
+        {
+            foreach (var spec in cfg.DummyNeutrals)
+            {
+                for (int i = 0; i < spec.Count; i++)
+                {
+                    // [Fix] 루프 안에서 CreateInstance
+                    var nData = ScriptableObject.CreateInstance<EnemyUnitDataSO>();
+                    nData.name = $"Neutral_{spec.NamePrefix}_{i}";
+                    nData.MaxHP = spec.HP;
+
+                    dummyMission.NeutralSpawns.Add(new NeutralSpawnDef
+                    {
+                        RoleTag = spec.RoleTag,
+                        UnitData = nData
+                    });
+                }
             }
         }
 

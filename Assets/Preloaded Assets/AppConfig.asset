@@ -26,7 +26,7 @@ MonoBehaviour:
     m_AssetGUID: 89c2979eee624484e8a0d2cdbb578879
     m_SubObjectName: 
     m_SubObjectType: 
-    m_EditorAssetChanged: 0
+    m_EditorAssetChanged: 1
   TileRegistryRef:
     m_AssetGUID: ed91cb3fbf8279d46bc8844ce423a49f
     m_SubObjectName: 
@@ -49,11 +49,6 @@ MonoBehaviour:
     m_EditorAssetChanged: 0
   SaveManagerRef:
     m_AssetGUID: 675ec267342fded43b7a3e7095ad5ba0
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_EditorAssetChanged: 0
-  TileDataManagerRef:
-    m_AssetGUID: 7202c9ecd599c9a4abd52ea4331469a9
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
