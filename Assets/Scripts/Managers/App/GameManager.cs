@@ -4,9 +4,13 @@ using System;
 
 public class GameManager : MonoBehaviour, IInitializable
 {
-    // ... (기존 변수 및 Safe Getter 유지) ...
     public bool IsPaused { get; private set; } = false;
     private GameObject _sessionRoot;
+
+    private MissionDataSO _runtimeMission;
+    private bool _ownsRuntimeMission;
+    private HideFlags _originalMissionHideFlags; // [Fix] 복구용 저장소
+
     private GlobalSettingsSO _globalSettings;
     private TileRegistrySO _tileRegistry;
 
@@ -24,53 +28,55 @@ public class GameManager : MonoBehaviour, IInitializable
         await UniTask.CompletedTask;
     }
 
-    // [변경] TestMission 파라미터 추가
-    public async UniTask StartSessionAsync(MapEntry? testMission = null)
+    public async UniTask<bool> StartSessionAsync(MissionDataSO missionData = null, bool ownsMission = false)
     {
         if (_sessionRoot != null)
         {
             Debug.LogWarning("[GameManager] Session already running.");
-            return;
+            return false;
         }
 
-        var settings = GetGlobalSettings();
-        var registry = GetTileRegistry();
+        _runtimeMission = missionData;
+        _ownsRuntimeMission = ownsMission;
+
+        // [Fix] HideFlags 저장 및 설정
+        if (_runtimeMission != null)
+        {
+            _originalMissionHideFlags = _runtimeMission.hideFlags;
+            if (_ownsRuntimeMission)
+            {
+                _runtimeMission.hideFlags = HideFlags.DontSave;
+            }
+        }
 
         Debug.Log("[GameManager] Starting new session...");
-
         _sessionRoot = new GameObject("@SessionSystems");
         _sessionRoot.transform.SetParent(this.transform);
 
         var sessionMgr = _sessionRoot.AddComponent<SessionManager>();
 
-        // [핵심] Initialize 전에 미션 주입
-        if (testMission.HasValue)
-        {
-            sessionMgr.SetInitialMission(testMission.Value);
-        }
-
         var sessionContext = new InitializationContext
         {
             Scope = ManagerScope.Session,
-            GlobalSettings = settings,
-            Registry = registry
+            GlobalSettings = _globalSettings,
+            Registry = _tileRegistry,
+            MissionData = missionData
         };
 
         try
         {
             await sessionMgr.Initialize(sessionContext);
             Debug.Log("[GameManager] Session Started successfully.");
+            return true;
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[GameManager] Session initialization failed: {ex.Message}");
-            Destroy(_sessionRoot);
-            _sessionRoot = null;
+            Debug.LogError($"[GameManager] Session Init Failed: {ex.Message}");
+            await EndSessionAsync();
             throw;
         }
     }
 
-    // ... (EndSessionAsync 및 기타 메서드 유지) ...
     public async UniTask EndSessionAsync()
     {
         if (_sessionRoot != null)
@@ -79,6 +85,49 @@ public class GameManager : MonoBehaviour, IInitializable
             _sessionRoot = null;
             await UniTask.NextFrame();
         }
+
         await ServiceLocator.ClearScopeAsync(ManagerScope.Session);
+
+        CleanupRuntimeMission();
+
+        Debug.Log("[GameManager] Session Ended.");
     }
+
+    private void CleanupRuntimeMission()
+    {
+        if (_runtimeMission != null)
+        {
+            if (_ownsRuntimeMission)
+            {
+                // 소유권이 있으면 파괴
+                if (_runtimeMission.EnemySpawns != null)
+                {
+                    foreach (var spawn in _runtimeMission.EnemySpawns)
+                        SafeDestroy(spawn.Unit);
+                }
+                SafeDestroy(_runtimeMission);
+                Debug.Log("[GameManager] Runtime Mission Data Cleaned up.");
+            }
+            else
+            {
+                // [Fix] 소유권이 없으면 HideFlags 원복
+                _runtimeMission.hideFlags = _originalMissionHideFlags;
+            }
+        }
+        _runtimeMission = null;
+    }
+
+    private void SafeDestroy(UnityEngine.Object obj)
+    {
+        if (obj == null) return;
+#if UNITY_EDITOR
+        if (Application.isPlaying) Destroy(obj);
+        else DestroyImmediate(obj);
+#else
+        Destroy(obj);
+#endif
+    }
+
+    public void StartGame() { IsPaused = false; Time.timeScale = 1.0f; }
+    public void PauseGame() { IsPaused = true; Time.timeScale = 0.0f; }
 }
