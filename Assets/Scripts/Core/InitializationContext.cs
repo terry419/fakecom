@@ -3,6 +3,9 @@ using System;
 
 public class InitializationContext
 {
+
+    // [추가] 선택된 미션의 메타데이터 (없을 수도 있음 -> Nullable)
+    public MapEntry? SelectedMission;
     // [필수] 전역 환경 설정
     public GlobalSettingsSO GlobalSettings { get; set; }
 
@@ -22,6 +25,8 @@ public class InitializationContext
     // 편의 프로퍼티
     public bool HasMapData => MapData != null;
     public bool HasRegistry => Registry != null;
+
+
 
     public void ValidateGlobalSettings()
     {

@@ -1,42 +1,84 @@
 using UnityEngine;
-using Cysharp.Threading.Tasks; // 비동기 필수
+using Cysharp.Threading.Tasks;
+using System;
 
 public class GameManager : MonoBehaviour, IInitializable
 {
+    // ... (기존 변수 및 Safe Getter 유지) ...
     public bool IsPaused { get; private set; } = false;
+    private GameObject _sessionRoot;
+    private GlobalSettingsSO _globalSettings;
+    private TileRegistrySO _tileRegistry;
 
-    // 1. 태어날 때: 공구함(ServiceLocator)에 등록만 함
-    private void Awake()
-    {
-        ServiceLocator.Register(this, ManagerScope.Global);
-    }
+    public GlobalSettingsSO GetGlobalSettings() => _globalSettings ?? throw new InvalidOperationException("GM Not Init");
+    public TileRegistrySO GetTileRegistry() => _tileRegistry ?? throw new InvalidOperationException("GM Not Init");
 
-    // 2. 죽을 때: 등록 해제
-    private void OnDestroy()
-    {
-        ServiceLocator.Unregister<GameManager>(ManagerScope.Global);
-    }
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Global);
+    private void OnDestroy() => ServiceLocator.Unregister<GameManager>(ManagerScope.Global);
 
-    // 3. 시동 걸 때: 여기서 진짜 준비를 함
     public async UniTask Initialize(InitializationContext context)
     {
-        // 예: 그래픽 설정 적용
-        Application.targetFrameRate = context.GlobalSettings.TargetFrameRate;
-
-        await UniTask.CompletedTask; // 특별히 기다릴 게 없으면 바로 완료 보고
+        _globalSettings = context.GlobalSettings;
+        _tileRegistry = context.Registry;
+        if (_globalSettings != null) Application.targetFrameRate = _globalSettings.TargetFrameRate;
+        await UniTask.CompletedTask;
     }
 
-    // 게임 시작/정지 기능
-    public void StartGame()
+    // [변경] TestMission 파라미터 추가
+    public async UniTask StartSessionAsync(MapEntry? testMission = null)
     {
-        IsPaused = false;
-        Time.timeScale = 1.0f;
+        if (_sessionRoot != null)
+        {
+            Debug.LogWarning("[GameManager] Session already running.");
+            return;
+        }
+
+        var settings = GetGlobalSettings();
+        var registry = GetTileRegistry();
+
+        Debug.Log("[GameManager] Starting new session...");
+
+        _sessionRoot = new GameObject("@SessionSystems");
+        _sessionRoot.transform.SetParent(this.transform);
+
+        var sessionMgr = _sessionRoot.AddComponent<SessionManager>();
+
+        // [핵심] Initialize 전에 미션 주입
+        if (testMission.HasValue)
+        {
+            sessionMgr.SetInitialMission(testMission.Value);
+        }
+
+        var sessionContext = new InitializationContext
+        {
+            Scope = ManagerScope.Session,
+            GlobalSettings = settings,
+            Registry = registry
+        };
+
+        try
+        {
+            await sessionMgr.Initialize(sessionContext);
+            Debug.Log("[GameManager] Session Started successfully.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[GameManager] Session initialization failed: {ex.Message}");
+            Destroy(_sessionRoot);
+            _sessionRoot = null;
+            throw;
+        }
     }
 
-    public void PauseGame()
+    // ... (EndSessionAsync 및 기타 메서드 유지) ...
+    public async UniTask EndSessionAsync()
     {
-        Debug.Log("[GameManager] 일시 정지.");
-        IsPaused = true;
-        Time.timeScale = 0.0f;
+        if (_sessionRoot != null)
+        {
+            Destroy(_sessionRoot);
+            _sessionRoot = null;
+            await UniTask.NextFrame();
+        }
+        await ServiceLocator.ClearScopeAsync(ManagerScope.Session);
     }
 }
