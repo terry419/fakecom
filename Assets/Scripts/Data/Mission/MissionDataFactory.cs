@@ -1,13 +1,14 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-// [Fix] 누락되었던 PlayerSpawnerSpec 정의 추가
+[System.Serializable]
 public class PlayerSpawnerSpec
 {
     public string UnitName;
     public int HP;
 }
 
+[System.Serializable]
 public class EnemySpawnerSpec
 {
     public string RoleTag;
@@ -21,17 +22,15 @@ public class EnemySpawnerSpec
     }
 }
 
+[System.Serializable]
 public struct MissionDataFactoryConfig
 {
     public int MaxPlayerCount;
     public string PlayerSpawnTag;
-
-    public List<EnemySpawnerSpec> DummyEnemies;
     public bool AddDummyEnemies;
-
+    public List<EnemySpawnerSpec> DummyEnemies;
     public bool AddDummyNeutrals;
     public List<EnemySpawnerSpec> DummyNeutrals;
-
     public bool AddDummyPlayers;
     public List<PlayerSpawnerSpec> DummyPlayers;
 }
@@ -44,20 +43,17 @@ public static class MissionDataFactory
         {
             MaxPlayerCount = 3,
             PlayerSpawnTag = "Spawn_Player",
-
             AddDummyEnemies = true,
             DummyEnemies = new List<EnemySpawnerSpec>
             {
                 new EnemySpawnerSpec("Spot_A", 2, 100, "Dummy_Grunt")
             },
-
             AddDummyPlayers = true,
             DummyPlayers = new List<PlayerSpawnerSpec>
             {
                 new PlayerSpawnerSpec { UnitName = "Hero_Alpha", HP = 150 },
                 new PlayerSpawnerSpec { UnitName = "Sniper_Bravo", HP = 100 }
             },
-
             AddDummyNeutrals = false,
             DummyNeutrals = new List<EnemySpawnerSpec>()
         };
@@ -67,6 +63,7 @@ public static class MissionDataFactory
     {
         var cfg = config ?? GetDefaultConfig();
         var dummyMission = ScriptableObject.CreateInstance<MissionDataSO>();
+        dummyMission.hideFlags = HideFlags.DontSave;
 
         dummyMission.MapDataRef = mapEntry.MapDataRef;
         dummyMission.MissionSettings = new MissionSettings
@@ -75,9 +72,7 @@ public static class MissionDataFactory
             Type = MissionType.Exterminate
         };
 
-        // --------------------------------------------------------
-        // Player Config
-        // --------------------------------------------------------
+        // 1. Player Config
         dummyMission.PlayerConfig = new PlayerMissionConfig();
         for (int i = 0; i < cfg.MaxPlayerCount; i++)
         {
@@ -88,17 +83,18 @@ public static class MissionDataFactory
         {
             foreach (var spec in cfg.DummyPlayers)
             {
-                // [Fix] 개별 인스턴스 생성
                 var pData = ScriptableObject.CreateInstance<PlayerUnitDataSO>();
+                pData.hideFlags = HideFlags.DontSave;
                 pData.name = spec.UnitName;
-                pData.BaseStats = new UnitStatBlock { MaxHP = spec.HP, Mobility = 6, Aim = 75 };
+                pData.UnitName = spec.UnitName;
+                pData.MaxHP = spec.HP;
+                pData.Mobility = 6;
+                pData.Aim = 75;
                 dummyMission.PlayerConfig.DefaultSquad.Add(pData);
             }
         }
 
-        // --------------------------------------------------------
-        // Enemy Spawns (데이터 공유 방지)
-        // --------------------------------------------------------
+        // 2. Enemy Spawns
         dummyMission.EnemySpawns = new List<EnemySpawnDef>();
         if (cfg.AddDummyEnemies && cfg.DummyEnemies != null)
         {
@@ -106,10 +102,13 @@ public static class MissionDataFactory
             {
                 for (int i = 0; i < spec.Count; i++)
                 {
-                    // [Fix] 루프 안에서 CreateInstance -> 독립 데이터 보장
                     var eData = ScriptableObject.CreateInstance<EnemyUnitDataSO>();
+                    eData.hideFlags = HideFlags.DontSave;
                     eData.name = $"{spec.NamePrefix}_{i}";
+                    eData.UnitName = spec.NamePrefix;
                     eData.MaxHP = spec.HP;
+                    eData.Mobility = 5;
+                    eData.Aim = 60;
 
                     dummyMission.EnemySpawns.Add(new EnemySpawnDef
                     {
@@ -120,9 +119,7 @@ public static class MissionDataFactory
             }
         }
 
-        // --------------------------------------------------------
-        // Neutral Spawns (데이터 공유 방지)
-        // --------------------------------------------------------
+        // 3. Neutral Spawns
         dummyMission.NeutralSpawns = new List<NeutralSpawnDef>();
         if (cfg.AddDummyNeutrals && cfg.DummyNeutrals != null)
         {
@@ -130,10 +127,12 @@ public static class MissionDataFactory
             {
                 for (int i = 0; i < spec.Count; i++)
                 {
-                    // [Fix] 루프 안에서 CreateInstance
                     var nData = ScriptableObject.CreateInstance<EnemyUnitDataSO>();
+                    nData.hideFlags = HideFlags.DontSave;
                     nData.name = $"Neutral_{spec.NamePrefix}_{i}";
+                    nData.UnitName = spec.NamePrefix;
                     nData.MaxHP = spec.HP;
+                    nData.Mobility = 0;
 
                     dummyMission.NeutralSpawns.Add(new NeutralSpawnDef
                     {
@@ -143,7 +142,6 @@ public static class MissionDataFactory
                 }
             }
         }
-
         return dummyMission;
     }
 }

@@ -18,13 +18,25 @@ MonoBehaviour:
   m_GUID: df3b0af03bc8b414f8b9b6104149827b
   m_SerializeEntries:
   - m_GUID: 0964b9e991755534c845512d39e3d106
-    m_Address: Assets/Data/Unit/1_PlayerUnit.asset
+    m_Address: 1_PlayerUnit
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UnitData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9d21199e9ddbfc047a905a9a87dc54b4
+    m_Address: EnemyUnit
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UnitData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9864e1af433f014b87670af5dd1012d
+    m_Address: EnemyUnit.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UnitData
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fafe13c03091abd4d8a99c5de9503184
-    m_Address: Assets/Prefabs/PlayerUnit.prefab
+    m_Address: PlayerUnit.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UnitData

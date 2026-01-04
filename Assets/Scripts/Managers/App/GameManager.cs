@@ -103,10 +103,21 @@ public class GameManager : MonoBehaviour, IInitializable
                 if (_runtimeMission.EnemySpawns != null)
                 {
                     foreach (var spawn in _runtimeMission.EnemySpawns)
-                        SafeDestroy(spawn.Unit);
+                    {
+                        // [Fix] spawn.Unit -> spawn.UnitData 로 수정
+                        SafeDestroy(spawn.UnitData);
+                    }
                 }
-                SafeDestroy(_runtimeMission);
-                Debug.Log("[GameManager] Runtime Mission Data Cleaned up.");
+
+                // 3. 중립 데이터 정리
+                if (_runtimeMission.NeutralSpawns != null)
+                {
+                    foreach (var spawn in _runtimeMission.NeutralSpawns)
+                    {
+                        // [Fix] spawn.Unit -> spawn.UnitData 로 수정
+                        SafeDestroy(spawn.UnitData);
+                    }
+                }
             }
             else
             {

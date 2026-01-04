@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   UnitID: 1_EnemyUnit
   UnitName: 1_EnemyUnit
-  EnemyType: 0
+  Role: 1
   ModelPrefab:
-    m_AssetGUID: 
+    m_AssetGUID: e9864e1af433f014b87670af5dd1012d
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
@@ -25,15 +25,19 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  MaxHP: 0
-  Mobility: 0
-  Agility: 0
-  Aim: 0
-  Evasion: 0
+  MaxHP: 100
+  MaxAP: 2
+  Mobility: 5
+  Agility: 5
+  Aim: 5
+  Evasion: 5
   CritChance: 0
-  BaseAILevel: 1
-  CommandAIBonus: 0
-  DropTable: {fileID: 0}
   BaseSurvivalChance: 0
   BaseNeuralSync: 100
   BaseOverclockChance: 0
+  EnemyType: 0
+  MainWeapon: {fileID: 11400000, guid: 762dfb9bee5f956438bcd4db8fc22bf7, type: 2}
+  BodyArmor: {fileID: 11400000, guid: d406acdf31c50a245ac88784f55831eb, type: 2}
+  BaseAILevel: 1
+  CommandAIBonus: 0
+  DropTable: {fileID: 0}
