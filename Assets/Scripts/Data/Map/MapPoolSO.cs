@@ -19,37 +19,35 @@ public class MapPoolSO : ScriptableObject
             mission = null;
             return false;
         }
-        int index = UnityEngine.Random.Range(0, Missions.Count);
-        mission = Missions[index];
-        return mission != null;
-    }
-
-    // 중복 위치 제외 추출
-    public bool TryGetRandomMissionExcluding(HashSet<string> excludedLocationIDs, out MissionDataSO mission)
-    {
-        mission = null;
-        if (Missions == null || Missions.Count == 0) return false;
-
-        var candidates = Missions.Where(m =>
-            m != null &&
-            (string.IsNullOrEmpty(m.UI.LocationID) || !excludedLocationIDs.Contains(m.UI.LocationID))
-        ).ToList();
-
-        if (candidates.Count == 0) return false;
-
-        mission = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        mission = Missions[Random.Range(0, Missions.Count)];
         return true;
     }
 
-    public bool Validate(out string errorMsg)
+    // 중복 위치 제외 추출
+    public bool TryGetRandomMissionExcluding(HashSet<string> excludedLocations, out MissionDataSO mission)
     {
-        if (Missions == null || Missions.Count == 0)
+        var candidates = Missions
+            .Where(m => !excludedLocations.Contains(m.UI.LocationID))
+            .ToList();
+
+        if (candidates.Count == 0)
         {
-            errorMsg = $"[Pool {name}] has no missions!";
+            // 후보가 없으면 그냥 아무거나 중복 허용해서 리턴 (Fallback)
+            return TryGetRandomMission(out mission);
+        }
+
+        mission = candidates[Random.Range(0, candidates.Count)];
+        return true;
+    }
+
+    public bool Validate(out string error)
+    {
+        if (Missions.Any(m => m == null))
+        {
+            error = $"Pool {name} contains null missions.";
             return false;
         }
-        // ... (나머지 검증 로직은 기존 유지) ...
-        errorMsg = string.Empty;
+        error = string.Empty;
         return true;
     }
 }

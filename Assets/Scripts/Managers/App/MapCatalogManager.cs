@@ -14,6 +14,7 @@ public class MapCatalogManager : MonoBehaviour, IInitializable
     public async UniTask Initialize(InitializationContext context)
     {
         if (_isInitialized) return;
+
         _catalog = context.MapCatalog;
 
         if (_catalog == null)
@@ -33,8 +34,8 @@ public class MapCatalogManager : MonoBehaviour, IInitializable
 
     public MapCatalogSO GetCatalogSO() => _catalog;
 
-    // [Refactor] 기존 메서드 업데이트 (int -> MissionDifficulty)
-    public bool TryGetRandomMissionByDifficulty(int targetDifficulty, out MissionDataSO mission)
+    // [Change] int -> float targetDifficulty
+    public bool TryGetRandomMissionByDifficulty(float targetDifficulty, out MissionDataSO mission)
     {
         if (!_isInitialized || _catalog == null)
         {
@@ -42,10 +43,10 @@ public class MapCatalogManager : MonoBehaviour, IInitializable
             return false;
         }
 
-        // 1. 정확히 일치하는 난이도 찾기
-        var pool = _catalog.DifficultyPools.FirstOrDefault(p => p.TargetDifficulty == targetDifficulty);
+        // 1. 정확히 일치하는 풀 찾기
+        var pool = _catalog.DifficultyPools.FirstOrDefault(p => Mathf.Approximately(p.TargetDifficulty, targetDifficulty));
 
-        // 2. 없으면 가장 가까운 난이도 찾기 (int니까 절대값 비교 가능)
+        // 2. 없으면 근사치 (Fallback)
         if (pool == null)
         {
             pool = _catalog.DifficultyPools.OrderBy(p => Mathf.Abs(p.TargetDifficulty - targetDifficulty)).FirstOrDefault();
@@ -60,16 +61,17 @@ public class MapCatalogManager : MonoBehaviour, IInitializable
         return false;
     }
 
-    // [Revert] int difficulty 사용
-    public List<MissionDataSO> GetDistinctMissions(int difficulty, int count)
+    // [Change] int -> float difficulty
+    public List<MissionDataSO> GetDistinctMissions(float difficulty, int count)
     {
         var results = new List<MissionDataSO>();
         var usedLocations = new HashSet<string>();
 
         if (!_isInitialized || _catalog == null) return results;
 
-        // 정확한 난이도 풀 찾기 (없으면 근사치)
-        var pool = _catalog.DifficultyPools.FirstOrDefault(p => p.TargetDifficulty == difficulty);
+        // 근사치 풀 찾기
+        var pool = _catalog.DifficultyPools.FirstOrDefault(p => Mathf.Approximately(p.TargetDifficulty, difficulty));
+
         if (pool == null)
         {
             pool = _catalog.DifficultyPools.OrderBy(p => Mathf.Abs(p.TargetDifficulty - difficulty)).FirstOrDefault();

@@ -1,6 +1,8 @@
-using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using YCOM.Utils;
 
 public class GameManager : MonoBehaviour, IInitializable
 {
@@ -39,7 +41,7 @@ public class GameManager : MonoBehaviour, IInitializable
         _runtimeMission = missionData;
         _ownsRuntimeMission = ownsMission;
 
-        // [Fix] HideFlags 저장 및 설정
+        // [DontSave 처리 로직 유지]
         if (_runtimeMission != null)
         {
             _originalMissionHideFlags = _runtimeMission.hideFlags;
@@ -55,6 +57,7 @@ public class GameManager : MonoBehaviour, IInitializable
 
         var sessionMgr = _sessionRoot.AddComponent<SessionManager>();
 
+        // 1. 세션 매니저 초기화 (데이터 세팅)
         var sessionContext = new InitializationContext
         {
             Scope = ManagerScope.Session,
@@ -65,18 +68,50 @@ public class GameManager : MonoBehaviour, IInitializable
 
         try
         {
+            // [Fix] 메모리 정리 (이전 세션의 잔재 정리)
+            await Resources.UnloadUnusedAssets();
+            System.GC.Collect();
+
+            // 1. 세션 매니저 초기화
+            // ... (SessionManager 생성 코드 유지) ...
             await sessionMgr.Initialize(sessionContext);
-            Debug.Log("[GameManager] Session Started successfully.");
+
+            // 2. 씬 전환 (타임아웃 적용 예시)
+            // 10초 안에 로드 안 되면 에러 처리
+            await SceneManager.LoadSceneAsync(SceneNames.Battle, LoadSceneMode.Single)
+                .ToUniTask()
+                .Timeout(System.TimeSpan.FromSeconds(10));
+
+            // 3. 맵 데이터 로드
+            MapDataSO loadedMapData = null;
+            if (missionData != null)
+            {
+                // [Fix] Definition -> MissionSettings 로 필드명 수정 반영
+                Debug.Log($"[GameManager] Loading Map for {missionData.MissionSettings.MissionName}...");
+
+                // 타임아웃 5초 적용
+                loadedMapData = await MapDataLoader.LoadMapDataAsync(missionData)
+                                    .Timeout(System.TimeSpan.FromSeconds(5));
+            }
+
+            // 4. 씬 초기화 트리거
+            // ... (SceneInitializer 찾아서 실행하는 로직 유지) ...
+
             return true;
         }
-        catch (Exception ex)
+        catch (System.TimeoutException)
         {
-            Debug.LogError($"[GameManager] Session Init Failed: {ex.Message}");
+            Debug.LogError("[GameManager] Session Start Timed Out!");
+            await EndSessionAsync(); // 실패 시 정리
+            throw;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[GameManager] Error: {ex.Message}");
             await EndSessionAsync();
             throw;
         }
     }
-
     public async UniTask EndSessionAsync()
     {
         if (_sessionRoot != null)

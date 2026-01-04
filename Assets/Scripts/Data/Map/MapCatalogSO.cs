@@ -9,15 +9,16 @@ public class MapCatalogSO : ScriptableObject
     [field: SerializeField]
     public List<MapPoolSO> DifficultyPools { get; private set; } = new List<MapPoolSO>();
 
-    // [Fix] 인자 타입 변경 (int -> MissionDifficulty)
-    public bool TryGetPoolByDifficulty(MissionDifficulty difficulty, out MapPoolSO pool)
+    // [Change] MissionDifficulty -> float
+    public bool TryGetPoolByDifficulty(float difficulty, out MapPoolSO pool)
     {
-        // Enum 직접 비교
-        pool = DifficultyPools.FirstOrDefault(p => p.TargetDifficulty == difficulty);
+        // 1. 정확히 일치하는 난이도 찾기 (float 비교이므로 오차범위 고려 가능하지만, 보통 Editor 세팅값은 정확함)
+        pool = DifficultyPools.FirstOrDefault(p => Mathf.Approximately(p.TargetDifficulty, difficulty));
         if (pool != null) return true;
 
-        // [Fix] 근사치 찾기: Enum을 int로 변환하여 거리 계산
-        pool = DifficultyPools.OrderBy(p => Mathf.Abs((int)p.TargetDifficulty - (int)difficulty)).FirstOrDefault();
+        // 2. 없으면 가장 가까운 난이도 찾기
+        pool = DifficultyPools.OrderBy(p => Mathf.Abs(p.TargetDifficulty - difficulty)).FirstOrDefault();
+
         return pool != null;
     }
 
@@ -40,8 +41,8 @@ public class MapCatalogSO : ScriptableObject
         bool isTotalValid = true;
 
         HashSet<string> globalMissionNames = new HashSet<string>();
-        // [Fix] Set 타입 변경 (int -> MissionDifficulty)
-        HashSet<MissionDifficulty> difficultySet = new HashSet<MissionDifficulty>();
+        // [Change] Set 타입을 float로 변경
+        HashSet<float> difficultySet = new HashSet<float>();
 
         if (DifficultyPools == null || DifficultyPools.Count == 0)
         {
@@ -58,6 +59,7 @@ public class MapCatalogSO : ScriptableObject
                 continue;
             }
 
+            // [Change] float 중복 체크
             if (difficultySet.Contains(pool.TargetDifficulty))
             {
                 sb.AppendLine($" - Error: Duplicate Difficulty Tier {pool.TargetDifficulty} in pool '{pool.name}'");
@@ -80,7 +82,6 @@ public class MapCatalogSO : ScriptableObject
                 {
                     if (mission == null) continue;
 
-                    // [Fix] MissionSettings -> Definition 변경 반영
                     string mName = mission.Definition.MissionName;
                     if (string.IsNullOrEmpty(mName)) continue;
 

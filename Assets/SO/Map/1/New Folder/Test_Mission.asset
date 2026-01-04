@@ -2,7 +2,7 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
-  m_ObjectHideFlags: 0
+  m_ObjectHideFlags: 52
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -17,12 +17,22 @@ MonoBehaviour:
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0
-  LocationID: Site_A
+  UI:
+    LocationID: Site_A
+    LocationName: 
+    MapSize: 0
+    DifficultyLevel: 1
+    EstimatedEnemyCount: 0
+    MaxSquadSize: 0
   MissionSettings:
+    MissionName: 
+    Type: 0
+    TimeLimit: 0
+  Definition:
     MissionName: 
     Description: 
     Type: 0
-    TurnLimit: 0
+    TimeLimit: 0
   PlayerConfig:
     SpawnSlots:
     - RoleTag: Spawn_Player

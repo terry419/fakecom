@@ -28,8 +28,7 @@ public class SessionManager : MonoBehaviour, IInitializable
             _currentMissionData = context.MissionData;
             IsInitialized = true;
 
-            // [Fix] MissionSettings -> Definition
-            Debug.Log($"[SessionManager] Initialized. Mission: {_currentMissionData.Definition.MissionName}");
+            Debug.Log($"[SessionManager] Initialized. Mission: {_currentMissionData.MissionSettings.MissionName}");
 
             await UniTask.CompletedTask;
         }

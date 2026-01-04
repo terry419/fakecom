@@ -1418,6 +1418,7 @@ GameObject:
   - component: {fileID: 102507541013354803}
   - component: {fileID: 5747453453902377018}
   - component: {fileID: 7641979484204183657}
+  - component: {fileID: 1054430714401271726}
   m_Layer: 5
   m_Name: MissionNode_prefab
   m_TagString: Untagged
@@ -1527,6 +1528,28 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1054430714401271726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7031828965940444322}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9be37393e4f8e264d9b617d82186a62e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _button: {fileID: 7641979484204183657}
+  _contentGroup: {fileID: 5708090094804987086}
+  _missionNameText: {fileID: 1888017286533279931}
+  _locationText: {fileID: 1095974450674331923}
+  _typeText: {fileID: 7319288575229360591}
+  _turnLimitText: {fileID: 1979029011029167165}
+  _difficultyText: {fileID: 1626623158223622419}
+  _mapSizeText: {fileID: 4346421982181223584}
+  _enemyCountText: {fileID: 2580756334661434129}
+  _squadSizeText: {fileID: 6705109646897682883}
 --- !u!1 &8174848804546976742
 GameObject:
   m_ObjectHideFlags: 0
@@ -1559,10 +1582,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 3352984046080873724}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 53.510002}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6865727172953179609
 CanvasRenderer:

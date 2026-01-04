@@ -46,14 +46,26 @@ public struct MissionUIMetadata
     [Tooltip("UI 표시용 지역 이름 (예: Sector 7).")]
     public string LocationName;
 
-    [Tooltip("UI 표시용 맵 크기 (예: 24, 24).")]
-    public Vector2Int MapSize;
+    [Tooltip("맵 크기 (Small, Medium, Large, Huge)")]
+    public MapSize MapSize;
+
+    [Tooltip("맵 난이도)")]
+    [Range(1, 10)]
+    public int DifficultyLevel;
 
     [Tooltip("디자인 기준 예상 적 숫자. 실제 스폰과 다를 수 있음.")]
     public int EstimatedEnemyCount;
 
     [Tooltip("최대 출격 가능 인원.")]
     public int MaxSquadSize;
+}
+
+[System.Serializable]
+public struct MissionSettings // [Fix] Definition 대신 Settings로 이름 통일
+{
+    public string MissionName;
+    public MissionType Type;
+    public int TimeLimit;
 }
 
 [CreateAssetMenu(fileName = "NewMissionData", menuName = "Data/Map/MissionData")]
@@ -64,6 +76,7 @@ public class MissionDataSO : ScriptableObject
 
     [Header("1.5. UI Metadata")]
     public MissionUIMetadata UI;
+    public MissionSettings MissionSettings;
 
     [Header("2. Definition")]
     public MissionDefinition Definition; // [Refactor] Settings -> Definition

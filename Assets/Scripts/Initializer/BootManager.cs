@@ -136,6 +136,17 @@ public class BootManager : MonoBehaviour
             Debug.Log(_bootLog.ToString());
 
             OnBootComplete?.Invoke(true);
+            string currentSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (currentSceneName == "BootScene" || currentSceneName == "Boot")
+            {
+                Debug.Log("[BootManager] Boot Sequence Complete. Loading BaseScene...");
+                UnityEngine.SceneManagement.SceneManager.LoadScene("BaseScene");
+            }
+            else
+            {
+                Debug.Log($"[BootManager] Boot Complete. Detected Test Mode in '{currentSceneName}'. Staying in current scene.");
+            }
+
             return true;
         }
         catch (Exception ex)
