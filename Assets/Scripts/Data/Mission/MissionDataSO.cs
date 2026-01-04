@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
+// [Fix] 삭제되었던 필수 정의 복구 (CS0246 해결)
 [System.Serializable]
 public struct PlayerSpawnSlot
 {
@@ -32,8 +33,27 @@ public struct EnemySpawnDef
 public struct NeutralSpawnDef
 {
     public string RoleTag;
-    // 중립 유닛용 SO가 따로 없다면 UnitDataSO 혹은 EnemyUnitDataSO 재사용
     public EnemyUnitDataSO UnitData;
+}
+
+// [Refactor] UI 전용 데이터 분리
+[System.Serializable]
+public struct MissionUIMetadata
+{
+    [Tooltip("월드맵 버튼 위치 ID (예: Site_A). 시스템 식별용.")]
+    public string LocationID;
+
+    [Tooltip("UI 표시용 지역 이름 (예: Sector 7).")]
+    public string LocationName;
+
+    [Tooltip("UI 표시용 맵 크기 (예: 24, 24).")]
+    public Vector2Int MapSize;
+
+    [Tooltip("디자인 기준 예상 적 숫자. 실제 스폰과 다를 수 있음.")]
+    public int EstimatedEnemyCount;
+
+    [Tooltip("최대 출격 가능 인원.")]
+    public int MaxSquadSize;
 }
 
 [CreateAssetMenu(fileName = "NewMissionData", menuName = "Data/Map/MissionData")]
@@ -42,18 +62,19 @@ public class MissionDataSO : ScriptableObject
     [Header("1. Map Reference")]
     public AssetReferenceT<MapDataSO> MapDataRef;
 
-    [Header("2. Settings")]
-    public MissionSettings MissionSettings;
+    [Header("1.5. UI Metadata")]
+    public MissionUIMetadata UI;
 
-    // [Fix] 주인님 지시대로 PlayerSettings 통합 (슬롯 + 로스터)
+    [Header("2. Definition")]
+    public MissionDefinition Definition; // [Refactor] Settings -> Definition
+
+    [Header("3. Configs")]
     public PlayerMissionConfig PlayerConfig;
 
-    [Header("3. Spawns")]
+    [Header("4. Spawns")]
     public List<EnemySpawnDef> EnemySpawns = new List<EnemySpawnDef>();
-
-    // [Fix] 중립 유닛(Neutral) 추가
     public List<NeutralSpawnDef> NeutralSpawns = new List<NeutralSpawnDef>();
 
-    [Header("4. Rewards")]
+    [Header("5. Rewards")]
     public List<ItemDataSO> Rewards = new List<ItemDataSO>();
 }

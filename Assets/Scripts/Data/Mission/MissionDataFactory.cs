@@ -66,7 +66,7 @@ public static class MissionDataFactory
         dummyMission.hideFlags = HideFlags.DontSave;
 
         dummyMission.MapDataRef = mapEntry.MapDataRef;
-        dummyMission.MissionSettings = new MissionSettings
+        dummyMission.Definition = new MissionDefinition
         {
             MissionName = mapEntry.MapID,
             Type = MissionType.Exterminate

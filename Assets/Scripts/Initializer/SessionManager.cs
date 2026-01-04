@@ -15,24 +15,21 @@ public class SessionManager : MonoBehaviour, IInitializable
             ServiceLocator.Unregister<SessionManager>(ManagerScope.Session);
     }
 
-    // [Fix] SetInitialMission 삭제 (Context로 단일화)
-
     public async UniTask Initialize(InitializationContext context)
     {
         try
         {
-            // [Fix] Context.Validate()를 통한 중앙 집중식 검증
             var validation = context.Validate();
             if (!validation)
             {
                 throw new BootstrapException($"[SessionManager] Validation Failed: {validation.ErrorMessage}");
             }
 
-            // Context에서 데이터 확정
             _currentMissionData = context.MissionData;
-
             IsInitialized = true;
-            Debug.Log($"[SessionManager] Initialized. Mission: {_currentMissionData.MissionSettings.MissionName}");
+
+            // [Fix] MissionSettings -> Definition
+            Debug.Log($"[SessionManager] Initialized. Mission: {_currentMissionData.Definition.MissionName}");
 
             await UniTask.CompletedTask;
         }

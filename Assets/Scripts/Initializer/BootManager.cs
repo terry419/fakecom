@@ -10,15 +10,13 @@ public class BootManager : MonoBehaviour
     private StringBuilder _bootLog = new StringBuilder();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    private const bool AUTO_START_SESSION = true;
+    // [Mod] 탐험 씬 테스트를 위해 자동 전투 진입을 끕니다.
+    private const bool AUTO_START_SESSION = false;
 #else
     private const bool AUTO_START_SESSION = false;
 #endif
 
-    private async void Start()
-    {
-        await BootAsync();
-    }
+    private async void Start() => await BootAsync();
 
     public async UniTask<bool> BootAsync()
     {
@@ -37,7 +35,7 @@ public class BootManager : MonoBehaviour
             _bootLog.AppendLine("   ✓ Initialized");
 
             // ----------------------------------------------------------------
-            // 1.5. Session (Auto Start)
+            // 1.5. Session Strategy
             // ----------------------------------------------------------------
             _bootLog.AppendLine("\n1.5. Session");
 
@@ -49,14 +47,14 @@ public class BootManager : MonoBehaviour
                     if (!ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
                         throw new BootstrapException("CatalogManager not found.");
 
-                    // [Fix] Factory 삭제 -> CatalogManager에서 진짜 미션 뽑아오기
+                    // [Fix] int(1) -> MissionDifficulty.Normal (Enum)
                     if (!catalogMgr.TryGetRandomMissionByDifficulty(1, out MissionDataSO selectedMission))
                         throw new BootstrapException("No mission found for Difficulty 1.");
 
-                    // [Fix] 세션 시작 (ownsMission = false, 에셋 보호)
                     await gameManager.StartSessionAsync(selectedMission, false);
 
-                    _bootLog.AppendLine($"   ✓ Auto-started (Mission: {selectedMission.MissionSettings.MissionName})");
+                    // [Fix] MissionSettings -> Definition
+                    _bootLog.AppendLine($"   ✓ Auto-started (Mission: {selectedMission.Definition.MissionName})");
                 }
                 catch (Exception ex)
                 {
@@ -66,7 +64,7 @@ public class BootManager : MonoBehaviour
             }
             else
             {
-                _bootLog.AppendLine("   - Skipped (Config is false)");
+                _bootLog.AppendLine("   - Skipped (Config is false). Waiting for Exploration...");
             }
 #else
             _bootLog.AppendLine("   - Skipped (Release Build)");
@@ -88,12 +86,12 @@ public class BootManager : MonoBehaviour
                 if (ServiceLocator.TryGet(out SessionManager sessionMgr) && sessionMgr.IsInitialized)
                 {
                     currentMission = sessionMgr.CurrentMission;
-
                     if (currentMission != null)
                     {
                         try
                         {
-                            _bootLog.Append($"   - Loading Map ({currentMission.MissionSettings.MissionName})...");
+                            // [Fix] MissionSettings -> Definition
+                            _bootLog.Append($"   - Loading Map ({currentMission.Definition.MissionName})...");
                             loadedMapData = await MapDataLoader.LoadMapDataAsync(currentMission);
                             _bootLog.AppendLine(" OK");
                         }
@@ -105,7 +103,7 @@ public class BootManager : MonoBehaviour
                     }
                 }
 
-                // [Fix] MapCatalogManager를 가져와서 SO를 꺼냄 (컴파일 에러 해결)
+                // [Fix] MapCatalogManager -> MapCatalogSO
                 MapCatalogSO catalogSO = null;
                 if (ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
                 {
@@ -117,17 +115,13 @@ public class BootManager : MonoBehaviour
                     Scope = ManagerScope.Scene,
                     GlobalSettings = globalSettings,
                     Registry = tileRegistry,
-                    MapCatalog = catalogSO, // [Fix] 가져온 CatalogSO 주입
+                    MapCatalog = catalogSO,
                     MissionData = currentMission,
                     MapData = loadedMapData
                 };
 
-                // 검증
                 var validation = sceneContext.Validate();
-                if (!validation)
-                {
-                    throw new BootstrapException($"Context Validation Failed: {validation.ErrorMessage}");
-                }
+                if (!validation) throw new BootstrapException($"Context Validation Failed: {validation.ErrorMessage}");
 
                 await sceneInitializer.InitializeSceneAsync(sceneContext, _bootLog);
                 _bootLog.AppendLine("   ✓ Initialized");
@@ -135,7 +129,7 @@ public class BootManager : MonoBehaviour
             else
             {
                 _bootLog.AppendLine("\n2. Scene Systems");
-                _bootLog.AppendLine("   - Warning: SceneInitializer not found.");
+                _bootLog.AppendLine("   - Warning: SceneInitializer not found. (Exploration Mode?)");
             }
 
             _bootLog.AppendLine("\n<color=green>✓ ALL SYSTEMS READY</color>");

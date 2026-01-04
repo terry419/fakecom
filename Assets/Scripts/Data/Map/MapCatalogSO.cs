@@ -9,12 +9,15 @@ public class MapCatalogSO : ScriptableObject
     [field: SerializeField]
     public List<MapPoolSO> DifficultyPools { get; private set; } = new List<MapPoolSO>();
 
-    public bool TryGetPoolByDifficulty(int difficulty, out MapPoolSO pool)
+    // [Fix] 인자 타입 변경 (int -> MissionDifficulty)
+    public bool TryGetPoolByDifficulty(MissionDifficulty difficulty, out MapPoolSO pool)
     {
+        // Enum 직접 비교
         pool = DifficultyPools.FirstOrDefault(p => p.TargetDifficulty == difficulty);
         if (pool != null) return true;
 
-        pool = DifficultyPools.OrderBy(p => Mathf.Abs(p.TargetDifficulty - difficulty)).FirstOrDefault();
+        // [Fix] 근사치 찾기: Enum을 int로 변환하여 거리 계산
+        pool = DifficultyPools.OrderBy(p => Mathf.Abs((int)p.TargetDifficulty - (int)difficulty)).FirstOrDefault();
         return pool != null;
     }
 
@@ -36,9 +39,9 @@ public class MapCatalogSO : ScriptableObject
         StringBuilder sb = new StringBuilder();
         bool isTotalValid = true;
 
-        // [Fix] Mission 이름 중복 검사로 변경
         HashSet<string> globalMissionNames = new HashSet<string>();
-        HashSet<int> difficultySet = new HashSet<int>();
+        // [Fix] Set 타입 변경 (int -> MissionDifficulty)
+        HashSet<MissionDifficulty> difficultySet = new HashSet<MissionDifficulty>();
 
         if (DifficultyPools == null || DifficultyPools.Count == 0)
         {
@@ -71,15 +74,14 @@ public class MapCatalogSO : ScriptableObject
                 isTotalValid = false;
             }
 
-            // [Fix] Entries -> Missions 변경 대응
             if (pool.Missions != null)
             {
                 foreach (var mission in pool.Missions)
                 {
                     if (mission == null) continue;
 
-                    // MissionName으로 중복 검사
-                    string mName = mission.MissionSettings.MissionName;
+                    // [Fix] MissionSettings -> Definition 변경 반영
+                    string mName = mission.Definition.MissionName;
                     if (string.IsNullOrEmpty(mName)) continue;
 
                     if (globalMissionNames.Contains(mName))
