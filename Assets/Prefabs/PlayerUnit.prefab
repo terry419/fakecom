@@ -12,6 +12,8 @@ GameObject:
   - component: {fileID: 2095357498167941172}
   - component: {fileID: 2324837317383570925}
   - component: {fileID: 4842652612367777614}
+  - component: {fileID: 5963974679956451856}
+  - component: {fileID: 1162152455696573106}
   m_Layer: 0
   m_Name: PlayerUnit
   m_TagString: Untagged
@@ -107,3 +109,38 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5963974679956451856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2382100463405782337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8eeddc12ef8ecc45ab052b99c6d780e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1162152455696573106
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2382100463405782337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb1fa374eec0b4444b29606467c09b95, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  unitData: {fileID: 11400000, guid: 0964b9e991755534c845512d39e3d106, type: 2}
+  globalSettings: {fileID: 11400000, guid: 028a1a5d62a8c8d4580d950cfde6b25c, type: 2}
+  currentHP: 0
+  currentTS: 0
+  <RemainingMobility>k__BackingField: 0
+  condition: 2
+  currentSync: 0
+  hasMoved: 0
+  hasAttacked: 0
+  usedMoveCost: 0
+  <LastFinalPenalty>k__BackingField: 0

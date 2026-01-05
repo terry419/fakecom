@@ -1,124 +1,225 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class TurnManager : MonoBehaviour
 {
-    // [설정] 초당 감소하는 TS 양 (기존 스크립트 값: 5f)
+    [Tooltip("1초당 감소하는 TS 수치입니다.")]
     [SerializeField] private float tsDecrementPerSecond = 5f;
 
-    // [데이터] 전체 유닛 관리
-    private List<UnitStatus> _allUnits = new List<UnitStatus>(); // Unit 클래스 대신 UnitStatus 사용 (기존 스크립트 참조)
+    private List<UnitStatus> allUnits = new List<UnitStatus>();
+    public UnitStatus ActiveUnit { get; private set; }
+    private bool isTurnActive = false;
 
-    // [상태] 현재 턴 진행 중 여부
-    public bool IsTurnActive { get; private set; } = false;
-    public UnitStatus CurrentTurnUnit { get; private set; }
+    public event System.Action<UnitStatus> OnTurnStarted;
+    public event System.Action<List<UnitStatus>> OnTimelineUpdated;
+
+    private CameraController cameraController;
+    private InputManager inputManager;
 
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Scene);
     }
 
-    private void OnDestroy()
+    private void Start()
     {
-        ServiceLocator.Unregister<TurnManager>(this);
-        _allUnits.Clear();
+        InitializeSceneDependencies();
     }
 
-    // 유닛 등록 (UnitStatus 컴포넌트 사용)
-    public void RegisterUnit(UnitStatus unit)
+    private void OnEnable()
     {
-        if (!_allUnits.Contains(unit))
-        {
-            _allUnits.Add(unit);
+        SceneManager.sceneLoaded += OnSceneLoaded;
 
-            // 초기 TS 설정: 민첩성이 높을수록 0에 가깝게 시작 (바로 턴 잡기 유리)
-            // 기존 코드: Random.Range(20f, 40f) / unit.Agility [cite: 690]
-            float agility = unit.Agility > 0 ? unit.Agility : 10f;
-            unit.CurrentTS = Random.Range(20f, 40f) / agility;
+        inputManager = ServiceLocator.Get<InputManager>();
+        if (inputManager != null)
+        {
+            inputManager.OnTurnEndInvoked += EndTurn;
+            // [수정] OnCameraRecenter 이벤트를 구독하여 활성 유닛 포커스 기능 수행
+            inputManager.OnCameraRecenter += HandleCameraRecenterInput;
         }
     }
 
-    public void UnregisterUnit(UnitStatus unit)
+    private void OnDisable()
     {
-        if (_allUnits.Contains(unit)) _allUnits.Remove(unit);
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (inputManager != null)
+        {
+            inputManager.OnTurnEndInvoked -= EndTurn;
+            // [수정] 이벤트 구독 해제
+            inputManager.OnCameraRecenter -= HandleCameraRecenterInput;
+        }
     }
 
-    // [핵심] 실시간 TS 차감 로직 (User 요청 복원)
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        StartCoroutine(WaitAndInitialize());
+    }
+    private IEnumerator WaitAndInitialize()
+    {
+        yield return null;
+        InitializeSceneDependencies();
+    }
+
+    private void InitializeSceneDependencies()
+    {
+        cameraController = ServiceLocator.Get<CameraController>();
+        if (inputManager == null) inputManager = ServiceLocator.Get<InputManager>();
+
+        allUnits = FindObjectsOfType<UnitStatus>().OrderBy(u => u.gameObject.name).ToList();
+
+        foreach (var unit in allUnits)
+        {
+            unit.CurrentTS = Random.Range(20f, 40f) / unit.Agility;
+        }
+
+        isTurnActive = false;
+        ActiveUnit = null;
+
+        OnTimelineUpdated?.Invoke(allUnits);
+    }
+
     private void Update()
     {
-        // 턴이 진행 중(누군가 행동 중)이면 시간 멈춤
-        if (IsTurnActive) return;
-        if (_allUnits.Count == 0) return;
-
-        // 1. 감소량 계산
-        float decrement = tsDecrementPerSecond * Time.deltaTime;
-
-        // 2. 모든 유닛 TS 차감
-        // 리스트를 복사하거나 역순으로 돌 필요는 없으나, 
-        // 0 도달 체크를 위해 임시 리스트를 쓸 수도 있음. 여기선 바로 체크.
-        foreach (var unit in _allUnits)
+        if (!isTurnActive)
         {
-            if (unit.IsDead) continue; // 사망 유닛 제외
+            bool timelineChanged = false;
+            float tsToDecrement = tsDecrementPerSecond * Time.deltaTime;
 
-            if (unit.CurrentTS > 0)
+            if (allUnits == null) return;
+
+            foreach (var unit in allUnits)
             {
-                unit.CurrentTS -= decrement;
+                if (unit == null) continue;
+
+                if (unit.CurrentTS > 0)
+                {
+                    unit.CurrentTS -= tsToDecrement;
+                    timelineChanged = true;
+                }
+
+                if (unit.CurrentTS <= 0)
+                {
+                    unit.CurrentTS = 0;
+                    StartTurn(unit);
+                    break;
+                }
             }
 
-            // 3. 턴 획득 체크
-            if (unit.CurrentTS <= 0)
-            {
-                unit.CurrentTS = 0;
-                StartTurn(unit);
-                break; // 한 프레임에 한 명만 턴 시작
-            }
+            if (timelineChanged) OnTimelineUpdated?.Invoke(allUnits);
         }
     }
 
     private void StartTurn(UnitStatus unit)
     {
-        IsTurnActive = true;
-        CurrentTurnUnit = unit;
+        Debug.Log($"[TurnManager] {unit.name}의 턴 시작. 카메라 이동 시도.");
+        isTurnActive = true;
+        ActiveUnit = unit;
+        ActiveUnit.ResetTurnData();
 
-        Debug.Log($"[TurnManager] 턴 시작: {unit.name}");
+        Debug.Log($"<color=yellow>[DEBUG_TM] 턴 시작: {unit.name}</color>");
+        Debug.Log($"<color=yellow>[DEBUG_TM] 유닛 좌표 확인: {unit.transform.position}</color>");
 
-        // 유닛에게 턴 시작 알림
-        unit.OnTurnStart();
+        if (cameraController != null)
+        {
+            cameraController.SetTarget(ActiveUnit.transform, false);
+        }
+        else
+        {
+            Debug.LogError($"<color=red>[DEBUG_TM] 치명적 오류: CameraController가 Null입니다!</color>");
+        }
 
-        // TODO: UI 갱신 이벤트 호출
+        ActiveUnit.OnTurnStart();
+
+        // [TODO] 만약 유닛 상태가 Incapacitated(무력화)라면 
+        // 50% 확률로 "행동 불능" 로그를 띄우고 바로 EndTurn()을 호출하는 로직 추가 필요
+        // 예: if (ActiveUnit.Condition == UnitCondition.Incapacitated && Random.value < 0.5f) { ... }
+
+        if (ActiveUnit.IsDead)
+        {
+            Debug.Log($"{ActiveUnit.name}은(는) 턴 시작과 동시에 사망했습니다.");
+            EndTurn();
+            return;
+        }
+
+        OnTurnStarted?.Invoke(ActiveUnit);
     }
 
     public void EndTurn()
     {
-        if (CurrentTurnUnit == null) return;
+        if (!isTurnActive || ActiveUnit == null) return;
 
-        // 행동에 따른 페널티(다음 대기시간) 계산
-        // UnitStatus.CalculateNextTurnPenalty() 활용 [cite: 833]
-        float penalty = CurrentTurnUnit.CalculateNextTurnPenalty();
-        CurrentTurnUnit.CurrentTS += penalty; // 0에서 페널티만큼 증가 -> 다시 대기
+        var pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        if (pathVisualizer != null) pathVisualizer.ClearAll();
 
-        Debug.Log($"[TurnManager] 턴 종료: {CurrentTurnUnit.name}, 다음 TS: {CurrentTurnUnit.CurrentTS}");
-
-        CurrentTurnUnit = null;
-        IsTurnActive = false; // 다시 Update 루프 가동
+        ActiveUnit.CurrentTS += ActiveUnit.CalculateNextTurnPenalty();
+        ActiveUnit.ResetTurnData();
+        ActiveUnit = null;
+        isTurnActive = false;
     }
 
-    // [GDD 11.2] 피격 페널티 적용 (외부 호출용)
-    public void ApplyHitPenalty(UnitStatus target, bool isCritical)
+    public void UpdateUnitTurnDelay(UnitStatus unit, float oldTS, float newTS, bool isCrit)
     {
-        // GDD: FinalTSPenalty의 10%/20% 적용
-        // UnitStatus.TakeDamage 내부에서 호출될 수도 있지만, 
-        // TurnManager가 주도권을 가지려면 여기서 처리.
+        StartCoroutine(ProcessTurnDelayAnimation(unit, oldTS, newTS, isCrit));
+    }
 
-        // UnitStatus에 저장된 LastFinalPenalty 사용 [cite: 820]
-        float basePenalty = target.LastFinalPenalty;
-        float ratio = isCritical ? 0.2f : 0.1f; // 임시 비율
-        float addedDelay = basePenalty * ratio;
+    private IEnumerator ProcessTurnDelayAnimation(UnitStatus unit, float startTS, float targetTS, bool isCrit)
+    {
+        // ... (이하 생략)
+        if (!isCrit)
+        {
+            float duration = 0.3f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                unit.CurrentTS = Mathf.Lerp(startTS, targetTS, t);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+        }
+        else
+        {
+            float difference = targetTS - startTS;
+            float overshootAmount = difference * 0.5f;
+            float overshootTarget = targetTS + overshootAmount;
+            float phase1Duration = 0.2f;
+            float p1Timer = 0f;
+            while (p1Timer < phase1Duration)
+            {
+                p1Timer += Time.deltaTime;
+                float t = p1Timer / phase1Duration;
+                float easeT = 1f - Mathf.Pow(1f - t, 3);
+                unit.CurrentTS = Mathf.Lerp(startTS, overshootTarget, easeT);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+            unit.CurrentTS = overshootTarget;
+            float phase2Duration = 0.3f;
+            float p2Timer = 0f;
+            while (p2Timer < phase2Duration)
+            {
+                p2Timer += Time.deltaTime;
+                float t = p2Timer / phase2Duration;
+                float smoothT = t * t * (3f - 2f * t);
+                unit.CurrentTS = Mathf.Lerp(overshootTarget, targetTS, smoothT);
+                OnTimelineUpdated?.Invoke(allUnits);
+                yield return null;
+            }
+        }
+        unit.CurrentTS = targetTS;
+        OnTimelineUpdated?.Invoke(allUnits);
+    }
 
-        target.CurrentTS += addedDelay; // 대기 시간 증가 (턴 밀림)
-
-        Debug.Log($"[TurnManager] {target.name} 피격! TS +{addedDelay} 증가");
+    // [추가] CameraRecenter 이벤트 핸들러
+    private void HandleCameraRecenterInput()
+    {
+        if (cameraController != null && ActiveUnit != null)
+        {
+            cameraController.SetTarget(ActiveUnit.transform, true); // 즉시 이동
+        }
     }
 }

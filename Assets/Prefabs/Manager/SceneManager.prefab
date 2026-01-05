@@ -221,6 +221,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29acac65418329d4db01a0b30f873be9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  moveSpeed: 10
+  rotationSpeed: 100
+  mouseRotationSpeed: 0.2
+  smoothing: 5
+  defaultPitch: 45
+  defaultYaw: 0
+  fixedZoomDistance: 10
+  actionViewOffset: {x: 0.5, y: 1.8, z: -2}
+  targetHeightOffset: 1
+  debugAttacker: {fileID: 0}
+  debugTarget: {fileID: 0}
+  shakeDuration: 0.3
+  shakeMagnitude: 0.2
+  currentYaw: 0
+  currentPitch: 0
 --- !u!1 &4524678035037519289
 GameObject:
   m_ObjectHideFlags: 0
@@ -265,6 +280,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48395f7b1ebf7fd448a6f06561b864a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tsDecrementPerSecond: 5
 --- !u!1 &4647220188888504884
 GameObject:
   m_ObjectHideFlags: 0
@@ -529,6 +545,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e7c5f1be9e9e57f4c809405404d52e02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _reachablePrefab: {fileID: 5126863275788783367, guid: 8fe520be13f5e6a489a3ba5ccb8c5289, type: 3}
+  _pathPrefab: {fileID: 1584731804883397378, guid: 03ad7ff298e29264d99c80c734df5b57, type: 3}
+  _unreachablePrefab: {fileID: 4002224012173158463, guid: ec1451339f3909545bc6f00c87339d23, type: 3}
+  _verticalOffset: 0.05
+  _initialPoolSize: 50
 --- !u!1 &6717286281797422196
 GameObject:
   m_ObjectHideFlags: 0
@@ -588,6 +609,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2894218d8d38b440bbf9054c3f2b5aa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _testMissionData: {fileID: 0}
 --- !u!1 &7042416757996620872
 GameObject:
   m_ObjectHideFlags: 0
@@ -632,6 +654,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1590911a49748f419dc251cb194c7d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  qteController: {fileID: 0}
 --- !u!1 &7443378049237077791
 GameObject:
   m_ObjectHideFlags: 0
