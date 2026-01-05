@@ -28,7 +28,7 @@ MonoBehaviour:
   MaxHP: 100
   MaxAP: 2
   Mobility: 5
-  Agility: 5
+  Agility: 1
   Aim: 5
   Evasion: 5
   CritChance: 0
