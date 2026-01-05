@@ -23,7 +23,6 @@ public class BattleStateFactory
         var newState = Create(stateEnum);
         if (newState == null)
         {
-            // 지원되지 않는 상태에 대해 명시적인 예외를 발생시킴
             throw new NotSupportedException($"[Factory] 상태 '{stateEnum}'의 생성이 지원되지 않습니다.");
         }
 
@@ -41,17 +40,21 @@ public class BattleStateFactory
             case BattleState.TurnWaiting:
                 return new TurnWaitingState(_context);
 
+            // [복구 완료] 이제 PlayerTurn 요청이 오면 정상적으로 상태를 생성합니다.
+            case BattleState.PlayerTurn:
+                return new PlayerTurnState(_context);
+
+            // (참고) 적 턴(EnemyTurnState) 스크립트도 만드셨다면 아래 주석을 푸세요.
+            // case BattleState.EnemyTurn:
+            //    return new EnemyTurnState(_context);
+
             case BattleState.BattleEnd:
                 return new BattleEndState(_context);
 
             case BattleState.Error:
                 return new ErrorState(_context);
 
-            // case BattleState.PlayerTurn:
-            //    return new PlayerTurnState(_context);
-
             default:
-                // null을 반환하여 GetOrCreate에서 예외를 던지도록 함
                 return null;
         }
     }

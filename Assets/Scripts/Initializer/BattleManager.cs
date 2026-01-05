@@ -127,7 +127,6 @@ public class BattleManager : MonoBehaviour, IInitializable
             _currentLogicState = _stateFactory.GetOrCreate(nextStateID);
             CurrentStateID = _currentLogicState.StateID;
 
-            Debug.Log($"[BattleManager] State Change: {oldID} -> {CurrentStateID}");
             OnStateChanged?.Invoke(oldID, CurrentStateID);
 
             _currentLogicState.OnRequestTransition += HandleTransitionRequest;

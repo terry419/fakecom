@@ -40,7 +40,6 @@ public class UnitManager : MonoBehaviour, IInitializable
 
     private async UniTask SpawnMissionUnitsAsync()
     {
-        Debug.Log("[UnitManager] Starting Auto-Spawn...");
         HashSet<GridCoords> usedTiles = new HashSet<GridCoords>();
 
         // 1. Player Spawn
@@ -73,7 +72,6 @@ public class UnitManager : MonoBehaviour, IInitializable
         if (_currentMission.NeutralSpawns != null)
             await SpawnFactionUnits(_currentMission.NeutralSpawns, d => d.RoleTag, d => d.UnitData, Faction.Neutral, usedTiles);
 
-        Debug.Log($"[UnitManager] Spawn Complete. Total Units: {_activeUnits.Count}");
     }
 
     private async UniTask SpawnFactionUnits<T>(IEnumerable<T> spawnDefs, Func<T, string> tagSelector, Func<T, UnitDataSO> dataSelector, Faction faction, HashSet<GridCoords> usedTiles)

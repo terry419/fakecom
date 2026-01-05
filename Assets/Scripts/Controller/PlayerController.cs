@@ -4,14 +4,14 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour, IUnitController
+public class PlayerController : MonoBehaviour, IInitializable
 {
     public Unit PossessedUnit { get; private set; }
+    [SerializeField] private PathVisualizer _pathVisualizer;
 
     private Camera _mainCamera;
     private MapManager _mapManager;
     private InputManager _inputManager;
-    private PathVisualizer _pathVisualizer;
     private CameraController _cameraController;
 
     private bool _isMyTurn = false;
@@ -24,56 +24,55 @@ public class PlayerController : MonoBehaviour, IUnitController
     private List<GridCoords> _validPathStep;
     private List<GridCoords> _invalidPathStep;
 
-    private void Awake()
+    private void Awake() => _mainCamera = Camera.main;
+
+    public UniTask Initialize(InitializationContext context)
     {
-        _mainCamera = Camera.main;
+        ServiceLocator.Register(this, ManagerScope.Scene);
+        _mapManager = ServiceLocator.Get<MapManager>();
+        _inputManager = ServiceLocator.Get<InputManager>();
+        if (_pathVisualizer == null) _pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        return UniTask.CompletedTask;
     }
 
-    public void Possess(Unit unit)
+    public async UniTask<bool> Possess(Unit unit)
     {
+        if (unit == null) return false;
         PossessedUnit = unit;
-        ServiceLocator.TryGet(out _mapManager);
-        ServiceLocator.TryGet(out _inputManager);
-        ServiceLocator.TryGet(out _pathVisualizer);
+        _isMyTurn = true;
 
-        if (ServiceLocator.TryGet(out _cameraController))
-        {
-            _cameraController.SetTarget(unit.transform);
-        }
-        else
-        {
+        if (_mapManager == null) ServiceLocator.TryGet(out _mapManager);
+        if (_inputManager == null) ServiceLocator.TryGet(out _inputManager);
+        if (_pathVisualizer == null) ServiceLocator.TryGet(out _pathVisualizer);
+        if (_cameraController == null && !ServiceLocator.TryGet(out _cameraController))
             _cameraController = FindObjectOfType<CameraController>();
-            if (_cameraController != null) _cameraController.SetTarget(unit.transform);
-        }
 
-        Debug.Log($"[PlayerController] Possessed Unit: {unit.name}");
+        if (_cameraController != null) _cameraController.SetTarget(unit.transform);
+
+        CalculateReachableArea();
+        ConnectInput();
+        await UniTask.Yield();
+        return true;
     }
 
-    public void Unpossess()
+    public async UniTask Unpossess()
     {
-        Debug.Log($"[PlayerController] Unpossess Unit: {PossessedUnit?.name}");
         DisconnectInput();
         PossessedUnit = null;
         _isMyTurn = false;
-        CleanupVisuals();
+        CleanupVisuals(); // 여기서는 다 지우는 게 맞음
+        await UniTask.Yield();
     }
 
     public async UniTask OnTurnStart()
     {
         if (PossessedUnit == null) return;
-
-        Debug.Log($"[PlayerController] Turn Start: {PossessedUnit.name} (AP: {PossessedUnit.CurrentAP})");
-
         _isMyTurn = true;
         _turnEnded = false;
         _turnCompletionSource = new UniTaskCompletionSource();
-
         ConnectInput();
         CalculateReachableArea();
-
         await _turnCompletionSource.Task;
-
-        Debug.Log("[PlayerController] Turn Finished.");
         DisconnectInput();
         CleanupVisuals();
     }
@@ -88,14 +87,13 @@ public class PlayerController : MonoBehaviour, IUnitController
 
     private void UpdateMouseHover()
     {
+        // 1. 마우스가 맵 밖(또는 허공)을 가리킬 때
         if (!GetGridFromScreen(out GridCoords targetCoords))
         {
+            // [수정] CleanupVisuals() 대신 경로만 지우는 함수 호출
             if (_validPathStep != null || _invalidPathStep != null)
             {
-                _validPathStep = null;
-                _invalidPathStep = null;
-                _pathVisualizer?.ClearPath();
-                _lastHoveredCoords = default;
+                ClearPathOnly();
             }
             return;
         }
@@ -103,80 +101,143 @@ public class PlayerController : MonoBehaviour, IUnitController
         if (targetCoords.Equals(_lastHoveredCoords)) return;
         _lastHoveredCoords = targetCoords;
 
+        if (_mapManager == null) return;
+
+        // 2. 경로 계산
         List<GridCoords> fullPath = Pathfinder.FindPath(PossessedUnit.Coordinate, targetCoords, _mapManager);
 
         if (fullPath == null || fullPath.Count == 0)
         {
-            _pathVisualizer?.ClearPath();
+            // 경로가 없으면 경로 표시만 끔 (녹색 타일 유지)
+            ClearPathOnly();
             return;
         }
 
-        // [Logic] 이동 가능 거리 계산 (선불제 로직 반영)
-        int availableMove = 0;
+        int maxRange = PossessedUnit.HasStartedMoving
+            ? PossessedUnit.CurrentMobility
+            : ((PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0);
 
-        if (PossessedUnit.HasStartedMoving)
+        int validCount = 0;
+        bool physicallyBlocked = false;
+
+        for (int i = 0; i < fullPath.Count; i++)
         {
-            // 이미 이동 중이면 남은 이동력만큼만 더 갈 수 있음
-            availableMove = PossessedUnit.CurrentMobility;
+            GridCoords step = fullPath[i];
+
+            // (A) 유닛 충돌 체크 (도착점 포함, 내 위치 제외)
+            if (_mapManager.HasUnit(step) && step != PossessedUnit.Coordinate)
+            {
+                physicallyBlocked = true;
+                break;
+            }
+
+            // (B) 장애물 체크
+            Tile t = _mapManager.GetTile(step);
+            if (t != null && !t.IsWalkable)
+            {
+                physicallyBlocked = true;
+                break;
+            }
+
+            // (C) 거리 체크
+            if (i >= maxRange)
+            {
+                // 거리 초과 시 루프 종료하지 않고 validCount만 멈춤 (빨간색으로 표시하기 위해)
+            }
+            else
+            {
+                validCount++;
+            }
+        }
+
+        _validPathStep = fullPath.Take(validCount).ToList();
+
+        if (physicallyBlocked)
+        {
+            // 물리적으로 막혔으면 막힌 그 타일까지만 빨간색으로 표시
+            if (validCount < fullPath.Count)
+                _invalidPathStep = new List<GridCoords> { fullPath[validCount] };
+            else
+                _invalidPathStep = new List<GridCoords>();
         }
         else
         {
-            // 아직 이동 안 했으면, AP가 1 이상 있어야 전체 Mobility만큼 이동 가능
-            availableMove = (PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0;
+            // AP만 부족한 경우 나머지 경로 전체를 빨간색으로 표시
+            _invalidPathStep = fullPath.Skip(validCount).ToList();
         }
-
-        _validPathStep = fullPath.Take(availableMove).ToList();
-        _invalidPathStep = fullPath.Skip(availableMove).ToList();
 
         _pathVisualizer?.ShowHybridPath(_validPathStep, _invalidPathStep);
     }
 
+    // [추가] 경로(파랑/빨강)만 지우고 이동 범위(녹색)는 남기는 함수
+    private void ClearPathOnly()
+    {
+        _validPathStep = null;
+        _invalidPathStep = null;
+        _pathVisualizer?.ClearPath(); // PathVisualizer.ClearPath는 경로만 지움
+        _lastHoveredCoords = default;
+    }
+
+    // 기존 함수: 전부 다 지울 때 사용 (턴 종료, 이동 직전 등)
+    private void CleanupVisuals()
+    {
+        _cachedReachableTiles = null;
+        ClearPathOnly();
+        _pathVisualizer?.ClearAll(); // 녹색 포함 전체 삭제
+    }
+
     private void CalculateReachableArea()
     {
+        if (_mapManager == null) _mapManager = ServiceLocator.Get<MapManager>();
         if (_mapManager == null || PossessedUnit == null) return;
 
-        // [Logic] 이동 가능 범위 계산 (선불제 로직 반영)
-        // 위 UpdateMouseHover와 동일한 로직
-        int range = 0;
-
-        if (PossessedUnit.HasStartedMoving)
-        {
-            range = PossessedUnit.CurrentMobility;
-        }
-        else
-        {
-            range = (PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0;
-        }
-
-        Debug.Log($"[PlayerController] Calc Reachable. AP:{PossessedUnit.CurrentAP}, Moved:{PossessedUnit.HasStartedMoving}, Range:{range}");
+        int range = PossessedUnit.HasStartedMoving ? PossessedUnit.CurrentMobility :
+                   ((PossessedUnit.CurrentAP >= 1) ? PossessedUnit.Mobility : 0);
 
         _cachedReachableTiles = Pathfinder.GetReachableTiles(PossessedUnit.Coordinate, range, _mapManager);
-        _pathVisualizer?.ShowReachable(_cachedReachableTiles, excludeCoords: PossessedUnit.Coordinate);
+
+        if (_pathVisualizer != null)
+            _pathVisualizer.ShowReachable(_cachedReachableTiles, excludeCoords: PossessedUnit.Coordinate);
     }
 
     private void ConnectInput()
     {
-        if (_inputManager == null) return;
-        _inputManager.OnCommandInput -= HandleCommand;
-        _inputManager.OnCommandInput += HandleCommand;
+        if (_inputManager == null) _inputManager = ServiceLocator.Get<InputManager>();
+        if (_inputManager != null)
+        {
+            _inputManager.OnCommandInput -= HandleCommand;
+            _inputManager.OnCommandInput += HandleCommand;
+        }
     }
-
     private void DisconnectInput()
     {
-        if (_inputManager == null) return;
-        _inputManager.OnCommandInput -= HandleCommand;
+        if (_inputManager != null) _inputManager.OnCommandInput -= HandleCommand;
     }
 
     private void HandleCommand(Vector2 screenPos)
     {
         if (!_isMyTurn || _turnEnded) return;
 
+        if (GetGridFromScreen(out GridCoords targetCoords))
+        {
+            if (targetCoords != PossessedUnit.Coordinate && _mapManager.HasUnit(targetCoords))
+            {
+                Debug.LogWarning("Invalid Target (Occupied by Unit)!");
+                return;
+            }
+            Tile t = _mapManager.GetTile(targetCoords);
+            if (t != null && !t.IsWalkable)
+            {
+                Debug.LogWarning("Invalid Target (Obstacle)!");
+                return;
+            }
+        }
+
         if (_validPathStep != null && _validPathStep.Count > 0)
         {
-            // 빨간색 경로(이동 불가)가 포함되어 있으면 이동 금지
             if (_invalidPathStep != null && _invalidPathStep.Count > 0)
             {
-                Debug.LogWarning("Target is too far!");
+                Debug.LogWarning("Target is invalid (Too far or Blocked)!");
                 return;
             }
             ExecuteMove(_validPathStep).Forget();
@@ -188,22 +249,13 @@ public class PlayerController : MonoBehaviour, IUnitController
         try
         {
             DisconnectInput();
-            CleanupVisuals();
-
+            CleanupVisuals(); // 이동 시작 시에는 다 지우는 게 맞음
             await PossessedUnit.MovePathAsync(path, _mapManager);
 
-            // 이동 후 턴 종료 조건 체크
-            // 1. AP가 아예 0이 되면 종료
-            // 2. 이동력까지 다 써버리면? (보통은 턴 종료 안 하고 공격 기회 줌. 여기선 AP 기준)
-            if (PossessedUnit.CurrentAP <= 0)
-            {
-                Debug.Log("AP Depleted -> Turn End");
-                EndTurn();
-            }
+            if (PossessedUnit.CurrentAP <= 0) EndTurn();
             else
             {
-                // AP 남았으면 (또는 이동력 남았으면) 다시 입력 대기
-                CalculateReachableArea();
+                CalculateReachableArea(); // 이동 후 다시 그림
                 ConnectInput();
             }
         }
@@ -214,20 +266,12 @@ public class PlayerController : MonoBehaviour, IUnitController
         }
     }
 
-    private void CleanupVisuals()
-    {
-        _cachedReachableTiles = null;
-        _validPathStep = null;
-        _invalidPathStep = null;
-        _pathVisualizer?.ClearAll();
-    }
-
     private bool GetGridFromScreen(out GridCoords coords)
     {
         coords = default;
-        if (_mainCamera == null || _mapManager == null) return false;
+        if (_mainCamera == null) _mainCamera = Camera.main;
+        if (_mapManager == null) return false;
 
-        // InputManager를 통해야 하지만 Raycast용으로 직접 읽음
         Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
         Ray ray = _mainCamera.ScreenPointToRay(mousePos);
 

@@ -177,7 +177,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05f13a0ca0d6ad842b9d95aa30c49510, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &3031048406308749683
+--- !u!1 &2885566093785216887
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -185,22 +185,22 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2512706143305438219}
-  - component: {fileID: 109151418434672249}
+  - component: {fileID: 1195913060963835502}
+  - component: {fileID: 5340290273456307633}
   m_Layer: 0
-  m_Name: CameraController
+  m_Name: PlayerController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2512706143305438219
+--- !u!4 &1195913060963835502
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3031048406308749683}
+  m_GameObject: {fileID: 2885566093785216887}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -209,33 +209,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6051140353520375680}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &109151418434672249
+--- !u!114 &5340290273456307633
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3031048406308749683}
+  m_GameObject: {fileID: 2885566093785216887}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 29acac65418329d4db01a0b30f873be9, type: 3}
+  m_Script: {fileID: 11500000, guid: 9a81d033ca134e4478c8b2cd9c400657, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 10
-  rotationSpeed: 100
-  mouseRotationSpeed: 0.2
-  smoothing: 5
-  defaultPitch: 45
-  defaultYaw: 0
-  fixedZoomDistance: 10
-  actionViewOffset: {x: 0.5, y: 1.8, z: -2}
-  targetHeightOffset: 1
-  debugAttacker: {fileID: 0}
-  debugTarget: {fileID: 0}
-  shakeDuration: 0.3
-  shakeMagnitude: 0.2
-  currentYaw: 0
-  currentPitch: 0
+  _pathVisualizer: {fileID: 1742431141158000950}
 --- !u!1 &4524678035037519289
 GameObject:
   m_ObjectHideFlags: 0
@@ -586,7 +572,6 @@ Transform:
   - {fileID: 6216121016443702694}
   - {fileID: 5795105194510838425}
   - {fileID: 5083633746176772965}
-  - {fileID: 2512706143305438219}
   - {fileID: 3197463791261651724}
   - {fileID: 3025496785202086379}
   - {fileID: 4209442709347666878}
@@ -595,6 +580,7 @@ Transform:
   - {fileID: 1573259171302870502}
   - {fileID: 4860101885767610736}
   - {fileID: 8252665184330700914}
+  - {fileID: 1195913060963835502}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7993066719342763643

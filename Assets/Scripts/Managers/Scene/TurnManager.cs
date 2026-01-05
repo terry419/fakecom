@@ -2,9 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using Cysharp.Threading.Tasks; // UniTask 사용을 위해 필수
 
-public class TurnManager : MonoBehaviour
+// [변경] IInitializable 인터페이스를 추가하여 SceneInitializer의 제어를 받도록 함
+public class TurnManager : MonoBehaviour, IInitializable
 {
     [Tooltip("1초당 감소하는 TS 수치입니다.")]
     [SerializeField] private float tsDecrementPerSecond = 5f;
@@ -24,75 +25,63 @@ public class TurnManager : MonoBehaviour
         ServiceLocator.Register(this, ManagerScope.Scene);
     }
 
-    private void Start()
-    {
-        InitializeSceneDependencies();
-    }
-
-    private void OnEnable()
-    {
-        SceneManager.sceneLoaded += OnSceneLoaded;
-
-        inputManager = ServiceLocator.Get<InputManager>();
-        if (inputManager != null)
-        {
-            inputManager.OnTurnEndInvoked += EndTurn;
-            // [수정] OnCameraRecenter 이벤트를 구독하여 활성 유닛 포커스 기능 수행
-            inputManager.OnCameraRecenter += HandleCameraRecenterInput;
-        }
-    }
-
-    private void OnDisable()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
-        if (inputManager != null)
-        {
-            inputManager.OnTurnEndInvoked -= EndTurn;
-            // [수정] 이벤트 구독 해제
-            inputManager.OnCameraRecenter -= HandleCameraRecenterInput;
-        }
-    }
-
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        StartCoroutine(WaitAndInitialize());
-    }
-    private IEnumerator WaitAndInitialize()
-    {
-        yield return null;
-        InitializeSceneDependencies();
-    }
-
-    private void InitializeSceneDependencies()
+    // [변경] Start() 제거 -> Initialize()로 로직 이동
+    // SceneInitializer가 UnitManager 초기화(유닛 생성)를 마친 뒤 이 함수를 호출합니다.
+    public async UniTask Initialize(InitializationContext context)
     {
         cameraController = ServiceLocator.Get<CameraController>();
-        if (inputManager == null) inputManager = ServiceLocator.Get<InputManager>();
+        inputManager = ServiceLocator.Get<InputManager>();
 
+        // [핵심] 이 시점에는 UnitManager가 유닛 스폰을 완료했으므로 유닛을 찾을 수 있습니다.
         allUnits = FindObjectsOfType<UnitStatus>().OrderBy(u => u.gameObject.name).ToList();
+        Debug.Log($"[TurnManager] 초기화 완료. 감지된 유닛 수: {allUnits.Count}");
 
         foreach (var unit in allUnits)
         {
-            unit.CurrentTS = Random.Range(20f, 40f) / unit.Agility;
+            if (unit.Agility > 0)
+                unit.CurrentTS = Random.Range(20f, 40f) / unit.Agility;
+            else
+                unit.CurrentTS = 100f; // 안전장치
+        }
+
+        // InputManager 이벤트 구독 (InputManager가 이미 초기화되었으므로 안전)
+        if (inputManager != null)
+        {
+            inputManager.OnCameraRecenter += HandleCameraRecenterInput;
         }
 
         isTurnActive = false;
         ActiveUnit = null;
 
         OnTimelineUpdated?.Invoke(allUnits);
+
+        await UniTask.CompletedTask;
+    }
+
+    // [변경] OnEnable/Disable에서 중복 구독 방지 및 SceneManager 의존성 제거
+    private void OnDisable()
+    {
+        if (inputManager != null)
+        {
+            inputManager.OnCameraRecenter -= HandleCameraRecenterInput;
+        }
+
+        if (ServiceLocator.IsRegistered<TurnManager>())
+            ServiceLocator.Unregister<TurnManager>(ManagerScope.Scene);
     }
 
     private void Update()
     {
         if (!isTurnActive)
         {
+            if (allUnits == null || allUnits.Count == 0) return;
+
             bool timelineChanged = false;
             float tsToDecrement = tsDecrementPerSecond * Time.deltaTime;
 
-            if (allUnits == null) return;
-
             foreach (var unit in allUnits)
             {
-                if (unit == null) continue;
+                if (unit == null || unit.IsDead) continue;
 
                 if (unit.CurrentTS > 0)
                 {
@@ -114,13 +103,9 @@ public class TurnManager : MonoBehaviour
 
     private void StartTurn(UnitStatus unit)
     {
-        Debug.Log($"[TurnManager] {unit.name}의 턴 시작. 카메라 이동 시도.");
         isTurnActive = true;
         ActiveUnit = unit;
         ActiveUnit.ResetTurnData();
-
-        Debug.Log($"<color=yellow>[DEBUG_TM] 턴 시작: {unit.name}</color>");
-        Debug.Log($"<color=yellow>[DEBUG_TM] 유닛 좌표 확인: {unit.transform.position}</color>");
 
         if (cameraController != null)
         {
@@ -132,10 +117,6 @@ public class TurnManager : MonoBehaviour
         }
 
         ActiveUnit.OnTurnStart();
-
-        // [TODO] 만약 유닛 상태가 Incapacitated(무력화)라면 
-        // 50% 확률로 "행동 불능" 로그를 띄우고 바로 EndTurn()을 호출하는 로직 추가 필요
-        // 예: if (ActiveUnit.Condition == UnitCondition.Incapacitated && Random.value < 0.5f) { ... }
 
         if (ActiveUnit.IsDead)
         {
@@ -158,6 +139,8 @@ public class TurnManager : MonoBehaviour
         ActiveUnit.ResetTurnData();
         ActiveUnit = null;
         isTurnActive = false;
+
+        OnTimelineUpdated?.Invoke(allUnits);
     }
 
     public void UpdateUnitTurnDelay(UnitStatus unit, float oldTS, float newTS, bool isCrit)
@@ -167,7 +150,6 @@ public class TurnManager : MonoBehaviour
 
     private IEnumerator ProcessTurnDelayAnimation(UnitStatus unit, float startTS, float targetTS, bool isCrit)
     {
-        // ... (이하 생략)
         if (!isCrit)
         {
             float duration = 0.3f;
@@ -214,12 +196,11 @@ public class TurnManager : MonoBehaviour
         OnTimelineUpdated?.Invoke(allUnits);
     }
 
-    // [추가] CameraRecenter 이벤트 핸들러
     private void HandleCameraRecenterInput()
     {
         if (cameraController != null && ActiveUnit != null)
         {
-            cameraController.SetTarget(ActiveUnit.transform, true); // 즉시 이동
+            cameraController.SetTarget(ActiveUnit.transform, true);
         }
     }
 }
