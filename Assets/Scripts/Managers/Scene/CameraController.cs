@@ -1,8 +1,9 @@
 using UnityEngine;
-using System.Collections;
-using Cysharp.Threading.Tasks; // [필수] IInitializable 및 UniTask 사용
+using Cysharp.Threading.Tasks;
 
-// [변경] IInitializable 인터페이스 구현 추가
+// [RequireComponent]를 사용하여 하위 컴포넌트가 자동으로 추가되게 합니다.
+[RequireComponent(typeof(CameraShaker))]
+[RequireComponent(typeof(CameraActionView))]
 public class CameraController : MonoBehaviour, IInitializable
 {
     [Header("Movement Settings")]
@@ -13,59 +14,57 @@ public class CameraController : MonoBehaviour, IInitializable
 
     [Header("Rotation Defaults")]
     [SerializeField] private float defaultPitch = 45f;
-    [SerializeField] private float defaultYaw = 45f; // [권장] 45도로 설정하여 쿼터뷰 보장
+    [SerializeField] private float defaultYaw = 45f;
 
     [Header("Zoom Settings")]
-    [Tooltip("카메라의 고정 줌 거리")]
-    [SerializeField] private float fixedZoomDistance = 14f; // [권장] 10 -> 14로 약간 멀리
-
-    [Header("Action View Settings")]
-    [SerializeField] private Vector3 actionViewOffset = new Vector3(0.5f, 1.8f, -2.0f);
-    [SerializeField] private float targetHeightOffset = 1.0f;
-
-    [Header("Debug Settings")]
-    [SerializeField] private Transform debugAttacker;
-    [SerializeField] private Transform debugTarget;
+    [SerializeField] private float fixedZoomDistance = 14f;
 
     [Header("Shake Settings")]
     [SerializeField] private float shakeDuration = 0.3f;
     [SerializeField] private float shakeMagnitude = 0.2f;
 
-    // --- 내부 계층 구조 ---
-    private Transform boomTransform;      // 회전 담당 (Pitch/Yaw)
-    private Transform shakeHolderTransform; // 줌 담당 (Zoom Distance)
-    private Transform cameraTransform;    // 실제 카메라 & 쉐이크 담당 (Shake)
+    [Header("Debug Settings")]
+    [SerializeField] private Transform debugAttacker;
+    [SerializeField] private Transform debugTarget;
 
+    // --- 내부 컴포넌트 참조 ---
+    private Transform boomTransform;
+    private Transform shakeHolderTransform;
+    private Transform cameraTransform;
+
+    // --- 분리된 로직 컴포넌트 ---
+    private CameraShaker _shaker;
+    private CameraActionView _actionView;
+
+    // --- 외부 매니저 ---
     private InputManager inputManager;
-    private Vector3 targetPosition;
+    private TurnManager _turnManager; // [TurnManager 의존성 역전]
 
+    // --- 상태 변수 ---
+    private Vector3 targetPosition;
     [SerializeField] private float currentYaw;
     [SerializeField] private float currentPitch;
 
-    // --- 액션 뷰 상태 ---
-    private bool isActionView = false;
-    private Transform actionAttacker;
-    private Transform actionTarget;
-
-    // 쉐이크 코루틴 관리
-    private Coroutine currentShakeCoroutine;
-
     private void Awake()
     {
-        // [삭제됨] 여기서 등록하면 중복 오류 발생함
-        // ServiceLocator.Register(this, ManagerScope.Scene); 
+        InitializeTransforms();
 
-        // 1. 실제 카메라 찾기
+        // 컴포넌트 가져오기
+        _shaker = GetComponent<CameraShaker>();
+        _actionView = GetComponent<CameraActionView>();
+    }
+
+    private void InitializeTransforms()
+    {
         Camera cam = GetComponentInChildren<Camera>();
         if (cam == null)
         {
-            Debug.LogError("[CameraController] 자식 계층에 Camera가 없습니다!");
+            Debug.LogError("[CameraController] 자식에 Camera가 없습니다!");
             enabled = false;
             return;
         }
         cameraTransform = cam.transform;
 
-        // 2. CameraBoom 생성 또는 찾기
         boomTransform = transform.Find("CameraBoom");
         if (boomTransform == null)
         {
@@ -74,7 +73,6 @@ public class CameraController : MonoBehaviour, IInitializable
             boomTransform.SetParent(transform, false);
         }
 
-        // 3. ShakeHolder (Zoom 담당) 생성 또는 찾기
         shakeHolderTransform = boomTransform.Find("ShakeHolder");
         if (shakeHolderTransform == null)
         {
@@ -83,7 +81,6 @@ public class CameraController : MonoBehaviour, IInitializable
             shakeHolderTransform.SetParent(boomTransform, false);
         }
 
-        // 4. 계층 구조 정리: Root -> Boom -> ShakeHolder -> Camera
         if (cameraTransform.parent != shakeHolderTransform)
         {
             cameraTransform.SetParent(shakeHolderTransform);
@@ -94,51 +91,53 @@ public class CameraController : MonoBehaviour, IInitializable
         targetPosition = transform.position;
     }
 
-    // [변경] SceneInitializer가 호출하는 초기화 함수
+    private void OnDestroy()
+    {
+        // 이벤트 해제
+        if (_turnManager != null) _turnManager.OnTurnStarted -= HandleTurnStarted;
+        if (inputManager != null) inputManager.OnCameraRecenter -= HandleRecenterRequest;
+
+        if (ServiceLocator.IsRegistered<CameraController>())
+            ServiceLocator.Unregister<CameraController>(ManagerScope.Scene);
+    }
+
     public async UniTask Initialize(InitializationContext context)
     {
-        // 1. 서비스 등록 (순서 보장)
         ServiceLocator.Register(this, ManagerScope.Scene);
 
-        // 2. 의존성 주입
         inputManager = ServiceLocator.Get<InputManager>();
+        _turnManager = ServiceLocator.Get<TurnManager>();
 
-        // 3. [중요] 초기 각도 및 줌 강제 설정 (백뷰 방지)
+        // 하위 컴포넌트 초기화
+        _shaker.Initialize(cameraTransform);
+        _actionView.Initialize(transform, boomTransform, shakeHolderTransform);
+
+        // 초기값 설정
         currentPitch = defaultPitch;
         currentYaw = defaultYaw;
 
         if (boomTransform != null)
-        {
             boomTransform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0);
-        }
 
         if (shakeHolderTransform != null)
-        {
             shakeHolderTransform.localPosition = new Vector3(0, 0, -fixedZoomDistance);
-        }
 
-        Debug.Log($"[CameraController] Initialized. Pitch:{currentPitch}, Yaw:{currentYaw}, Dist:{fixedZoomDistance}");
+        // 이벤트 구독 (옵저버 패턴)
+        if (_turnManager != null) _turnManager.OnTurnStarted += HandleTurnStarted;
+        if (inputManager != null) inputManager.OnCameraRecenter += HandleRecenterRequest;
 
+        Debug.Log("[CameraController] Initialized & Components Linked.");
         await UniTask.CompletedTask;
     }
 
-    // [삭제] Start() 제거 -> Initialize()로 통합됨
-    /*
-    private void Start()
-    {
-        inputManager = ServiceLocator.Get<InputManager>();
-    }
-    */
-
     private void LateUpdate()
     {
-        if (isActionView)
+        // 1. 액션 뷰 상태라면 위임
+        if (_actionView.IsActive)
         {
-            if (actionAttacker != null && actionTarget != null)
-            {
-                HandleActionView();
-            }
+            _actionView.UpdateView();
         }
+        // 2. 일반 뷰 상태라면 직접 처리
         else
         {
             HandleNormalView();
@@ -149,7 +148,7 @@ public class CameraController : MonoBehaviour, IInitializable
     {
         if (inputManager == null) return;
 
-        // --- 이동 ---
+        // 이동 입력
         Vector2 moveInput = inputManager.CameraMoveVector;
         if (moveInput.sqrMagnitude > 0.01f)
         {
@@ -157,36 +156,31 @@ public class CameraController : MonoBehaviour, IInitializable
             Vector3 forward = heading * Vector3.forward;
             Vector3 right = heading * Vector3.right;
             Vector3 moveDir = (forward * moveInput.y + right * moveInput.x).normalized;
+
             targetPosition += moveDir * moveSpeed * Time.deltaTime;
         }
 
-        // --- 회전 ---
+        // 회전 입력
         if (inputManager.IsCameraRotatePressed())
-        {
-            Vector2 mouseDelta = inputManager.GetMouseDelta();
-            currentYaw += mouseDelta.x * mouseRotationSpeed;
-        }
+            currentYaw += inputManager.GetMouseDelta().x * mouseRotationSpeed;
 
         float keyRotation = inputManager.CameraKeyRotateAxis;
         if (Mathf.Abs(keyRotation) > 0.01f)
-        {
             currentYaw += keyRotation * rotationSpeed * Time.deltaTime;
-        }
 
         ApplyNormalTransform();
     }
 
     private void ApplyNormalTransform()
     {
-        // 1. Root 이동 (TargetPosition은 카메라가 바라보는 '중심점'입니다)
-        Vector3 nextPos = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * smoothing);
-        transform.position = nextPos;
+        // 위치 보간
+        transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * smoothing);
 
-        // 2. Boom 회전
+        // 회전 보간
         Quaternion targetRotation = Quaternion.Euler(currentPitch, currentYaw, 0);
         boomTransform.rotation = Quaternion.Slerp(boomTransform.rotation, targetRotation, Time.deltaTime * smoothing);
 
-        // 3. Zoom (ShakeHolder)
+        // 줌 거리 복구 (액션 뷰에서 돌아왔을 때를 대비)
         if (shakeHolderTransform != null)
         {
             Vector3 targetLocalPos = new Vector3(0, 0, -fixedZoomDistance);
@@ -194,139 +188,64 @@ public class CameraController : MonoBehaviour, IInitializable
         }
     }
 
+    // --- 외부 제어 메서드 ---
+
     public void SetTarget(Transform target, bool immediate = false)
     {
-        if (target == null)
-        {
-            Debug.LogError("[DEBUG_CAM] SetTarget : Target Null입니다.");
-            return;
-        }
+        if (target == null) return;
 
-        if (isActionView) DisableActionView();
+        // 액션 뷰 해제
+        if (_actionView.IsActive) _actionView.Disable();
 
         targetPosition = target.position;
-
-        // [중요] 각도 초기화 코드 제거됨 (플레이어가 돌린 각도 유지)
-        // currentPitch = defaultPitch; 
-        // currentYaw = defaultYaw; 
-
-        // 줌 거리 초기화 (필요시 주석 처리 가능)
-        if (shakeHolderTransform != null)
-        {
-            shakeHolderTransform.localPosition = new Vector3(0, 0, -fixedZoomDistance);
-        }
-
-        StopShake();
+        _shaker.Stop(); // 타겟 변경 시 쉐이크 중단
 
         if (immediate)
         {
-            Debug.Log("<color=cyan>[DEBUG_CAM] 즉시 이동 실행</color>");
             transform.position = targetPosition;
-            // 즉시 이동 시에는 현재 각도 반영
             boomTransform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0);
+            if (shakeHolderTransform != null)
+                shakeHolderTransform.localPosition = new Vector3(0, 0, -fixedZoomDistance);
         }
+    }
+
+    public void PlayImpactShake()
+    {
+        // 설정값을 사용하여 쉐이커 호출
+        _shaker.Play(shakeDuration, shakeMagnitude);
     }
 
     public void EnableActionView(Transform attacker, Transform target)
     {
-        if (cameraTransform == null || attacker == null || target == null) return;
-
-        actionAttacker = attacker;
-        actionTarget = target;
-        isActionView = true;
-
-        StopShake();
-        HandleActionView();
+        _shaker.Stop();
+        _actionView.Enable(attacker, target);
     }
 
     public void DisableActionView()
     {
-        isActionView = false;
-        actionAttacker = null;
-        actionTarget = null;
-        targetPosition = transform.position;
-
-        StopShake();
-    }
-
-    private void HandleActionView()
-    {
-        if (actionAttacker == null || actionTarget == null)
-        {
-            DisableActionView();
-            return;
-        }
-
-        Vector3 directionToTarget = (actionTarget.position - actionAttacker.position).normalized;
-        if (directionToTarget == Vector3.zero) directionToTarget = actionAttacker.forward;
-
-        Vector3 rightDir = Vector3.Cross(Vector3.up, directionToTarget).normalized;
-
-        Vector3 targetPos = actionAttacker.position
-                            + (rightDir * actionViewOffset.x)
-                            + (Vector3.up * actionViewOffset.y)
-                            + (directionToTarget * actionViewOffset.z);
-
-        Vector3 lookAtPoint = actionTarget.position + (Vector3.up * targetHeightOffset);
-        Quaternion targetRot = Quaternion.LookRotation(lookAtPoint - targetPos);
-
-        transform.position = targetPos;
-        boomTransform.rotation = targetRot;
-
-        if (shakeHolderTransform != null)
-        {
-            shakeHolderTransform.localPosition = Vector3.zero;
-            shakeHolderTransform.localRotation = Quaternion.identity;
-        }
+        _actionView.Disable();
+        targetPosition = transform.position; // 현재 위치에서 다시 시작
+        _shaker.Stop();
     }
 
     public void ToggleDebugActionView()
     {
-        if (isActionView) DisableActionView();
+        if (_actionView.IsActive) DisableActionView();
         else if (debugAttacker != null && debugTarget != null) EnableActionView(debugAttacker, debugTarget);
-        else Debug.LogWarning("[CameraController] 디버그 타겟이 없습니다.");
     }
 
-    // --- Shake 기능 ---
+    // --- 이벤트 핸들러 (TurnManager 의존성 제거됨) ---
 
-    public void PlayImpactShake()
+    private void HandleTurnStarted(UnitStatus unit)
     {
-        StopShake();
-        currentShakeCoroutine = StartCoroutine(Co_ImpactShake(shakeDuration, shakeMagnitude));
+        if (unit != null) SetTarget(unit.transform, false);
     }
 
-    private void StopShake()
+    private void HandleRecenterRequest()
     {
-        if (currentShakeCoroutine != null)
+        if (_turnManager != null && _turnManager.ActiveUnit != null)
         {
-            StopCoroutine(currentShakeCoroutine);
-            currentShakeCoroutine = null;
+            SetTarget(_turnManager.ActiveUnit.transform, true);
         }
-        if (cameraTransform != null)
-        {
-            cameraTransform.localPosition = Vector3.zero;
-        }
-    }
-
-    private IEnumerator Co_ImpactShake(float duration, float magnitude)
-    {
-        float elapsed = 0.0f;
-
-        while (elapsed < duration)
-        {
-            float damping = 1.0f - (elapsed / duration);
-            float currentMag = magnitude * damping;
-
-            float x = Random.Range(-1f, 1f) * currentMag;
-            float y = Random.Range(-1f, 1f) * currentMag;
-
-            cameraTransform.localPosition = new Vector3(x, y, 0);
-
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        cameraTransform.localPosition = Vector3.zero;
-        currentShakeCoroutine = null;
     }
 }

@@ -6,6 +6,7 @@ public abstract class UnitDataSO : ScriptableObject
     [Header("1. Identity")]
     public string UnitID;
     public string UnitName;
+    public TeamType UnitTeam;
     public ClassType Role;
 
     [Header("2. Visual")]
@@ -31,9 +32,9 @@ public abstract class UnitDataSO : ScriptableObject
     public float BaseOverclockChance = 5f;
 
     [Header("Animation Settings")]
-    [Tooltip("»ç¸Á ½Ã Animator¿¡ Àü´ÞÇÒ Trigger ÆÄ¶ó¹ÌÅÍ ÀÌ¸§")]
+    [Tooltip("ï¿½ï¿½ï¿½ ï¿½ï¿½ Animatorï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Trigger ï¿½Ä¶ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½")]
     public string deathAnimationTrigger = "Die";
 
-    [Tooltip("»ç¸Á ¾Ö´Ï¸ÞÀÌ¼ÇÀÇ State ÀÌ¸§ (Àç»ý ´ë±â¿ë)")]
+    [Tooltip("ï¿½ï¿½ï¿½ ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ï¿½ï¿½ State ï¿½Ì¸ï¿½ (ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)")]
     public string deathStateName = "Death";
 }
