@@ -4,7 +4,6 @@ using UnityEngine.InputSystem;
 
 public class PlayerInputHandler : MonoBehaviour
 {
-    // High-Level Events
     public event Action<GridCoords> OnHoverChanged;
     public event Action<GridCoords> OnMoveRequested;
 
@@ -14,34 +13,40 @@ public class PlayerInputHandler : MonoBehaviour
 
     private GridCoords _lastHoveredCoords;
     private bool _isActive = false;
+    private bool _isInitialized = false;
+
+    // 1000f 상수화
+    private const float RAYCAST_DISTANCE = 1000f;
 
     public void Initialize(InputManager inputMgr, MapManager mapMgr)
     {
         _inputManager = inputMgr;
         _mapManager = mapMgr;
         _mainCamera = Camera.main;
+        _isInitialized = true;
     }
 
     public void SetActive(bool active)
     {
+        if (!_isInitialized) return;
         if (_isActive == active) return;
+
         _isActive = active;
 
         if (_isActive)
         {
-            // InputManager.OnCommandInput 이벤트 구독
-            _inputManager.OnCommandInput += HandleClick;
+            if (_inputManager != null) _inputManager.OnCommandInput += HandleClick;
         }
         else
         {
-            _inputManager.OnCommandInput -= HandleClick;
+            if (_inputManager != null) _inputManager.OnCommandInput -= HandleClick;
+            _lastHoveredCoords = default;
         }
     }
 
-    // 유일한 Update 루프 사용자
     private void Update()
     {
-        if (!_isActive) return;
+        if (!_isActive || !_isInitialized) return;
         HandleHover();
     }
 
@@ -49,7 +54,6 @@ public class PlayerInputHandler : MonoBehaviour
     {
         if (TryGetGridFromMouse(out GridCoords currentCoords))
         {
-            // 좌표가 변경되었을 때만 이벤트 발송 (최적화)
             if (!currentCoords.Equals(_lastHoveredCoords))
             {
                 _lastHoveredCoords = currentCoords;
@@ -60,16 +64,15 @@ public class PlayerInputHandler : MonoBehaviour
 
     private void HandleClick(Vector2 screenPos)
     {
-        if (!_isActive) return;
+        if (!_isActive || !_isInitialized) return;
 
-        // 클릭 시점의 좌표가 유효하다면 이동 요청 발송
         if (TryGetGridFromMouse(out GridCoords targetCoords))
         {
             OnMoveRequested?.Invoke(targetCoords);
         }
     }
 
-    // Raycast 로직 캡슐화
+    // [수정됨] 원본 로직 복원: LayerMask 없이 Raycast 후 MapManager에 타일 존재 여부 확인
     private bool TryGetGridFromMouse(out GridCoords coords)
     {
         coords = default;
@@ -79,11 +82,11 @@ public class PlayerInputHandler : MonoBehaviour
         Vector2 mousePos = Mouse.current.position.ReadValue();
         Ray ray = _mainCamera.ScreenPointToRay(mousePos);
 
-        // Raycast 로직 이동
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
+        // 레이어 구분 없이 Ray를 쏘고, 맞은 위치가 유효한 타일인지 확인하는 원본 방식
+        if (Physics.Raycast(ray, out RaycastHit hit, RAYCAST_DISTANCE))
         {
-            coords = GridUtils.WorldToGrid(hit.point); 
-            return _mapManager.HasTile(coords); 
+            coords = GridUtils.WorldToGrid(hit.point);
+            return _mapManager.HasTile(coords);
         }
         return false;
     }

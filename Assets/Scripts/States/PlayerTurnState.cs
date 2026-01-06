@@ -121,5 +121,66 @@ public class PlayerTurnState : BattleStateBase
         RequestTransition(BattleState.TurnWaiting, null);
     }
 
-    public override void Update() { }
+    public override void Update()
+    {
+        // 1. 입력 감지
+        if (Input.GetMouseButtonDown(0))
+        {
+            Debug.Log($"<color=yellow>[DEBUG_INPUT] Click detected. Frame: {Time.frameCount}</color>");
+
+            // 2. Raycast 수행
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+            // LayerMask 없이 모든 충돌체 검사 (원인 파악용)
+            if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
+            {
+                GameObject hitObj = hit.collider.gameObject;
+                string layerName = LayerMask.LayerToName(hitObj.layer);
+
+                Debug.Log($"<color=yellow>[DEBUG_RAY] Hit Object: {hitObj.name}</color>\n" +
+                          $"- Layer: {layerName} (Index: {hitObj.layer})\n" +
+                          $"- World Point: {hit.point}");
+
+                // 3. MapManager를 통해 좌표 변환 및 타일 검증
+                var mapManager = ServiceLocator.Get<MapManager>();
+                if (mapManager != null)
+                {
+                    // [확인됨] MapManager.WorldToGrid 반환값은 GridCoords임
+                    GridCoords coords = mapManager.WorldToGrid(hit.point);
+
+                    // [확인됨] GridCoords.ToString() 오버라이드 존재하므로 바로 로그 출력 가능
+                    Debug.Log($"<color=cyan>[DEBUG_GRID] Converted Coords: {coords}</color>");
+
+                    // [확인됨] MapManager.GetTile() 존재함
+                    var tile = mapManager.GetTile(coords);
+
+                    if (tile != null)
+                    {
+                        // [확인됨] MapManager.TryGetRandomTileByTag에서 tile.IsWalkable 사용 확인됨
+                        Debug.Log($"<color=green>[DEBUG_TILE] Tile Found!</color>\n" +
+                                  $"- FloorID: {tile.FloorID}\n" +
+                                  $"- IsWalkable: {tile.IsWalkable}");
+
+                        // 현재 턴 유닛 정보 로그 (Context 사용)
+                        if (_context != null && _context.Turn != null && _context.Turn.ActiveUnit != null)
+                        {
+                            Debug.Log($"[DEBUG_CONTEXT] Current ActiveUnit: {_context.Turn.ActiveUnit.name}");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"<color=red>[DEBUG_TILE] No Tile found at {coords}. (Grid 범위 밖이거나 데이터 없음)</color>");
+                    }
+                }
+                else
+                {
+                    Debug.LogError("[DEBUG_ERROR] MapManager is NULL via ServiceLocator.");
+                }
+            }
+            else
+            {
+                Debug.LogError("<color=red>[DEBUG_RAY] Raycast hit NOTHING. (Camera settings or Missing Colliders)</color>");
+            }
+        }
+    }
 }

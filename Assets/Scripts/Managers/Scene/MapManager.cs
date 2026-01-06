@@ -16,6 +16,8 @@ public class MapManager : MonoBehaviour, IInitializable
     public int GridDepth { get; private set; }
     public int LayerCount { get; private set; }
     public int MinLevel { get; private set; }
+
+    public int StateVersion { get; private set; } = 0;
     public GridCoords BasePosition { get; private set; }
 
     public Vector3 GridToWorld(GridCoords coords) => GridUtils.GridToWorld(coords);
@@ -124,5 +126,9 @@ public class MapManager : MonoBehaviour, IInitializable
         if (candidates.Count == 0) { tile = null; return false; }
         tile = candidates[UnityEngine.Random.Range(0, candidates.Count)];
         return true;
+    }
+    public void NotifyMapChanged()
+    {
+        StateVersion++;
     }
 }
