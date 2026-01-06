@@ -13,7 +13,6 @@ public abstract class UnitDataSO : ScriptableObject
     public AssetReferenceGameObject ModelPrefab;
     public AssetReferenceGameObject HitVFX;
 
-
     [Header("3. Base Stats")]
     public int MaxHP;
     public int MaxAP = 2;
@@ -31,10 +30,14 @@ public abstract class UnitDataSO : ScriptableObject
     public float BaseNeuralSync = 100f;
     public float BaseOverclockChance = 5f;
 
+    [Header("5. Core Equipment")]
+   public WeaponDataSO MainWeapon; 
+   public ArmorDataSO BodyArmor;   
+
     [Header("Animation Settings")]
-    [Tooltip("��� �� Animator�� ������ Trigger �Ķ���� �̸�")]
+    [Tooltip("사망 시 Animator에서 호출할 Trigger 파라미터 이름")]
     public string deathAnimationTrigger = "Die";
 
-    [Tooltip("��� �ִϸ��̼��� State �̸� (��� ����)")]
+    [Tooltip("사망 애니메이션의 State 이름 (상태 체크용)")]
     public string deathStateName = "Death";
 }

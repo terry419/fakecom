@@ -25,9 +25,9 @@ public class UnitManager : MonoBehaviour, IInitializable
         _cachedPlayerController = FindObjectOfType<PlayerController>();
         _currentMission = context.MissionData;
 
-        // 미션 데이터가 없으면 진행 불가 (워닝만 띄우고 넘어가되 스폰은 안 함)
         if (_currentMission != null)
         {
+            // [Check] 여기서 await을 했으므로 경고가 사라집니다.
             await SpawnMissionUnitsAsync();
         }
         else
@@ -52,9 +52,9 @@ public class UnitManager : MonoBehaviour, IInitializable
             for (int i = 0; i < count; i++)
             {
                 string tag = slots[i].RoleTag;
-                // [Fix] TileData -> Tile
                 if (TryGetAvailableTile(tag, usedTiles, out Tile tile))
                 {
+                    // [Check] await 추가됨
                     await SpawnUnitAsync(squad[i], tile.Coordinate, Faction.Player);
                 }
                 else
@@ -71,7 +71,6 @@ public class UnitManager : MonoBehaviour, IInitializable
         // 3. Neutral Spawn
         if (_currentMission.NeutralSpawns != null)
             await SpawnFactionUnits(_currentMission.NeutralSpawns, d => d.RoleTag, d => d.UnitData, Faction.Neutral, usedTiles);
-
     }
 
     private async UniTask SpawnFactionUnits<T>(IEnumerable<T> spawnDefs, Func<T, string> tagSelector, Func<T, UnitDataSO> dataSelector, Faction faction, HashSet<GridCoords> usedTiles)
@@ -84,6 +83,7 @@ public class UnitManager : MonoBehaviour, IInitializable
 
             if (TryGetAvailableTile(tag, usedTiles, out Tile tile))
             {
+                // [Check] await 추가됨
                 await SpawnUnitAsync(data, tile.Coordinate, faction);
             }
             else
@@ -119,7 +119,6 @@ public class UnitManager : MonoBehaviour, IInitializable
         if (data == null)
             throw new ArgumentNullException(nameof(data), "[UnitManager] Cannot spawn unit with null Data.");
 
-        // [Strict] 프리팹 로드 (실패 시 예외 발생으로 멈춤)
         GameObject prefab = await GetOrLoadPrefabAsync(data.ModelPrefab);
 
         GameObject go = Instantiate(prefab, _mapManager.GridToWorld(coords), Quaternion.identity);
@@ -139,16 +138,15 @@ public class UnitManager : MonoBehaviour, IInitializable
         {
             Debug.LogError($"[UnitManager] Spawn Logic Error: {ex.Message}");
             Destroy(go);
-            throw; // 상위로 전파하여 부팅 중단
+            throw;
         }
 
-        // 플레이어 컨트롤러 자동 빙의
         if (faction == Faction.Player)
         {
             if (_cachedPlayerController == null) _cachedPlayerController = FindObjectOfType<PlayerController>();
             if (_cachedPlayerController != null && _cachedPlayerController.PossessedUnit == null)
             {
-                _cachedPlayerController.Possess(unit);
+                await _cachedPlayerController.Possess(unit);
             }
         }
 
@@ -157,32 +155,28 @@ public class UnitManager : MonoBehaviour, IInitializable
 
     private async UniTask<GameObject> GetOrLoadPrefabAsync(AssetReferenceGameObject assetRef)
     {
-        // 1. 에셋 레퍼런스 유효성 검사
         if (assetRef == null || !assetRef.RuntimeKeyIsValid())
         {
-            throw new InvalidOperationException($"[UnitManager] Invalid Prefab Reference in UnitData. Cannot spawn.");
+            throw new InvalidOperationException($"[UnitManager] Invalid Prefab Reference in UnitData.");
         }
 
         string key = assetRef.RuntimeKey.ToString();
 
-        // 2. 캐시 확인
         if (_prefabCache.TryGetValue(key, out GameObject cached) && cached != null)
             return cached;
 
-        // 3. 로드 시도 (실패 시 예외 발생)
         try
         {
             var loaded = await assetRef.LoadAssetAsync<GameObject>().ToUniTask();
             if (loaded == null)
             {
-                throw new InvalidOperationException($"[UnitManager] Failed to load prefab (Asset is null): {key}");
+                throw new InvalidOperationException($"[UnitManager] Failed to load prefab: {key}");
             }
             _prefabCache[key] = loaded;
             return loaded;
         }
         catch (Exception ex)
         {
-            // 땜질 없이 명확하게 에러 리포트 후 중단
             throw new InvalidOperationException($"[UnitManager] Addressable Load Failed for '{key}': {ex.Message}", ex);
         }
     }

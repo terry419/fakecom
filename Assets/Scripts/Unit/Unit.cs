@@ -135,7 +135,20 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public void ConsumeAP(int amount) => CurrentAP = Mathf.Max(0, CurrentAP - amount);
     public void ResetAP() { CurrentAP = MaxAP > 0 ? MaxAP : 2; CurrentMobility = Mobility; HasStartedMoving = false; }
-    public void TakeDamage(int damage) { CurrentHP = Mathf.Max(0, CurrentHP - damage); if (CurrentHP <= 0) Destroy(gameObject); }
+    public async UniTask TakeDamage(int damage)
+    {
+        CurrentHP = Mathf.Max(0, CurrentHP - damage);
+
+        // [연출 대기] 추후 애니메이션 길이에 맞춰 자동화 가능
+        // 현재는 하드코딩된 시간 대신, 추후 Animation Clip Length 등을 사용할 수 있게 구조 마련
+        await UniTask.Delay(500);
+
+        if (CurrentHP <= 0)
+        {
+            // 사망 처리 (필요 시 비동기 사망 연출 추가 가능)
+            Destroy(gameObject);
+        }
+    }
     private float GetTargetHeight(float surfaceY) => (_collider == null) ? surfaceY : surfaceY + _collider.bounds.extents.y;
 
     private void OnDestroy()

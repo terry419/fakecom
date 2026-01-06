@@ -9,13 +9,6 @@ public class EnemyUnitDataSO : UnitDataSO
     public EnemyUnitType EnemyType;
 
 
-    [Header("4. Loadout")] // [추가] 장비 슬롯 신설
-    [Tooltip("적 주무기 (사거리/데미지 결정)")]
-    public WeaponDataSO MainWeapon;
-
-    [Tooltip("적 방어구 (방어 등급 결정)")]
-    public ArmorDataSO BodyArmor;
-
     [Header("5. AI Intelligence")]
     [Tooltip("AI 레벨 (1~10). 높을수록 정교한 전술 구사.")]
     public int BaseAILevel = 1;

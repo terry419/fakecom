@@ -9,12 +9,17 @@ using System;
 public class UnitSaveData
 {
     [Header("Identity")]
-    public string unitID;      // UnitDataSO를 찾기 위한 고유 키 (파일명 등)
-    public int faction;        // 0: Player, 1: Enemy, 2: Neutral
+    public string unitID;       // UnitDataSO를 찾기 위한 고유 키 (파일명 등)
+    public int faction;         // 0: Player, 1: Enemy, 2: Neutral
 
     [Header("Variable Stats")]
-    public int CurrentHP;      // UnitStatus에서 참조 중인 핵심 필드
-    public int Experience;     // (확장용) 경험치
+    public int CurrentHP;       // UnitStatus에서 참조 중인 핵심 필드
+    public int Experience;      // (확장용) 경험치
+
+    // [New] 전투 및 시스템 검증을 위한 필수 데이터 추가
+    public int CurrentAP;           // 현재 행동력
+    public float CurrentNeuralSync; // 신경 동기화 수치
+    public UnitCondition Condition; // 현재 상태 (Normal, Panic 등)
 
     [Header("Position")]
     public Vector3Int GridPos; // 저장된 그리드 좌표
@@ -30,5 +35,10 @@ public class UnitSaveData
         GridPos = pos;
         faction = factionIndex;
         Experience = 0;
+
+        // [New] 초기값 설정 (안전을 위해 기본값 할당)
+        CurrentAP = 2; // 기본 AP
+        CurrentNeuralSync = 100f; // 기본 Sync
+        Condition = UnitCondition.Normal;
     }
 }
