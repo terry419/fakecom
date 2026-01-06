@@ -60,7 +60,7 @@ public class PlayerController : MonoBehaviour, IInitializable
         DisconnectInput();
         PossessedUnit = null;
         _isMyTurn = false;
-        CleanupVisuals(); // 여기서는 다 지우는 게 맞음
+        CleanupVisuals(); // 시각 효과 정리
         await UniTask.Yield();
     }
 
@@ -87,10 +87,10 @@ public class PlayerController : MonoBehaviour, IInitializable
 
     private void UpdateMouseHover()
     {
-        // 1. 마우스가 맵 밖(또는 허공)을 가리킬 때
+        // 1. 마우스 위치의 그리드 좌표 확인
         if (!GetGridFromScreen(out GridCoords targetCoords))
         {
-            // [수정] CleanupVisuals() 대신 경로만 지우는 함수 호출
+            // 경로 데이터가 있다면 클리어
             if (_validPathStep != null || _invalidPathStep != null)
             {
                 ClearPathOnly();
@@ -108,7 +108,7 @@ public class PlayerController : MonoBehaviour, IInitializable
 
         if (fullPath == null || fullPath.Count == 0)
         {
-            // 경로가 없으면 경로 표시만 끔 (녹색 타일 유지)
+            // 경로를 찾을 수 없는 경우 표시 제거
             ClearPathOnly();
             return;
         }
@@ -124,7 +124,7 @@ public class PlayerController : MonoBehaviour, IInitializable
         {
             GridCoords step = fullPath[i];
 
-            // (A) 유닛 충돌 체크 (도착점 포함, 내 위치 제외)
+            // (A) 유닛 충돌 체크 (본인 제외)
             if (_mapManager.HasUnit(step) && step != PossessedUnit.Coordinate)
             {
                 physicallyBlocked = true;
@@ -139,10 +139,10 @@ public class PlayerController : MonoBehaviour, IInitializable
                 break;
             }
 
-            // (C) 거리 체크
+            // (C) 이동 거리 체크
             if (i >= maxRange)
             {
-                // 거리 초과 시 루프 종료하지 않고 validCount만 멈춤 (빨간색으로 표시하기 위해)
+                // 범위를 초과한 경우 validCount를 늘리지 않음 (붉은색 표시용)
             }
             else
             {
@@ -154,7 +154,7 @@ public class PlayerController : MonoBehaviour, IInitializable
 
         if (physicallyBlocked)
         {
-            // 물리적으로 막혔으면 막힌 그 타일까지만 빨간색으로 표시
+            // 물리적으로 막힌 경우 첫 번째 막힌 타일만 표시
             if (validCount < fullPath.Count)
                 _invalidPathStep = new List<GridCoords> { fullPath[validCount] };
             else
@@ -162,28 +162,28 @@ public class PlayerController : MonoBehaviour, IInitializable
         }
         else
         {
-            // AP만 부족한 경우 나머지 경로 전체를 빨간색으로 표시
+            // AP 부족으로 못가는 나머지 경로 전체 표시
             _invalidPathStep = fullPath.Skip(validCount).ToList();
         }
 
         _pathVisualizer?.ShowHybridPath(_validPathStep, _invalidPathStep);
     }
 
-    // [추가] 경로(파랑/빨강)만 지우고 이동 범위(녹색)는 남기는 함수
+    // 마우스가 그리드를 벗어나거나 이동이 시작될 때 경로만 지우는 함수
     private void ClearPathOnly()
     {
         _validPathStep = null;
         _invalidPathStep = null;
-        _pathVisualizer?.ClearPath(); // PathVisualizer.ClearPath는 경로만 지움
+        _pathVisualizer?.ClearPath();
         _lastHoveredCoords = default;
     }
 
-    // 기존 함수: 전부 다 지울 때 사용 (턴 종료, 이동 직전 등)
+    // 모든 시각 효과 정리 (턴 종료, 이동 시작 시 호출)
     private void CleanupVisuals()
     {
         _cachedReachableTiles = null;
         ClearPathOnly();
-        _pathVisualizer?.ClearAll(); // 녹색 포함 전체 삭제
+        _pathVisualizer?.ClearAll(); // 도달 가능 영역까지 전부 삭제
     }
 
     private void CalculateReachableArea()
@@ -209,6 +209,7 @@ public class PlayerController : MonoBehaviour, IInitializable
             _inputManager.OnCommandInput += HandleCommand;
         }
     }
+
     private void DisconnectInput()
     {
         if (_inputManager != null) _inputManager.OnCommandInput -= HandleCommand;
@@ -249,13 +250,13 @@ public class PlayerController : MonoBehaviour, IInitializable
         try
         {
             DisconnectInput();
-            CleanupVisuals(); // 이동 시작 시에는 다 지우는 게 맞음
+            CleanupVisuals(); // 이동 중 시각 효과 제거
             await PossessedUnit.MovePathAsync(path, _mapManager);
 
             if (PossessedUnit.CurrentAP <= 0) EndTurn();
             else
             {
-                CalculateReachableArea(); // 이동 후 다시 그림
+                CalculateReachableArea(); // 이동 후 도달 가능 영역 갱신
                 ConnectInput();
             }
         }
