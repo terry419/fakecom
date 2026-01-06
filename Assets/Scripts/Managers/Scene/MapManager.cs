@@ -107,6 +107,14 @@ public class MapManager : MonoBehaviour, IInitializable
         }
         GetTile(coords)?.RemoveOccupant(unit); // Tile 점유 해제
     }
+    public Unit GetUnit(GridCoords coords)
+    {
+        if (_unitMap.TryGetValue(coords, out Unit unit))
+        {
+            return unit;
+        }
+        return null;
+    }
 
     public void MoveUnit(Unit unit, GridCoords newCoords)
     {

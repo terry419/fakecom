@@ -80,6 +80,15 @@ public class InputManager : MonoBehaviour, IInitializable
     // ========================================================================
     private void SetupInputBindings()
     {
+        _inputActions.Player.Select.performed += ctx =>
+        {
+            if (_isInputActive && !_isPointerOverUI)
+            {
+                Vector2 mousePos = _inputActions.Player.Point.ReadValue<Vector2>();
+                OnCommandInput?.Invoke(mousePos);
+            }
+        };
+
         // 1) Command (우클릭) - [수정] RightClick -> Command
         _inputActions.Player.RightClick.performed += ctx =>
         {

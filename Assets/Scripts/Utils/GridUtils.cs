@@ -72,6 +72,10 @@ public static class GridUtils
     {
         return Mathf.Abs(from.x - to.x) + Mathf.Abs(from.z - to.z) + Mathf.Abs(from.y - to.y);
     }
+    public static int GetManhattanDistance(GridCoords a, GridCoords b)
+    {
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.z - b.z) + Mathf.Abs(a.y - b.y);
+    }
 
     // [신규] 인접 타일 간 실제 이동 비용 (G값). 비평가 요청 반영.
     public static int GetAdjacentMovementCost(GridCoords from, GridCoords to)

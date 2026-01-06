@@ -29,7 +29,7 @@ MonoBehaviour:
   ConstraintType: 0
   EndsTurn: 1
   MaxDurability: 100
-  AccuracyCurveData: {fileID: 0}
+  AccuracyCurveData: {fileID: 11400000, guid: ffcaee4a16c85054b865d9ad47d8a112, type: 2}
   OnHitStatusEffects:
   - Type: 1
     Chance: 5
