@@ -24,11 +24,7 @@ public class DamageTextManager : MonoBehaviour, IInitializable
     private Transform _poolContainer;
     private bool _isReady = false;
 
-    private void Awake()
-    {
-        ServiceLocator.Register(this, ManagerScope.Scene);
-    }
-
+    private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
     private void OnDestroy()
     {
         if (_prefab != null) Addressables.Release(_prefab);
@@ -37,17 +33,16 @@ public class DamageTextManager : MonoBehaviour, IInitializable
 
     public async UniTask Initialize(InitializationContext context)
     {
-        // 계층 구조 정리용 컨테이너 생성
         GameObject containerGO = new GameObject("DamageTextPool_Container");
         _poolContainer = containerGO.transform;
         _poolContainer.SetParent(this.transform);
 
-        // 1. 프리팹 로드 (문법 수정: 프로퍼티 호출)
         if (_damageTextRef != null && _damageTextRef.RuntimeKeyIsValid())
         {
             try
             {
                 _prefab = await _damageTextRef.LoadAssetAsync<GameObject>().ToUniTask();
+                Debug.Log($"[DamageTextManager] 프리팹 로드 성공: {_prefab.name}");
             }
             catch (System.Exception e)
             {
@@ -55,44 +50,57 @@ public class DamageTextManager : MonoBehaviour, IInitializable
                 return;
             }
         }
+        else
+        {
+            Debug.LogError("[DamageTextManager] Addressable Reference가 설정되지 않았습니다!");
+            return;
+        }
 
         if (_prefab == null) return;
 
-        // 2. 오브젝트 풀 초기화
         _pool = new ObjectPool<DamageText>(
             createFunc: CreateText,
             actionOnGet: OnGetText,
-            actionOnRelease: OnReleaseText, // 여기서 리셋 처리
+            actionOnRelease: OnReleaseText,
             actionOnDestroy: OnDestroyText,
             defaultCapacity: _defaultPoolSize,
             maxSize: _maxPoolSize
         );
 
         _isReady = true;
+        Debug.Log("[DamageTextManager] 시스템 준비 완료.");
     }
 
     private DamageText CreateText()
     {
         GameObject obj = Instantiate(_prefab, _poolContainer);
         DamageText dt = obj.GetComponent<DamageText>();
+
+        // [LOG 5] 실제 생성 확인
+        if (dt == null) Debug.LogError("[DamageTextManager] 프리팹에 DamageText 컴포넌트가 없습니다!");
+
         dt.SetPool(_pool);
         return dt;
     }
 
     private void OnGetText(DamageText dt) => dt.gameObject.SetActive(true);
-
     private void OnReleaseText(DamageText dt)
     {
-        // IMPORTANT: 풀 반환 시점에만 상태 초기화 호출
         dt.ResetState();
         dt.gameObject.SetActive(false);
     }
-
     private void OnDestroyText(DamageText dt) => Destroy(dt.gameObject);
 
     public void ShowDamage(Vector3 worldPos, int damage, bool isCrit, bool isMiss)
     {
-        if (!_isReady) return;
+        // [LOG 6] 호출 확인
+        Debug.Log($"[DamageTextManager] ShowDamage 호출됨. 준비상태: {_isReady}");
+
+        if (!_isReady)
+        {
+            Debug.LogWarning("[DamageTextManager] 아직 초기화되지 않아서 무시됨.");
+            return;
+        }
 
         DamageText dt = _pool.Get();
         dt.transform.position = worldPos + Vector3.up * 1.5f;
@@ -101,5 +109,8 @@ public class DamageTextManager : MonoBehaviour, IInitializable
         float scale = isMiss ? _normalScale : (isCrit ? _critScale : _normalScale);
 
         dt.Play(damage, color, scale, isMiss);
+
+        // [LOG 7] 오브젝트 상태 확인
+        Debug.Log($"[DamageTextManager] 텍스트 활성화됨 at {dt.transform.position}. Active: {dt.gameObject.activeSelf}");
     }
 }

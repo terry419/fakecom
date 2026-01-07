@@ -6,48 +6,34 @@ using System;
 
 public class InputManager : MonoBehaviour, IInitializable
 {
-    public static InputManager Instance { get; private set; }
+    // [수정 1] static Instance 및 중복 파괴 로직 제거 (ServiceLocator가 유일성 보장)
+    // public static InputManager Instance { get; private set; } 
 
     // ========================================================================
     // 1. 이벤트 정의
     // ========================================================================
-    public event Action<Vector2> OnCommandInput; // 우클릭(명령)
-    public event Action<Vector2> OnMouseMove;    // 마우스 이동
-    public event Action OnTurnEndInvoked;        // 턴 종료 (9번 키)
-    public event Action OnCameraRecenter;        // 카메라 복귀 (8번 키)
-    public event Action<int> OnAbilityHotkeyPressed; // 숫자 키 1~7
+    public event Action<Vector2> OnCommandInput;
+    public event Action<Vector2> OnMouseMove;
+    public event Action OnTurnEndInvoked;
+    public event Action OnCameraRecenter;
+    public event Action<int> OnAbilityHotkeyPressed;
 
-    // [Camera Polling Data]
     public Vector2 CameraMoveVector { get; private set; }
     public float CameraKeyRotateAxis { get; private set; }
 
-    // ========================================================================
-    // 2. 내부 변수
-    // ========================================================================
     private PlayerInputActions _inputActions;
     private bool _isInputActive = false;
     private bool _isPointerOverUI = false;
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        // [수정 2] 싱글톤 로직 삭제 -> 바로 등록
         ServiceLocator.Register(this, ManagerScope.Global);
         _inputActions = new PlayerInputActions();
     }
 
     private void OnDestroy()
     {
-        // 이벤트 초기화
         OnCommandInput = null;
         OnMouseMove = null;
         OnTurnEndInvoked = null;
@@ -62,7 +48,6 @@ public class InputManager : MonoBehaviour, IInitializable
 
     public UniTask Initialize(InitializationContext context)
     {
-        // [수정] .Get() 제거 및 단순 Null 체크로 변경 (안전성 확보)
         if (_inputActions == null || _inputActions.asset == null)
         {
             Debug.LogError("[InputManager] PlayerInputActions asset is missing!");
@@ -71,13 +56,14 @@ public class InputManager : MonoBehaviour, IInitializable
 
         SetupInputBindings();
         ResumeInput();
+
         Debug.Log("[InputManager] Initialized.");
         return UniTask.CompletedTask;
     }
 
-    // ========================================================================
-    // 3. 액션 바인딩
-    // ========================================================================
+    // ... (이하 나머지 코드는 기존과 동일하게 유지) ...
+    // SetupInputBindings, DisposeActions, Update, HandleNumberKeys 등등
+
     private void SetupInputBindings()
     {
         _inputActions.Player.Select.performed += ctx =>
@@ -89,8 +75,7 @@ public class InputManager : MonoBehaviour, IInitializable
             }
         };
 
-        // 1) Command (우클릭) - [수정] RightClick -> Command
-        _inputActions.Player.RightClick.performed += ctx =>
+        _inputActions.Player.RightClick.performed += ctx => // 이름 수정 (RightClick -> Command)
         {
             if (_isInputActive && !_isPointerOverUI)
             {
@@ -99,10 +84,7 @@ public class InputManager : MonoBehaviour, IInitializable
             }
         };
 
-        // 2) TurnEnd (9번 키)
         _inputActions.Player.TurnEnd.performed += _ => OnTurnEndInvoked?.Invoke();
-
-        // 3) Recenter (8번 키)
         _inputActions.Player.Recenter.performed += _ => OnCameraRecenter?.Invoke();
     }
 
@@ -115,9 +97,6 @@ public class InputManager : MonoBehaviour, IInitializable
         }
     }
 
-    // ========================================================================
-    // 4. Update Loop
-    // ========================================================================
     private void Update()
     {
         if (!_isInputActive) return;
@@ -136,12 +115,9 @@ public class InputManager : MonoBehaviour, IInitializable
         var keyboard = Keyboard.current;
         if (keyboard == null) return;
 
-        // [수정] 1~7번 키 안전한 루프 처리
         for (int i = 1; i <= 7; i++)
         {
-            // Key.Digit1(50) + 0 = Key.Digit1
             Key key = Key.Digit1 + (i - 1);
-
             if (keyboard[key].wasPressedThisFrame)
             {
                 OnAbilityHotkeyPressed?.Invoke(i);
@@ -150,9 +126,6 @@ public class InputManager : MonoBehaviour, IInitializable
         }
     }
 
-    // ========================================================================
-    // 5. 외부 제어 및 헬퍼
-    // ========================================================================
     public void InvokeTurnEnd() => OnTurnEndInvoked?.Invoke();
     public void PauseInput() => SetInputActive(false);
     public void ResumeInput() => SetInputActive(true);
@@ -174,8 +147,7 @@ public class InputManager : MonoBehaviour, IInitializable
 
     public bool IsCameraRotatePressed()
     {
-        // [수정] RightClick -> Command
-        return _inputActions != null && _inputActions.Player.RightClick.IsPressed();
+        return _inputActions != null && _inputActions.Player.RightClick.IsPressed(); // 이름 수정
     }
 
     public Vector2 GetMouseDelta()

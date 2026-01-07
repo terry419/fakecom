@@ -3,51 +3,46 @@ using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 
+[RequireComponent(typeof(UnitMovementSystem))]
 public class Unit : MonoBehaviour, ITileOccupant
 {
-    // ========================================================================
-    // 1. 기본 정보 및 속성
-    // ========================================================================
+    // ... (기존 필드 동일) ...
     public Faction Faction { get; private set; }
     public GridCoords Coordinate { get; private set; }
     public GridCoords Coords => Coordinate;
     public UnitDataSO Data { get; private set; }
 
     [Header("Class Settings")]
-    public ClassType ClassType = ClassType.Assault; // 기본값
+    public ClassType ClassType = ClassType.Assault;
 
-    // ========================================================================
-    // 2. 스탯 및 상태
-    // ========================================================================
-    public int CurrentHP { get; private set; }
+    private UnitStatus _status;
+    public UnitStatus Status => _status ? _status : (_status = GetComponent<UnitStatus>());
 
-    public int CurrentMobility { get; private set; }
+    private UnitMovementSystem _movementSystem;
+    public UnitMovementSystem MovementSystem => _movementSystem ? _movementSystem : (_movementSystem = GetComponent<UnitMovementSystem>());
+
+    // Bridge Properties
+    public int CurrentHP => Status.CurrentHP;
+    public int CurrentMobility => Status.RemainingMobility;
+    public bool HasAttacked => Status.HasAttacked;
+    public bool HasStartedMoving => Status.HasMoved;
     public int Mobility => Data != null ? Data.Mobility : 5;
 
-    public bool HasAttacked { get; private set; }
-    public bool HasStartedMoving { get; private set; }
-
-    // ========================================================================
-    // 3. 컴포넌트 및 액션
-    // ========================================================================
     private IUnitController _controller;
     public IUnitController Controller => _controller;
-
-    private Collider _collider;
-    [SerializeField] private float _moveSpeed = 3.0f;
-    [SerializeField] private float _rotateSpeed = 15.0f;
-    private bool _isSpawned = false;
 
     private List<BaseAction> _actions = new List<BaseAction>();
     private MoveAction _moveAction;
     private AttackAction _attackAction;
+
+    // [추가] Visualizer 참조
+    private UnitActionVisualizer _actionVisualizer;
 
     public IReadOnlyList<BaseAction> GetActions() => _actions.AsReadOnly();
     public MoveAction GetMoveAction() => _moveAction;
     public AttackAction GetAttackAction() => _attackAction;
     public BaseAction GetDefaultAction() => _moveAction;
 
-    // ITileOccupant 구현
     public OccupantType Type => OccupantType.Unit;
     public bool IsBlockingMovement => true;
     public bool IsCover => false;
@@ -58,38 +53,22 @@ public class Unit : MonoBehaviour, ITileOccupant
 #pragma warning restore 67
 
     public event Action<Unit> OnUnitInitialized;
+    private UnitDamageFeedback _damageFeedback;
 
-    private void Awake() => _collider = GetComponent<Collider>();
+    private void Awake()
+    {
+        _status = GetComponent<UnitStatus>();
+        _movementSystem = GetComponent<UnitMovementSystem>();
+    }
 
-    // ========================================================================
-    // 5. 초기화 (수정됨)
-    // ========================================================================
     public void Initialize(UnitDataSO data, Faction faction)
     {
         Data = data;
         Faction = faction;
         gameObject.name = Data != null ? $"{Data.UnitName}" : "Unit";
 
-        // HP 초기화
-        if (Data != null)
-        {
-            CurrentHP = Data.MaxHP;
+        if (Data != null) ClassType = Data.Role;
 
-            // [Fix] SO의 ClassType 설정을 Unit 인스턴스에 적용
-            // 이 부분이 빠져서 기본값인 Assault로 동작하고 있었습니다.
-            ClassType = Data.Role;
-        }
-        else
-        {
-            CurrentHP = 10;
-        }
-
-        // 턴 상태 초기화
-        CurrentMobility = Mobility;
-        HasAttacked = false;
-        HasStartedMoving = false;
-
-        // 팀 컬러 설정
         var renderer = GetComponentInChildren<Renderer>();
         if (renderer != null)
         {
@@ -98,44 +77,53 @@ public class Unit : MonoBehaviour, ITileOccupant
             else renderer.material.color = Color.green;
         }
 
-        // 액션 초기화
+        if (MovementSystem != null) MovementSystem.Initialize(this);
+
+        // 1. Action 생성 (이 시점에 AddComponent 됨)
         _actions.Clear();
         _moveAction = GetOrAddAction<MoveAction>();
         _attackAction = GetOrAddAction<AttackAction>();
 
+        // 2. [핵심 수정] Visualizer를 가져오거나 추가한 뒤, 생성된 Action을 주입(Initialize)
+        _actionVisualizer = GetComponent<UnitActionVisualizer>();
+        if (_actionVisualizer == null)
+        {
+            _actionVisualizer = gameObject.AddComponent<UnitActionVisualizer>();
+        }
+
+        // 생성된 Action들을 Visualizer에 연결
+        _actionVisualizer.Initialize(_moveAction, _attackAction);
+        _damageFeedback = GetComponent<UnitDamageFeedback>();
+        if (_damageFeedback == null)
+        {
+            _damageFeedback = gameObject.AddComponent<UnitDamageFeedback>();
+        }
+        // HealthSystem은 Status를 통해 접근하거나 GetComponent로 가져옴
+        _damageFeedback.Initialize(Status.HealthSystem);
         OnUnitInitialized?.Invoke(this);
     }
 
+    // ... (이하 기존 메서드들 유지: GetOrAddAction, SpawnOnMap, MovePathAsync 등) ...
     private T GetOrAddAction<T>() where T : BaseAction
     {
         T action = GetComponent<T>();
-        if (action == null)
-        {
-            action = gameObject.AddComponent<T>();
-        }
+        if (action == null) action = gameObject.AddComponent<T>();
         action.Initialize(this);
-
-        if (!_actions.Contains(action))
-        {
-            _actions.Add(action);
-        }
+        if (!_actions.Contains(action)) _actions.Add(action);
         return action;
     }
 
-    // ... (이하 기존 로직 동일) ...
     public void SpawnOnMap(GridCoords coords)
     {
         if (!ServiceLocator.TryGet(out MapManager mapManager))
             throw new InvalidOperationException($"[{nameof(Unit)}] MapManager not found.");
-        Tile tile = mapManager.GetTile(coords);
-        if (tile == null) throw new ArgumentException($"[{nameof(Unit)}] Invalid Spawn Coords: {coords}");
 
         Coordinate = coords;
-        _isSpawned = true;
 
         Vector3 worldPos = GridUtils.GridToWorld(coords);
-        float targetY = GetTargetHeight(worldPos.y);
-        transform.position = new Vector3(worldPos.x, targetY, worldPos.z);
+        float y = worldPos.y;
+        if (TryGetComponent<Collider>(out var col)) y += col.bounds.extents.y;
+        transform.position = new Vector3(worldPos.x, y, worldPos.z);
 
         if (Data != null) gameObject.name = $"{Data.UnitName}_{Coordinate} ({Faction})";
     }
@@ -152,10 +140,6 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public async UniTask OnTurnStart()
     {
-        CurrentMobility = Mobility;
-        HasAttacked = false;
-        HasStartedMoving = false;
-
         if (_controller != null) await _controller.OnTurnStart();
     }
 
@@ -165,53 +149,26 @@ public class Unit : MonoBehaviour, ITileOccupant
     {
         if (path == null || path.Count == 0) return;
 
-        HasStartedMoving = true;
-
-        int distance = path.Count;
-        CurrentMobility = Mathf.Max(0, CurrentMobility - distance);
-
-        foreach (var nextCoords in path)
+        if (Status != null)
         {
-            mapManager.MoveUnit(this, nextCoords);
-            Coordinate = nextCoords;
+            Status.HasMoved = true;
+            Status.ConsumeMobility(path.Count);
+        }
 
-            Vector3 targetPos = GridUtils.GridToWorld(nextCoords);
-            targetPos.y = GetTargetHeight(targetPos.y);
-            Vector3 direction = (targetPos - transform.position).normalized;
-            if (direction != Vector3.zero)
+        if (MovementSystem != null)
+        {
+            await MovementSystem.MoveAlongPathAsync(path, mapManager);
+            if (path.Count > 0)
             {
-                Quaternion targetRot = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
-                RotateTo(targetRot).Forget();
+                Coordinate = path[path.Count - 1];
             }
-            while (Vector3.Distance(transform.position, targetPos) > 0.05f)
-            {
-                transform.position = Vector3.MoveTowards(transform.position, targetPos, _moveSpeed * Time.deltaTime);
-                await UniTask.Yield();
-            }
-            transform.position = targetPos;
         }
     }
 
     public void MarkAsAttacked()
     {
-        HasAttacked = true;
+        if (Status != null) Status.HasAttacked = true;
     }
-
-    private async UniTaskVoid RotateTo(Quaternion targetRot)
-    {
-        float t = 0; Quaternion startRot = transform.rotation;
-        while (t < 1f) { t += Time.deltaTime * _rotateSpeed; transform.rotation = Quaternion.Slerp(startRot, targetRot, t); await UniTask.Yield(); }
-        transform.rotation = targetRot;
-    }
-
-    public async UniTask TakeDamage(int damage)
-    {
-        CurrentHP = Mathf.Max(0, CurrentHP - damage);
-        await UniTask.Delay(500);
-        if (CurrentHP <= 0) Destroy(gameObject);
-    }
-
-    private float GetTargetHeight(float surfaceY) => (_collider == null) ? surfaceY : surfaceY + _collider.bounds.extents.y;
 
     private void OnDestroy()
     {
@@ -228,7 +185,6 @@ public class Unit : MonoBehaviour, ITileOccupant
             _actions.Clear();
         }
 
-        if (!_isSpawned) return;
         if (ServiceLocator.TryGet(out MapManager mapManager) && ServiceLocator.TryGet(out UnitManager unitManager))
         {
             mapManager.UnregisterUnit(this);

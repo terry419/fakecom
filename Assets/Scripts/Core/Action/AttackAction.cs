@@ -1,19 +1,23 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using System; // Action 이벤트를 위해 추가
 using System.Threading;
 
 public class AttackAction : BaseAction
 {
     private MapManager _mapManager;
     private CombatManager _combatManager;
-    private PathVisualizer _pathVisualizer;
+
+    // [변경] PathVisualizer 제거 -> 이벤트 정의
+    public event Action<Vector3, int> OnShowRange;
+    public event Action OnHideRange;
 
     public override void Initialize(Unit unit)
     {
         base.Initialize(unit);
         _mapManager = ServiceLocator.Get<MapManager>();
         _combatManager = ServiceLocator.Get<CombatManager>();
-        _pathVisualizer = ServiceLocator.Get<PathVisualizer>();
+        // _pathVisualizer 제거됨
     }
 
     public override string GetActionName() => "Attack";
@@ -27,22 +31,22 @@ public class AttackAction : BaseAction
     public override void OnSelect()
     {
         base.OnSelect();
-        if (_pathVisualizer != null)
-        {
-            _pathVisualizer.ShowRangeCircle(_unit.transform.position, GetWeaponRange());
-        }
+        // [변경] 이벤트 발송
+        OnShowRange?.Invoke(_unit.transform.position, GetWeaponRange());
     }
 
     public override void OnExit()
     {
         base.OnExit();
-        _pathVisualizer?.HideRangeCircle();
+        // [변경] 이벤트 발송
+        OnHideRange?.Invoke();
     }
 
     public override bool CanExecute(GridCoords targetCoords = default)
     {
         if (State == ActionState.Disabled || State == ActionState.Running) return false;
 
+        // [SSOT] Bridge Property 사용
         if (_unit.HasAttacked) return false;
 
         if (_unit.ClassType == ClassType.Sniper && _unit.HasStartedMoving)
@@ -83,7 +87,8 @@ public class AttackAction : BaseAction
             return ActionExecutionResult.Fail(targetError);
         }
 
-        _pathVisualizer?.HideRangeCircle();
+        // [변경] 공격 시작 전 범위 표시 숨기기
+        OnHideRange?.Invoke();
 
         Unit targetUnit = _mapManager.GetUnit(mouseGrid);
 

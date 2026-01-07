@@ -386,9 +386,9 @@ MonoBehaviour:
   _lineRenderer: {fileID: 8974885397081247026}
   _circleSegments: 50
   _rangeCircleOffset: 0.8
-  _verticalOffset: 0.1
+  _verticalOffset: 0.12
   _initialPoolSize: 50
-  _zFightingOffset: 0.001
+  _zFightingOffset: 0.01
   _useRenderQueue: 1
 --- !u!1 &4524678035037519289
 GameObject:
@@ -612,7 +612,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _damageTextRef:
-    m_AssetGUID: 
+    m_AssetGUID: cbc5b4004b9afe44495913dc4dc5492d
     m_SubObjectName: 
     m_SubObjectType: 
     m_EditorAssetChanged: 0

@@ -1,5 +1,6 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,26 +8,26 @@ using System.Threading;
 public class MoveAction : BaseAction
 {
     private MovementPlanner _planner;
-    private PathVisualizer _pathVisualizer;
     private MapManager _mapManager;
+
+    public event Action<HashSet<GridCoords>, GridCoords> OnShowReachable;
+    public event Action<List<GridCoords>, List<GridCoords>> OnShowPath;
+    public event Action OnClearVisuals;
 
     public override void Initialize(Unit unit)
     {
         base.Initialize(unit);
         _mapManager = ServiceLocator.Get<MapManager>();
-        _pathVisualizer = ServiceLocator.Get<PathVisualizer>();
         _planner = new MovementPlanner(_mapManager);
     }
 
     public override string GetActionName() => "Move";
 
+    // ... (CanExecute, GetBlockReason 생략, 기존과 동일) ...
     public override bool CanExecute(GridCoords targetCoords = default)
     {
         if (State == ActionState.Disabled || State == ActionState.Running) return false;
-
         if (_unit.CurrentMobility <= 0) return false;
-
-        // Ÿ ǥ   ȿ üũ
         if (targetCoords != default)
         {
             var result = _planner.CalculatePath(_unit, targetCoords);
@@ -34,32 +35,32 @@ public class MoveAction : BaseAction
         }
         return true;
     }
+    public override string GetBlockReason(GridCoords targetCoords = default) => base.GetBlockReason(targetCoords);
 
-    public override string GetBlockReason(GridCoords targetCoords = default)
-    {
-        string baseReason = base.GetBlockReason(targetCoords);
-        if (!string.IsNullOrEmpty(baseReason)) return baseReason;
-
-        if (targetCoords != default)
-        {
-            var result = _planner.CalculatePath(_unit, targetCoords);
-            if (!result.IsValidMovePath) return "Invalid Path";
-
-            if (result.ValidPath.Count == 0 || !result.ValidPath.Last().Equals(targetCoords))
-                return "Target Unreachable";
-        }
-        return string.Empty;
-    }
 
     private void RefreshMoveVisuals()
     {
+        Debug.Log("[MoveAction-Debug] RefreshMoveVisuals Called.");
+
         _planner.CalculateReachableArea(_unit);
-        _pathVisualizer?.ShowReachable(_planner.CachedReachableTiles, _unit.Coordinate);
+
+        // [LOG 2] 이벤트 구독자 확인
+        if (OnShowReachable == null)
+        {
+            Debug.LogError("[MoveAction-Debug] OnShowReachable Event has NO SUBSCRIBERS! (Visualizer missing?)");
+        }
+        else
+        {
+            Debug.Log($"[MoveAction-Debug] Invoking OnShowReachable. Subscriber Count: {OnShowReachable.GetInvocationList().Length}");
+            OnShowReachable.Invoke(_planner.CachedReachableTiles, _unit.Coordinate);
+        }
     }
 
     public override void OnSelect()
     {
         base.OnSelect();
+        Debug.Log($"[MoveAction-Debug] OnSelect Called. State: {State}");
+
         if (State == ActionState.Active)
         {
             RefreshMoveVisuals();
@@ -69,7 +70,7 @@ public class MoveAction : BaseAction
     public override void OnExit()
     {
         base.OnExit();
-        _pathVisualizer?.ClearAll();
+        OnClearVisuals?.Invoke();
         _planner.InvalidatePathCache();
     }
 
@@ -78,30 +79,22 @@ public class MoveAction : BaseAction
         if (State != ActionState.Active) return;
 
         PathCalculationResult result = _planner.CalculatePath(_unit, mouseGrid);
+
         if (result.HasAnyPath)
-        {
-            _pathVisualizer?.ShowHybridPath(result.ValidPath.ToList(), result.InvalidPath.ToList());
-        }
+            OnShowPath?.Invoke(result.ValidPath.ToList(), result.InvalidPath.ToList());
         else
-        {
-            _pathVisualizer?.ClearPath();
-        }
+            OnShowPath?.Invoke(null, null);
     }
 
     protected override async UniTask<ActionExecutionResult> OnClickAsync(GridCoords mouseGrid, CancellationToken token)
     {
         PathCalculationResult result = _planner.CalculatePath(_unit, mouseGrid);
 
-        if (!result.IsValidMovePath)
-            return ActionExecutionResult.Fail("Invalid Path Analysis");
+        if (!result.IsValidMovePath) return ActionExecutionResult.Fail("Invalid Path");
+        if (result.ValidPath.Count == 0 || !result.ValidPath.Last().Equals(mouseGrid)) return ActionExecutionResult.Fail("Unreachable");
 
-        if (result.ValidPath.Count == 0 || !result.ValidPath.Last().Equals(mouseGrid))
-            return ActionExecutionResult.Fail("Target Unreachable");
-
-        _pathVisualizer?.ClearAll();
-
+        OnClearVisuals?.Invoke();
         await _unit.MovePathAsync(result.ValidPath.ToList(), _mapManager);
-
         return ActionExecutionResult.Ok();
     }
 }
