@@ -2,102 +2,101 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// ÀÌµ¿ °æ·Î °è»ê °á°ú¸¦ ´ã´Â ºÒº¯(Immutable) °´Ã¼ÀÔ´Ï´Ù.
-/// À¯´ÖÀÌ ½ÇÁ¦·Î ÀÌµ¿ÇÒ ¼ö ÀÖ´Â °æ·Î(Valid)¿Í, 
-/// ½Ã°¢ÀûÀ¸·Î¸¸ º¸¿©Áà¾ß ÇÏ´Â °æ·Î(Invalid, ÀÌµ¿·Â ºÎÁ·ÀÌ³ª Àå¾Ö¹° µî)¸¦ ºĞ¸®ÇÏ¿© °ü¸®ÇÕ´Ï´Ù.
+/// ì´ë™ ê²½ë¡œ ê³„ì‚° ê²°ê³¼ë¥¼ ë‹´ëŠ” ë¶ˆë³€(Immutable) ê°ì²´ì…ë‹ˆë‹¤.
+/// ìœ ë‹›ì´ ì‹¤ì œë¡œ ì´ë™í•  ìˆ˜ ìˆëŠ” ê²½ë¡œ(Valid)ì™€,
+/// ì‹œê°ì ìœ¼ë¡œë§Œ í‘œì‹œí•´ ì£¼ì–´ì•¼ í•˜ëŠ” ê²½ë¡œ(Invalid, ì´ë™ë ¥ ë¶€ì¡± í˜¹ì€ ì¥ì• ë¬¼ ë“±)ë¥¼ ë¶„ë¦¬í•˜ì—¬ ê´€ë¦¬í•©ë‹ˆë‹¤.
 /// </summary>
 public class PathCalculationResult
 {
     // --------------------------------------------------------------------------
-    // 1. Singleton Empty Instance (¸Ş¸ğ¸® ÇÒ´ç ÃÖÀûÈ­)
+    // 1. Singleton Empty Instance (ë©”ëª¨ë¦¬ í• ë‹¹ ìµœì í™”)
     // --------------------------------------------------------------------------
     /// <summary>
-    /// °æ·Î°¡ ¾ø´Â ºó »óÅÂ¸¦ ³ªÅ¸³»´Â ½Ì±ÛÅÏ °´Ã¼ÀÔ´Ï´Ù.
+    /// ê²½ë¡œê°€ ì—†ëŠ” ë¹ˆ ìƒíƒœë¥¼ ë‚˜íƒ€ë‚´ëŠ” ì‹±ê¸€í„´ ê°ì²´ì…ë‹ˆë‹¤.
     /// </summary>
     public static PathCalculationResult Empty { get; } = new PathCalculationResult(null, null, false, 0);
 
     // --------------------------------------------------------------------------
-    // 2. Data Fields (ÀĞ±â Àü¿ë)
+    // 2. Data Fields (ì½ê¸° ì „ìš©)
     // --------------------------------------------------------------------------
     /// <summary>
-    /// ½ÇÁ¦·Î ÀÌµ¿ °¡´ÉÇÑ °æ·ÎÀÔ´Ï´Ù. (Mobility ¹üÀ§ ³», Àå¾Ö¹° ¾øÀ½)
+    /// ì‹¤ì œë¡œ ì´ë™ ê°€ëŠ¥í•œ ê²½ë¡œì…ë‹ˆë‹¤. (Mobility ë²”ìœ„ ë‚´, ì¥ì• ë¬¼ ì—†ìŒ)
     /// </summary>
     public IReadOnlyList<GridCoords> ValidPath { get; }
 
     /// <summary>
-    /// ÀÌµ¿Àº ºÒ°¡´ÉÇÏÁö¸¸ Ç¥½ÃÇØ¾ß ÇÏ´Â °æ·ÎÀÔ´Ï´Ù. (Mobility ÃÊ°ú, È¤Àº Àå¾Ö¹° ³Ê¸Ó)
+    /// ì´ë™ì€ ë¶ˆê°€ëŠ¥í•˜ì§€ë§Œ ì‹œê°ì ìœ¼ë¡œ í‘œì‹œí•´ì¤˜ì•¼ í•˜ëŠ” ê²½ë¡œì…ë‹ˆë‹¤. (Mobility ì´ˆê³¼, í˜¹ì€ ì¥ì• ë¬¼ ê²½ë¡œ)
     /// </summary>
     public IReadOnlyList<GridCoords> InvalidPath { get; }
 
     /// <summary>
-    /// °æ·Î°¡ ¹°¸®ÀûÀÎ Àå¾Ö¹°(À¯´Ö, º® µî)¿¡ ÀÇÇØ ¸·Çû´ÂÁö ¿©ºÎÀÔ´Ï´Ù.
+    /// ê²½ë¡œê°€ ì¥ì• ë¬¼(ìœ ë‹›, ë²½ ë“±)ì— ì˜í•´ ë§‰í˜”ëŠ”ì§€ ì—¬ë¶€ì…ë‹ˆë‹¤.
     /// </summary>
     public bool IsBlocked { get; }
 
     /// <summary>
-    /// ÀÌ °æ·Î(ValidPath)¸¦ ¼öÇàÇÏ±â À§ÇØ ÁöºÒÇØ¾ß ÇÏ´Â AP ºñ¿ëÀÔ´Ï´Ù.
-    /// (ÀÌµ¿ °³½Ã ºñ¿ë. ÀÌ¹Ì ÀÌµ¿ ÁßÀÌ¸é 0, »õ·Î ½ÃÀÛÇÏ¸é 1)
+    /// ì´ ê²½ë¡œ(ValidPath)ë¥¼ ì´ë™í•˜ëŠ” ë° ì†Œëª¨ë˜ëŠ” Mobility ê°’ì…ë‹ˆë‹¤.
     /// </summary>
-    public int RequiredAPForValidPath { get; }
+    public int RequiredMobility { get; }
 
     // --------------------------------------------------------------------------
-    // 3. Helper Properties (ÄÁÆ®·Ñ·¯ ·ÎÁ÷ Áö¿ø)
+    // 3. Helper Properties (ì»¨íŠ¸ë¡¤ëŸ¬ ì œê³µìš©)
     // --------------------------------------------------------------------------
 
     /// <summary>
-    /// ¾î¶² ÇüÅÂ·Îµç °æ·Î(À¯È¿/¹«È¿)°¡ Á¸ÀçÇÏ´ÂÁö ¿©ºÎ.
+    /// ì–´ë–¤ ê²½ë¡œë“  ê²½ë¡œ(ìœ íš¨/ë¬´íš¨)ê°€ ì¡´ì¬í•˜ëŠ”ì§€ ì—¬ë¶€.
     /// </summary>
     public bool HasAnyPath => ValidPath.Count > 0 || InvalidPath.Count > 0;
 
     /// <summary>
-    /// ½ÇÁ¦·Î ÀÌµ¿ ¸í·ÉÀ» ³»·Áµµ µÇ´Â '¿ÏÀü À¯È¿ÇÑ' °æ·ÎÀÎÁö ¿©ºÎ.
-    /// (À¯È¿ °æ·Î°¡ Á¸ÀçÇÏ¸ç, Àå¾Ö¹°¿¡ ¸·È÷Áö ¾ÊÀ½)
+    /// ì‹¤ì œë¡œ ì´ë™ ê°€ëŠ¥í•œ 'ì™„ì „ ìœ íš¨í•œ' ê²½ë¡œì¸ì§€ ì—¬ë¶€.
+    /// (ìœ íš¨ ê²½ë¡œê°€ ì¡´ì¬í•˜ë©°, ì¥ì• ë¬¼ì— ë§‰íˆì§€ ì•ŠìŒ)
     /// </summary>
     public bool IsValidMovePath => ValidPath.Count > 0 && !IsBlocked;
 
     /// <summary>
-    /// À¯È¿ ±¸°£Àº ÀÖÁö¸¸ ¸ñÀûÁö°¡ Àå¾Ö¹° µîÀ¸·Î ¸·Çô ÀÖ´Â »óÅÂÀÎÁö.
+    /// ìœ íš¨ ê²½ë¡œê°€ ì¡´ì¬í•˜ì§€ë§Œ ì¥ì• ë¬¼ì— ì˜í•´ ëê¹Œì§€ ê°ˆ ìˆ˜ ì—†ëŠ” ê²½ìš°.
     /// </summary>
     public bool IsPartiallyBlocked => ValidPath.Count > 0 && IsBlocked;
 
     /// <summary>
-    /// ÁÖ¾îÁø AP·Î ÀÌ Çàµ¿(ÀÌµ¿ °³½Ã)À» ¼öÇàÇÒ ¼ö ÀÖ´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+    /// ì£¼ì–´ì§„ Mobilityë¡œ ì´ í–‰ë™(ì´ë™ ê²½ë¡œ)ì„ ê°ë‹¹í•  ìˆ˜ ìˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
     /// </summary>
-    public bool CanUnitAfford(int currentUnitAP) => currentUnitAP >= RequiredAPForValidPath;
+    public bool CanUnitAfford(int currentUnitMobility) => currentUnitMobility >= RequiredMobility;
 
     // --------------------------------------------------------------------------
     // 4. Constructor & Factory
     // --------------------------------------------------------------------------
 
-    // private »ı¼ºÀÚ: ¿ÜºÎ¿¡¼­ÀÇ ¹«ºĞº°ÇÑ »ı¼ºÀ» ¸·°í, ³»ºÎ º¹»ç¸¦ ¼öÇàÇÕ´Ï´Ù.
+    // private ìƒì„±ì: ì™¸ë¶€ì—ì„œì˜ ë¶ˆë³€ì„± ìœ ì§€ë¥¼ ìœ„í•´, ì •ì  íŒ©í† ë¦¬ë¥¼ ê°•ì œí•©ë‹ˆë‹¤.
     private PathCalculationResult(
         IEnumerable<GridCoords> valid,
         IEnumerable<GridCoords> invalid,
         bool isBlocked,
-        int requiredAP)
+        int requiredMobility)
     {
-        // ÀÔ·Â¹ŞÀº ÄÃ·º¼ÇÀ» ToList()·Î º¹»çÇÏ¿©, ¿ÜºÎ ¸®½ºÆ®°¡ º¯°æµÇ¾îµµ ÀÌ °´Ã¼´Â ¿µÇâ¹ŞÁö ¾Êµµ·Ï ÇÕ´Ï´Ù.
-        // ÀÔ·ÂÀÌ nullÀÌ¸é ºó ¸®½ºÆ®·Î ÃÊ±âÈ­ÇÕ´Ï´Ù.
+        // ì…ë ¥ë°›ì€ ì»¬ë ‰ì…˜ì„ ToList()ë¡œ ë³µì‚¬í•˜ì—¬, ì™¸ë¶€ ë¦¬ìŠ¤íŠ¸ê°€ ë³€ê²½ë˜ì–´ë„ ì´ ê°ì²´ëŠ” ì˜í–¥ì„ ë°›ì§€ ì•Šë„ë¡ í•©ë‹ˆë‹¤.
+        // ì…ë ¥ì´ nullì´ë©´ ë¹ˆ ë¦¬ìŠ¤íŠ¸ë¡œ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
         ValidPath = (valid ?? Enumerable.Empty<GridCoords>()).ToList();
         InvalidPath = (invalid ?? Enumerable.Empty<GridCoords>()).ToList();
 
         IsBlocked = isBlocked;
-        RequiredAPForValidPath = requiredAP;
+        RequiredMobility = requiredMobility;
     }
 
     /// <summary>
-    /// °è»êµÈ °æ·Î Á¤º¸¸¦ ¹ÙÅÁÀ¸·Î °á°ú °´Ã¼¸¦ »ı¼ºÇÕ´Ï´Ù.
+    /// ìƒˆë¡œìš´ ê²½ë¡œ ê³„ì‚° ê²°ê³¼ ë¶ˆë³€ ê°ì²´ë¥¼ ìƒì„±í•©ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="valid">ÀÌµ¿ °¡´ÉÇÑ °æ·Î ¸®½ºÆ®</param>
-    /// <param name="invalid">ÀÌµ¿ ºÒ°¡´ÉÇÑ °æ·Î ¸®½ºÆ®</param>
-    /// <param name="isBlocked">Àå¾Ö¹° ¸·Èû ¿©ºÎ</param>
-    /// <param name="requiredAP">ÀÌ ÀÌµ¿¿¡ ÇÊ¿äÇÑ AP ºñ¿ë</param>
+    /// <param name="valid">ì´ë™ ê°€ëŠ¥í•œ ê²½ë¡œ íƒ€ì¼ ë¦¬ìŠ¤íŠ¸</param>
+    /// <param name="invalid">ì´ë™ ë¶ˆê°€ëŠ¥í•œ ê²½ë¡œ íƒ€ì¼ ë¦¬ìŠ¤íŠ¸</param>
+    /// <param name="isBlocked">ì¥ì• ë¬¼ ì¡´ì¬ ì—¬ë¶€</param>
+    /// <param name="requiredMobility">ì´ ì´ë™ì— í•„ìš”í•œ Mobility ê°’</param>
     public static PathCalculationResult Create(
         IEnumerable<GridCoords> valid,
         IEnumerable<GridCoords> invalid,
         bool isBlocked,
-        int requiredAP)
+        int requiredMobility)
     {
-        return new PathCalculationResult(valid, invalid, isBlocked, requiredAP);
+        return new PathCalculationResult(valid, invalid, isBlocked, requiredMobility);
     }
 }

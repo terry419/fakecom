@@ -17,7 +17,7 @@ public static class Pathfinder
     private static readonly Dictionary<GridCoords, int> _astarCostSoFar = new Dictionary<GridCoords, int>();
 
     // 1. Reachable Tiles (BFS)
-    public static HashSet<GridCoords> GetReachableTiles(GridCoords start, int maxAP, MapManager map)
+    public static HashSet<GridCoords> GetReachableTiles(GridCoords start, int mobility, MapManager map)
     {
         var results = new HashSet<GridCoords>();
         if (map == null || !map.HasTile(start)) return results;
@@ -33,15 +33,15 @@ public static class Pathfinder
         {
             GridCoords current = _bfsQueue.Dequeue();
             int currentCost = _bfsCost[current];
-            if (currentCost >= maxAP) continue;
+            if (currentCost >= mobility) continue;
 
             for (int i = 0; i < _directions.Length; i++)
             {
-                // BFS´Â ¾ö°İÇÏ°Ô Walkable¸¸ Å½»ö
+                // BFSë¥¼ ìˆ˜í–‰í•˜ê³  Walkableì„ íƒìƒ‰
                 if (!IsValidMove(current, _directions[i], map, out GridCoords next, ignoreWalkability: false)) continue;
 
                 int newCost = currentCost + 1;
-                if (newCost <= maxAP)
+                if (newCost <= mobility)
                 {
                     if (!_bfsCost.ContainsKey(next) || newCost < _bfsCost[next])
                     {
@@ -55,7 +55,7 @@ public static class Pathfinder
         return results;
     }
 
-    // 2. Find Path (A*) - [¼öÁ¤µÊ] ¾ø´Â ÇÔ¼ö Á¦°ÅÇÏ°í GetNeighbor »ç¿ë
+    // 2. Find Path (A*) - [ìˆ˜ì •ë¨] ë‹¨ì¼ í•¨ìˆ˜ ì‚¬ìš©í•˜ê³  GetNeighbor ì¬ì‚¬ìš©
     public static List<GridCoords> FindPath(GridCoords start, GridCoords end, MapManager map)
     {
         if (start.Equals(end)) return new List<GridCoords>();
@@ -86,12 +86,12 @@ public static class Pathfinder
             {
                 Direction dir = _directions[i];
 
-                // [¼öÁ¤] GridUtils.TryGetNeighbor -> GridUtils.GetNeighbor·Î º¯°æ
-                // ´Ü¼øÈ÷ ÁÂÇ¥ °è»ê¸¸ ¼öÇà (¹üÀ§ Ã¼Å©´Â IsValidMove ³»ºÎÀÇ map.GetTile¿¡¼­ Ã³¸®µÊ)
+                // [ìˆ˜ì •ë¨] GridUtils.TryGetNeighbor -> GridUtils.GetNeighborë¡œ ë³€ê²½
+                // ì¸ì ‘ ì¢Œí‘œë§Œ ì–»ì–´ì˜´ (Walkable ì²´í¬ëŠ” IsValidMove ë‚´ë¶€ì—ì„œ map.GetTileì„ í†µí•´ ì²˜ë¦¬)
                 GridCoords nextCheck = GridUtils.GetNeighbor(current, dir);
                 bool isDestination = nextCheck.Equals(end);
 
-                // µµÂøÁöÁ¡ÀÌ¸é Walkable °Ë»ç ¹«½Ã (ignoreWalkability: true)
+                // ëª©ì ì§€ íƒ€ì¼ì´ë©´ Walkable ê²€ì‚¬ ìŠ¤í‚µ (ignoreWalkability: true)
                 if (!IsValidMove(current, dir, map, out GridCoords next, ignoreWalkability: isDestination)) continue;
 
                 int newCost = _astarCostSoFar[current] + 1;
@@ -116,14 +116,14 @@ public static class Pathfinder
 
         if (nextTile == null) return false;
 
-        // 1. ÇöÀç Å¸ÀÏ º® Ã¼Å©
+        // 1. í˜„ì¬ íƒ€ì¼ì˜ ì—ì§€ ì²´í¬
         Tile currentTile = map.GetTile(current);
         if (currentTile != null && currentTile.IsPathBlockedByEdge(dir)) return false;
 
-        // 2. º¸Çà °¡´É ¿©ºÎ (ignoreWalkability°¡ true¸é ¹«½ÃÇÏ°í Åë°ú)
+        // 2. ë‹¤ìŒ íƒ€ì¼ Walkable ì—¬ë¶€ (ignoreWalkabilityê°€ trueë©´ ë¬´ì‹œí•¨)
         if (!ignoreWalkability && !nextTile.IsWalkable) return false;
 
-        // 3. ¸ÂÀºÆí º® Ã¼Å©
+        // 3. ë‹¤ìŒ íƒ€ì¼ì˜ ì—ì§€ ì²´í¬
         Direction oppositeDir = GridUtils.GetOppositeDirection(dir);
         if (nextTile.IsPathBlockedByEdge(oppositeDir)) return false;
 

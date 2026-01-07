@@ -15,7 +15,6 @@ public abstract class UnitDataSO : ScriptableObject
 
     [Header("3. Base Stats")]
     public int MaxHP;
-    public int MaxAP = 2;
     public int Mobility;
     public int Agility;
     public int Range;

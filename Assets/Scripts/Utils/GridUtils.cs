@@ -140,4 +140,8 @@ public static class GridUtils
 
         return (dx + dz == 1);
     }
+    public static float GetCellSize()
+    {
+        return CELL_SIZE;
+    }
 }

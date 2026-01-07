@@ -2,14 +2,6 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 
-// [변경] AP Cost는 이제 의미가 없으므로 0을 기본으로 하는 더미 구조체 혹은 삭제 가능.
-// 호환성을 위해 남겨두되 로직에서 무시합니다.
-[System.Serializable]
-public struct ActionCost
-{
-    public int AP;
-}
-
 public struct ActionExecutionResult
 {
     public bool Success;
@@ -38,14 +30,10 @@ public abstract class BaseAction : MonoBehaviour
 
     public abstract string GetActionName();
 
-    // [변경] AP 비용 계산 메서드는 남겨두지만 0을 반환 (인터페이스 유지)
-    public virtual ActionCost GetActionCost() => new ActionCost { AP = 0 };
-
     public virtual string GetBlockReason(GridCoords targetCoords = default)
     {
         if (_unit == null) return "No Unit";
         if (State == ActionState.Running) return "Already Running";
-        // [수정] AP 부족 체크 로직 삭제됨
         return string.Empty;
     }
 
@@ -100,7 +88,6 @@ public abstract class BaseAction : MonoBehaviour
 
             if (result.Success)
             {
-                // [수정] ApplyCost(비용 차감) 로직 삭제됨
                 State = ActionState.Finished;
             }
             else if (result.Cancelled)

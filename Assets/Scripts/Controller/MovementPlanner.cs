@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// À¯´ÖÀÇ ÀÌµ¿ °æ·Î¸¦ °è»êÇÏ°í, ÀÌµ¿·Â Á¦ÇÑÀ» Àû¿ëÇÏ¿© À¯È¿¼ºÀ» °ËÁõÇÏ´Â ·ÎÁ÷ Å¬·¡½ºÀÔ´Ï´Ù.
+/// ìœ ë‹›ì˜ ì´ë™ ê²½ë¡œë¥¼ ê³„íší•˜ê³ , ì´ë™ë ¥ì„ ê³ ë ¤í•˜ì—¬ ìœ íš¨ì„±ì„ ê²€ì‚¬í•˜ëŠ” í•µì‹¬ í´ë˜ìŠ¤ì…ë‹ˆë‹¤.
 /// </summary>
 public class MovementPlanner
 {
@@ -13,7 +13,6 @@ public class MovementPlanner
     // -------------------------------------------------------
     private GridCoords _lastStartCoords;
     private GridCoords _lastTargetCoords;
-    // [¼öÁ¤] AP °ü·Ã Ä³½Ì º¯¼ö »èÁ¦ (_lastUnitAP)
     private int _lastUnitMobility;
     private bool _lastUnitHasMoved;
 
@@ -28,11 +27,10 @@ public class MovementPlanner
     }
 
     /// <summary>
-    /// ÀÌµ¿ °¡´É °Å¸® °è»ê ·ÎÁ÷ °øÅëÈ­ (Helper)
+    /// ìœ ë‹›ì˜ í˜„ì¬ ë‚¨ì€ ì´ë™ë ¥ì„ ê°€ì ¸ì˜µë‹ˆë‹¤. (Helper)
     /// </summary>
-    private int GetMaxMoveRange(Unit unit)
+    private int GetRemainingMobility(Unit unit)
     {
-        // [¼öÁ¤] AP °³³ä »èÁ¦ -> ÇöÀç ³²Àº ÀÌµ¿·Â(Mobility)ÀÌ °ğ ÀÌµ¿ °¡´É °Å¸®
         return unit.CurrentMobility;
     }
 
@@ -40,8 +38,8 @@ public class MovementPlanner
     {
         if (unit == null) return;
 
-        int range = GetMaxMoveRange(unit);
-        CachedReachableTiles = Pathfinder.GetReachableTiles(unit.Coordinate, range, _mapManager);
+        int remainingMobility = GetRemainingMobility(unit);
+        CachedReachableTiles = Pathfinder.GetReachableTiles(unit.Coordinate, remainingMobility, _mapManager);
 
         InvalidatePathCache();
     }
@@ -60,7 +58,6 @@ public class MovementPlanner
 
     private bool IsCacheValid(Unit unit, GridCoords target)
     {
-        // [¼öÁ¤] AP ºñ±³ ·ÎÁ÷ »èÁ¦ (_lastUnitAP)
         return _cachedResult != null &&
                _lastStartCoords.Equals(unit.Coordinate) &&
                _lastTargetCoords.Equals(target) &&
@@ -85,10 +82,7 @@ public class MovementPlanner
 
         if (fullPath.Count == 0) return PathCalculationResult.Empty;
 
-        int maxRange = GetMaxMoveRange(unit);
-
-        // [¼öÁ¤] AP ºñ¿ë °³³äÀÌ »ç¶óÁ³À¸¹Ç·Î Ç×»ó 0 Ã³¸® (È¤Àº PathCalculationResult ±¸Á¶ ¼öÁ¤ ÇÊ¿ä ½Ã 0 Àü´Ş)
-        int requiredActionPoint = 0;
+        int remainingMobility = GetRemainingMobility(unit);
 
         List<GridCoords> valid = new List<GridCoords>();
         List<GridCoords> invalid = new List<GridCoords>();
@@ -100,7 +94,7 @@ public class MovementPlanner
 
             Tile tile = _mapManager.GetTile(step);
 
-            // 1. Å¸ÀÏ ÀÌµ¿ ºÒ°¡(Pillar µî) Ã¼Å©
+            // 1. íƒ€ì¼ ì´ë™ ë¶ˆê°€(Pillar ë“±) ì²´í¬
             if (tile == null || !tile.IsWalkable)
             {
                 isBlocked = true;
@@ -108,7 +102,7 @@ public class MovementPlanner
                 continue;
             }
 
-            // 2. À¯´Ö Á¸Àç ¿©ºÎ Ã¼Å©
+            // 2. ë‹¤ë¥¸ ìœ ë‹› ì¡´ì¬ ì—¬ë¶€ ì²´í¬
             if (_mapManager.HasUnit(step))
             {
                 isBlocked = true;
@@ -116,8 +110,8 @@ public class MovementPlanner
                 continue;
             }
 
-            // 3. ÀÌµ¿·Â ¹üÀ§ Ã¼Å©
-            if (!isBlocked && (i + 1) <= maxRange)
+            // 3. ì´ë™ë ¥ ì†Œëª¨ ì²´í¬
+            if (!isBlocked && (i + 1) <= remainingMobility)
             {
                 valid.Add(step);
             }
@@ -127,14 +121,16 @@ public class MovementPlanner
             }
         }
 
+        // ì‹¤ì œ ì´ë™ì— ì†Œëª¨ë  MobilityëŠ” ìœ íš¨í•œ ê²½ë¡œì˜ ê¸¸ì´ì™€ ê°™ìŠµë‹ˆë‹¤.
+        int requiredMobility = valid.Count;
+
         _lastStartCoords = unit.Coordinate;
         _lastTargetCoords = target;
-        // [¼öÁ¤] AP Ä³½Ì »èÁ¦
         _lastUnitMobility = unit.CurrentMobility;
         _lastUnitHasMoved = unit.HasStartedMoving;
         _lastMapVersion = _mapManager.StateVersion;
 
-        _cachedResult = PathCalculationResult.Create(valid, invalid, isBlocked, requiredActionPoint);
+        _cachedResult = PathCalculationResult.Create(valid, invalid, isBlocked, requiredMobility);
         return _cachedResult;
     }
 

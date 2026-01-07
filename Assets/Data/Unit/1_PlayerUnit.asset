@@ -15,7 +15,7 @@ MonoBehaviour:
   UnitID: 1_PlayerUnit
   UnitName: 1_PlayerUnit
   UnitTeam: 0
-  Role: 2
+  Role: 3
   ModelPrefab:
     m_AssetGUID: fafe13c03091abd4d8a99c5de9503184
     m_SubObjectName: 

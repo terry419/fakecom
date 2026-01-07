@@ -10,8 +10,6 @@ public class MoveAction : BaseAction
     private PathVisualizer _pathVisualizer;
     private MapManager _mapManager;
 
-    private const int MOVE_AP_COST = 1;
-
     public override void Initialize(Unit unit)
     {
         base.Initialize(unit);
@@ -22,15 +20,13 @@ public class MoveAction : BaseAction
 
     public override string GetActionName() => "Move";
 
-    public override ActionCost GetActionCost() => new ActionCost { AP = 0 };
     public override bool CanExecute(GridCoords targetCoords = default)
     {
         if (State == ActionState.Disabled || State == ActionState.Running) return false;
 
-        // [핵심] 그냥 이동력이 남아있으면 이동 가능
         if (_unit.CurrentMobility <= 0) return false;
 
-        // 타겟 좌표 있으면 경로 유효성 체크
+        // 타 표   효 체크
         if (targetCoords != default)
         {
             var result = _planner.CalculatePath(_unit, targetCoords);
@@ -49,7 +45,6 @@ public class MoveAction : BaseAction
             var result = _planner.CalculatePath(_unit, targetCoords);
             if (!result.IsValidMovePath) return "Invalid Path";
 
-            // [Fix] 부분 이동 방지 (도달 불가 지역)
             if (result.ValidPath.Count == 0 || !result.ValidPath.Last().Equals(targetCoords))
                 return "Target Unreachable";
         }
@@ -93,7 +88,6 @@ public class MoveAction : BaseAction
         }
     }
 
-    // [Fix] BaseAction 시그니처에 맞춰 CancellationToken 추가
     protected override async UniTask<ActionExecutionResult> OnClickAsync(GridCoords mouseGrid, CancellationToken token)
     {
         PathCalculationResult result = _planner.CalculatePath(_unit, mouseGrid);
@@ -106,8 +100,6 @@ public class MoveAction : BaseAction
 
         _pathVisualizer?.ClearAll();
 
-        // [Note] Unit.MovePathAsync에도 token을 전달하면 더 완벽하지만,
-        // 현재는 BaseAction이 취소를 감지하고 상태를 복구하므로 동작은 합니다.
         await _unit.MovePathAsync(result.ValidPath.ToList(), _mapManager);
 
         return ActionExecutionResult.Ok();
