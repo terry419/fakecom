@@ -47,7 +47,16 @@ MonoBehaviour:
     MaxHP: 25
     DefaultCover: 0
     IsPassable: 0
+  Portals:
+  - Type: 0
+    Prefab: {fileID: 8354126558350536518, guid: 78daae2efb051f1488165d79b8a812b1, type: 3}
+  - Type: 1
+    Prefab: {fileID: 8354126558350536518, guid: 646ef72dee530cb439b82fb60a8a1e94, type: 3}
   HighlightMaterial: {fileID: 2100000, guid: 6bfc2b92c847a7d44b06fc5a7655c755, type: 2}
   GridColor: {r: 1, g: 1, b: 1, a: 1}
   PillarHighlightColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   EraseHighlightColor: {r: 1, g: 0, b: 0, a: 1}
+  PlayerSpawnColor: {r: 0, g: 1, b: 0, a: 1}
+  EnemySpawnColor: {r: 1, g: 0, b: 0, a: 1}
+  PortalInColor: {r: 0.5, g: 0, b: 1, a: 1}
+  PortalOutColor: {r: 0, g: 0.5, b: 1, a: 1}

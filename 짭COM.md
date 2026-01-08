@@ -46,9 +46,9 @@
 * 작전 통제실 (Operations Center)  
   * 월드맵을 통해 다음 수행할 미션(난이도, 보상, 적 유형)을 선택.  
   * **구현 로직**:  
-    * `MapCatalogManager`가 전역 `MapCatalogSO`를 참조하여 난이도별 풀(`DifficultyPools`)에서 미션 후보들을 인덱싱하여 선택 리스트를 구성함..  
-    * 플레이어가 미션을 선택하면 `MissionManager`는 해당 미션의 `MapEntry` 정보를 보관함. `MapDataSO`를 랜덤 결정.  
-    * 전투 씬 진입 시 `SceneInitializer`가 이 정보를 바탕으로 실제 `MapDataSO`를 비동기 로드하고, `InitializationContext`에 담아 각 시스템에 주입함.  
+    * **Global:** `MapCatalogManager`가 전역 `MapCatalogSO`를 참조하여 난이도별 풀에서 적절한 미션 후보(`MissionSO`) 리스트를 구성함.  
+    * **Session:** 플레이어가 미션을 선택하면, \*\*Session Scope의 `MissionManager`\*\*가 해당 미션 정보(`MissionSO`)를 저장하여 씬이 변경되어도 데이터를 유지함.  
+    * **Scene:** 전투 씬 진입 시 `SceneInitializer`가 `MissionManager`에 저장된 미션 정보를 참조하여 실제 맵 데이터를 로드하고 전투 환경을 구축함.  
 * 수리공방 (Repair Shop)  
   *  **역할:** 전투에서 획득한 '손상된 장비'를 수리하여 사용 가능한 상태로 복구하는 시설.  
   * **기능:** 루팅된 무기는 기본적으로 '파손(Damaged)' 상태이며, 일정 자재(Junk)와 자금을 소모하여 수리해야 유닛에게 장착할 수 있습니다.
@@ -132,7 +132,8 @@
 * ***Mobility (이동력):** 한 턴에 이동할 수 있는 타일 수.*  
 * ***Aim (명중률):** 공격 시 액티브 미니게임의 **\[성공 영역(녹색/노랑)\]** 크기를 결정.*  
 * ***Evasion (회피율):** 적의 명중률을 깎지 않는다. 대신 피격 시 발동하는 **\[방어 QTE\]의 성공 영역(Green Zone) 크기**를 결정한다. (회피율이 높을수록 방어 QTE가 쉬워짐).*  
-* ***Action/Move Count (내부 변수):** UI에는 표시되지 않으나, 시스템적으로 '이동 1회, 공격 1회'의 행동 기회를 제어하는 내부 변수.*
+* ***Agility:** 11.1절 공식에 따라 턴 순서를 결정하는 핵심 스탯.*  
+* ***TS:** 0에 도달하면 턴을 획득하는 실시간 대기 수치.*
 
 ### **4.2. 병과 및 전용 무기 (Class & Weapon)**
 
@@ -401,15 +402,32 @@
 * **경로(Invalid):** 이동력 초과 또는 이동 불가 지역(오브젝트/유닛 점유) → **빨간색(Red) 라인/타일**.  
 * **복합 경로:** 갈 수 있는 데까지는 파란색, 그 이후부터 빨간색으로 이어지는 **'부분 경로 표시'** 로직 명시.
 
+### **5.9 미션 및 스폰 시스템 (Mission & Spawn)** 
+
+* ###  **MissionSO 구조: 기존 `MapEntry`를 대체하는 데이터 컨테이너.**
+
+  * `MapDataRef` (AssetReference): 전투용 맵 데이터.  
+  * `MaxPlayerUnits` (int): 출격 가능 아군 수.  
+  * `EnemySpawns` (List): `EnemyData`, `SpawnRoleTag`, `Count` 정보를 포함하는 리스트.  
+  * `Rewards`: 클리어 시 획득할 `ItemDataSO` 및 자원 보상.
+
+* ###  **분대(Pod) 스폰 로직:**
+
+  * `SpawnRoleTag`와 일치하는 타일을 앵커(Anchor)로 설정.  
+  * 
+
 # **6.0. 기술 아키텍처 (Technical Architecture)** 
 
 본 프로젝트는 **Unity 3D (URP)** 환경을 기반으로 하며, **Service Locator 패턴**과 **Initializer 패턴**을 결합하여 싱글톤의 폐해(결합도, 순서 문제)를 해결하고, 메모리 생명주기(Lifecycle)를 엄격히 통제한다.
 
 #### **6.0.1. 아키텍처 핵심 원칙 (Core Principles)**
 
-1. **서비스 로케이터 (Service Locator):** 모든 매니저 클래스는 싱글톤(Instance) 변수를 가지지 않으며, 오직 `ServiceLocator`를 통해서만 접근 가능하다.  
+1. **서비스 로케이터 (Service Locator): 모든 매니저는 `ServiceLocator`를 통해서만 접근한다.**  
 2. **하이브리드 등록 (Hybrid Registration): Global 매니저는 자신의 Awake()에서 스스로를 등록한다(자가 등록). 반면, 씬의 생명주기에 종속적인 Session 및 Scene 매니저는 SceneInitializer에 의해 중앙에서 등록을 관리한다(중앙 등록). 이를 통해 각 스코프의 특성에 맞는 등록 방식을 사용한다.**  
-3.   
+3. **3계층 생명주기 (3-Tier Lifecycle):**  
+   * **Global: 앱 시동 시 등록, 영구 유지 (`AppBootstrapper`).**  
+   * **Session: 게임 시작 시 등록, 타이틀 복귀 시 파괴 (`GameSession` \- 미션 데이터 유지).**  
+   * **Scene: 씬 로드 시 등록, 씬 종료 시 파괴 (`SceneInitializer`).**  
 4. **2단계 초기화 (Two-Phase Initialization):**  
    * **1단계 (등록 \- Awake): 모든 매니저는 `Awake()`에서 `ServiceLocator`에 자신을 등록하며, 타 시스템 참조는 금지함.**  
    * **2단계 (컨텍스트 주입 \- Initialize): `BootManager`에 의해 트리거된 Initializer가 `InitializationContext`를 생성하여 각 매니저의 `Initialize(context)`를 호출함**  
@@ -418,7 +436,8 @@
 6. **결함 감지 및 차단 (Fail-Fast):** 초기화 도중 치명적인 예외(Exception) 발생 시, 즉시 부팅 절차를 중단하고 에러 로그를 출력한 뒤 애플리케이션을 종료하거나 에러 상태(`SessionState.Error`)로 전이한다.  
 7. 대규모 맵 로딩 전략 (Loading Strategy):  
    * **시간 할당제 스트리밍 (Time-Sliced Streaming):** 130x130 이상의 대규모 맵 로딩 시, 타일 생성 루프가 메인 스레드를 독점하여 화면이 멈추는(Freezing) 현상을 방지한다. 타일 생성 시 '개수' 기준이 아닌 \*\*"프레임당 16ms(0.016초) 제한"\*\*을 두어, 시간이 초과되면 작업을 일시 중단(`await UniTask.Yield`)하고 제어권을 OS에 넘긴다. 이를 통해 로딩 중에도 UI 애니메이션과 터치 반응성을 유지한다.  
-   * **온디맨드 생성 (On-Demand Generation):** 초기화 시 `new Tile()`을 맵 전체에 수행하지 않는다. `MapData`에 유효한 정보가 존재하는 좌표에 대해서만 객체를 생성하여 런타임 메모리 스파이크를 방지한다.
+   * **온디맨드 생성 (On-Demand Generation):** 초기화 시 `new Tile()`을 맵 전체에 수행하지 않는다. `MapData`에 유효한 정보가 존재하는 좌표에 대해서만 객체를 생성하여 런타임 메모리 스파이크를 방지한다.   
+8. **데이터 주입 (Injection):** Global → Session → Scene 순으로 컨텍스트를 전달하여 데이터 일관성을 보장한다.
 
 ---
 
@@ -443,7 +462,7 @@
 
 ### **(1) Global Scope (App Lifetime)**
 
-* **생명주기:** 앱 실행 시 AppInitializer에 의해 생성 \~ 앱 종료 시까지 유지 (DontDestroyOnLoad).  
+* **생명주기:** 앱 실행(Boot) \~ 종료(Quit). `DontDestroyOnLoad`.  
 * **등록 방식:** **자가 등록 (Self-Registration)**. Awake()에서 ServiceLocator.Register(this) 호출.  
 * "단, `AppInitializer`는 매니저를 **생성(Instantiate)만** 하며, 등록 코드를 포함하지 않는다(의존성 제거)."  
 * **초기화 주체:** AppInitializer (Addressables 로드 및 생성 담당).
@@ -451,18 +470,26 @@
 | 매니저 이름 | 핵심 역할 | 주요 책임 및 기능 |
 | :---- | :---- | :---- |
 | **ServiceLocator** | **연결** | 모든 매니저의 등록/해제 및 접근점 제공 (싱글톤 대체). |
-| **AppInitializer** | **시동** | "앱의 진입점(Entry Point). `AppConfig` 로드 및 Global 매니저 생성(Instantiate)을 담당한다. **\[개발 편의성\]:** `BootScene`이 아닌 일반 씬에서 실행 시, 자동으로 Global 환경을 구축(Bootstrap)하여 개발 속도를 저하시키지 않도록 한다." 단, 자동 부트스트랩의 호출(Trigger)은 SceneInitializer가 수행한다 |
+| **AppBootstrapper** | **시동** | "앱의 진입점(Entry Point). `AppConfig` 로드 및 Global 매니저 생성(Instantiate)을 담당한다. **\[개발 편의성\]:** `BootScene`이 아닌 일반 씬에서 실행 시, 자동으로 Global 환경을 구축(Bootstrap)하여 개발 속도를 저하시키지 않도록 한다." 단, 자동 부트스트랩의 호출(Trigger)은 SceneInitializer가 수행한다 |
 | **GameManager** | **총괄** | 게임의 최상위 상태(Main Menu ↔ InGame) 관리. |
 | **DataManager** | **DB** | 게임 내 모든 정적 데이터(SO) 및 세이브 데이터 로드/캐싱. |
 | **InputManager** | **입력** | 하드웨어 입력을 게임 Action으로 변환 및 레이어(UI/Game) 제어. |
 | **GlobalSettingsSO** | **설정** | 해상도, 사운드 볼륨 등 전역 설정 데이터 컨테이너. |
-| **MapCatalogManager** |  | `MapCatalogSO`를 인덱싱하여 난이도/태그별 맵 검색 API를 제공하는 DB 역할 |
-| **MissionManager** |  | 플레이어가 선택한 미션 정보(`MapEntry`)를 관리하고 전투 세션으로 전달 |
+| **SaveManager** | **저장** | 로컬 파일 기반 세이브 데이터 입출력 관리. |
 
-### **(2) Scene Scope (Session Lifetime)**
+### **(2) Session Scope (Session Lifetime)**
 
-* **생명주기:** 전투 씬(InGame) 로드 시 생성 \~ 씬 언로드 시 파괴.  
-* **초기화 주체:** SceneInitializer.
+* **생명주기:** 전투 씬(InGame) 로드 시 생성 \~ 씬 언로드 시 파괴.
+
+| 매니저 이름 | 핵심 역할 | 주요 책임 |
+| :---- | :---- | :---- |
+| **MissionManager** | **세션 미션** | **선택된 MissionSO 데이터 유지 및 씬 간 중계.** |
+| **PlayerRosterManager** | **부대 관리** | **(예정) 아군 유닛들의 상태 및 성장 데이터 보존.** |
+| **InventoryManager** | **아이템 관리** | **(예정) 세션 내 획득 아이템 및 인벤토리 관리.** |
+| **MapCatalogManager** | **미션 DB** | `MapCatalogSO`를 인덱싱하여 난이도/태그별 맵 검색 API를 제공하는 DB 역할 |
+| **BaseManager** | **기지 관리** | • 기지 내 UI 메뉴(연구, 병영, 정비) 네비게이션 처리. • SquadManager와 연동하여 대원 치료/훈련 로직 수행. |
+
+### **(3) Scene Scope (Level Lifetime)**
 
 | 계층 (Layer) | 매니저 이름 | 주요 책임 |
 | :---- | :---- | :---- |
@@ -476,17 +503,12 @@
 | **Visual** | **TilemapGenerator** | MapManager의 논리 데이터를 기반으로 실제 프리팹을 월드에 비동기(GenerateAsync) 스폰 및 배치. |
 |  | **DamageTextMgr** | • 데미지 플로팅 텍스트 연출. |
 | **System** | **EnvironmentManager** | • **환경 변화 중계:** 벽/기둥 파괴 이벤트를 수신하여 데이터와 비주얼 간의 동기화 명령 하달. 333  • **논리 갱신 트리거:** 구조물 제거 시 Tile.UpdateCache()를 호출하여 이동 가능 여부 및 시야를 실시간 재계산하게 함.   • **상태 변환 관리:** 바닥 타일의 파손 상태(FloorType 변경)와 그에 따른 이동 비용(Cost) 가중치 적용 관리.  |
-| **TileDataManager** |  | `TileRegistry`를 보유하며, 런타임에 필요한 타일/벽/기둥의 프리팹과 속성 데이터를 공급함. |
-
-### **(3) Scene Scope (Non-Battle)**
-
-* 기지(Base) 및 월드맵(WorldMap) 씬 전용 매니저.
-
-| 씬 | 매니저 이름 | 주요 책임 및 기능 |
-| :---- | :---- | :---- |
-| **Base** | **BaseManager** | • 기지 내 UI 메뉴(연구, 병영, 정비) 네비게이션 처리. • SquadManager와 연동하여 대원 치료/훈련 로직 수행. |
-| **World** | **MissionManager** | • 랜덤 미션 생성 및 지역별 보상 데이터 관리. • 선택된 미션 정보를 Battle 씬으로 전달(MapDataSO). |
-|  |  |  |
+|  | **TileDataManager** | `TileRegistry`를 보유하며, 런타임에 필요한 타일/벽/기둥의 프리팹과 속성 데이터를 공급함. |
+|  | **PathVisualizer** | `이동 범위 및 경로 시각화.` |
+|  | **QTEManager** | `무기별 QTE 모듈 실행 및 결과 판정.` |
+|  | **DamageTextManager** | `데미지 플로팅 텍스트 팝업 관리.` |
+|  | **TargetUIManager** | `타겟 유닛 정보 표시 관리.` |
+|  | **PlayerInputCoordinator** | `입력을 활성 컨트롤러로 전달.` |
 
 ### **6.3. 핵심 시스템 구현 로직 (Core Implementation Logic)**
 
@@ -565,8 +587,15 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 
 * **시각적 피드백:** 층간 이동이 가능한 타일(순간이동기)은 전술 뷰에서 식별 가능한 색상(예: 노란색)으로 하이라이트한다.
 
+#### 
 
-#### **5\. 유닛-컨트롤러 아키텍처 (Unit-Controller Architecture)**
+#### **5\. 탐험 및 자동 스폰 흐름 (Exploration & Auto-Spawn)**
+
+1. **탐험 단계:** `MapCatalogManager`에서 추천된 미션 중 하나를 선택, `MissionManager`(Global/Lazy)에 저장.  
+2. **전투 로드:** `SceneInitializer`가 `MissionManager`를 확인하여 맵 데이터를 비동기 로드.  
+3. **분대 스폰:** `UnitManager`가 `MissionSO`에 정의된 `EnemySpawns` 리스트를 순회하며 앵커 타일 기준 **Scattered Spawning** 수행.
+
+#### **6\. 유닛-컨트롤러 아키텍처 (Unit-Controller Architecture)**
 
 본 프로젝트는 유닛의 데이터/상태와 제어 로직을 명확히 분리하는 컨트롤러 패턴을 따른다.
 
@@ -581,7 +610,7 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
   * \`AIController\`는 자체적인 AI 로직에 따라 판단하여 Unit에게 명령을 내린다.
 
 
-#### **6\. 사망 장비 회수 및 임시 창고 로직** 
+#### **7\. 사망 장비 회수 및 임시 창고 로직** 
 
 **사망 발생:** 아군 유닛 HP가 0이 되어 사망(`Dead`) 상태 전환.  
 **자동 탈착:** 해당 유닛의 `MainWeapon`과 `BodyArmor`가 즉시 장착 해제됨.  
@@ -598,7 +627,7 @@ Raycast 판정의 정확도를 위해 레이어를 명확히 구분한다.
 * 이 임시 보관함 상태는 \*\*\[다음 유닛의 턴 종료 시점\]\*\*까지 유지됨.  
 * 이때까지 정리하지 않으면 임시 보관함에 남은 아이템은 **영구 소실(Destroy)** 처리됨.
 
-#### **7\. 스킬/사거리 계산 (Chebyshev)**
+#### **8\. 스킬/사거리 계산 (Chebyshev)**
 
 * **유클리드 거리(Euclidean Distance) 사용. 두 점 사이의 '직선 거리'를 기준으로 원형의 사거리를 계산한다. (예: 반경 5칸 이내)**.  
 * 로직: 스킬/사거리 \`R\` 내에 목표 \`B(x2, z2)\`가 있는지 판단할 때, 공격자 \`A(x1, z1)\`로부터의 거리 \`D\`가 \`R\` 이내인지 확인한다. 성능 최적화를 위해 제곱 거리(\`D^2\`)를 사용하여 비교한다.  
@@ -699,7 +728,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
    * **결과 확인:** 피격 모션, HP 감소, 데미지 텍스트(Critical/Miss)가 뜨는 동안 **약 1.0\~1.5초간 카메라 유지**.  
 7. **카메라 복귀 (Return):**  
    * 턴이 종료되면 다음 순서 유닛에게로 이동.  
-   * 턴이 남아있다면(AP 잔존) 다시 유닛 **A**에게로 복귀.
+   * 턴이 남아있다면 다시 유닛 **A**에게로 복귀.
 
 **(2) 방어 시퀀스 (Active Defense Sequence)**
 
@@ -809,7 +838,7 @@ Enum 관리 원칙: '1 Enum, 1 File'
 |  | TracerVFX | AssetReference | **\[Visual\]** 총알 궤적 이펙트 (Hitscan 표현용). |
 |  | ImpactVFX | AssetReference | **\[Visual\]** 탄착 지점 폭발/피격 이펙트. |
 | **5\. Action Logic** | **ConstraintType** | Enum | **행동 제약 유형.** (아래 설명 참조) • **Standard:** 이동 후 사격 가능. • **Heavy:** 이동 후 사격 불가 (고정 사격). |
-|  | **EndsTurn** | bool | **턴 강제 종료 여부.**  • **True:** 사격 시 즉시 턴 종료 (소총, 저격총). • **False:** 사격 후에도 잔여 AP로 행동 가능 (권총). |
+|  | **EndsTurn** | bool | **턴 강제 종료 여부.**  • **True:** 사격 시 즉시 턴 종료 (소총, 저격총). • **False:** 사격 후에도 행동 가능 (권총). |
 |  | **ActionModule** | AssetReference | **\[Logic\]** 공격 QTE 미니게임 로직 모듈. |
 
 ### **8.4. ArmorDataSO (방어구 데이터)**
@@ -1255,7 +1284,7 @@ RefundCost \= \[PurchaseCost × 0.3 \] 소수점 버림
 | :---- | :---- | :---- | :---- |
 | **표준형 (Standard)** | Constraint: Standard  EndsTurn: True | • **이동 → 사격:** 가능 (턴 종료) • **사격 → 이동:** 불가 | 돌격소총(Rifle), 산탄총(Shotgun) |
 | **중화기형 (Heavy)** | Constraint: Heavy  EndsTurn: True | • **이동 → 사격:** **불가** (이동 시 사격 비활성) • **사격 → 이동:** 불가 | 저격총(Sniper), 중기관총(MG) |
-| **경량형 (Light)** | Constraint: Standard  EndsTurn: False | • **이동 → 사격:** 가능 • **사격 → 이동:** **가능** (잔여 AP/이동력 사용) | 권총(Pistol), SMG |
+| **경량형 (Light)** | Constraint: Standard  EndsTurn: False | • **이동 → 사격:** 가능 • **사격 → 이동:** **가능**  | 권총(Pistol), SMG |
 
 ---
 

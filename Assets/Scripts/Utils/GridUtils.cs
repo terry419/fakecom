@@ -144,4 +144,19 @@ public static class GridUtils
     {
         return CELL_SIZE;
     }
+    public static Direction QuaternionToDirection(Quaternion rot)
+    {
+        // 로컬 Forward 벡터를 구함
+        Vector3 forward = rot * Vector3.forward;
+
+        // X축과 Z축 중 어느 쪽 성분이 더 큰지 비교하여 주축 결정
+        if (Mathf.Abs(forward.x) > Mathf.Abs(forward.z))
+        {
+            return forward.x > 0 ? Direction.East : Direction.West;
+        }
+        else
+        {
+            return forward.z > 0 ? Direction.North : Direction.South;
+        }
+    }
 }

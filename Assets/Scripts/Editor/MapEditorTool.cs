@@ -9,10 +9,7 @@ public class MapEditorTool : EditorWindow
     private MapEditorIO _io;
 
     [MenuItem("YCOM/Map Editor Tool")]
-    public static void ShowWindow()
-    {
-        GetWindow<MapEditorTool>("Map Editor");
-    }
+    public static void ShowWindow() { GetWindow<MapEditorTool>("Map Editor"); }
 
     private void OnEnable()
     {
@@ -26,6 +23,10 @@ public class MapEditorTool : EditorWindow
         _sceneInput.OnCreatePillarRequested += _action.HandleCreatePillar;
         _sceneInput.OnEraseTileRequested += _action.HandleEraseTile;
 
+        _sceneInput.OnCreatePortalRequested += OnRequestCreatePortal;
+        _sceneInput.OnCreateSpawnRequested += OnRequestCreateSpawn;
+        _sceneInput.OnRemoveMarkerRequested += _action.HandleRemoveMarker;
+
         SceneView.duringSceneGui += OnSceneGUI;
     }
 
@@ -38,90 +39,104 @@ public class MapEditorTool : EditorWindow
             _sceneInput.OnModifyEdgeRequested -= _action.HandleModifyEdge;
             _sceneInput.OnCreatePillarRequested -= _action.HandleCreatePillar;
             _sceneInput.OnEraseTileRequested -= _action.HandleEraseTile;
+            _sceneInput.OnCreatePortalRequested -= OnRequestCreatePortal;
+            _sceneInput.OnCreateSpawnRequested -= OnRequestCreateSpawn;
+            _sceneInput.OnRemoveMarkerRequested -= _action.HandleRemoveMarker;
         }
+    }
+
+    private void OnRequestCreatePortal(GridCoords coords)
+    {
+        _action.HandleCreatePortal(coords, _context.SelectedPortalType, _context.CurrentPortalID, _context.CurrentPortalFacing);
+    }
+
+    private void OnRequestCreateSpawn(GridCoords coords)
+    {
+        _action.HandleCreateSpawn(coords, _context.SelectedSpawnType, _context.CurrentSpawnRoleTag);
     }
 
     private void OnGUI()
     {
-        if (Application.isPlaying)
-        {
-            GUILayout.Label("Editor disabled during Play Mode", EditorStyles.boldLabel);
-            return;
-        }
-
+        if (Application.isPlaying) { GUILayout.Label("Editor disabled during Play Mode"); return; }
         if (_context == null) _context = MapEditorContext.Instance;
 
-        GUILayout.Label("Construction Settings", EditorStyles.boldLabel);
+        DrawCommonSettings();
+        GUILayout.Space(10);
 
-        // [Wiring] Registry만 남기고 Settings 삭제
+        _context.CurrentToolMode = (MapEditorContext.ToolMode)EditorGUILayout.EnumPopup("Editor Mode", _context.CurrentToolMode);
+        GUILayout.Space(5);
+
+        switch (_context.CurrentToolMode)
+        {
+            case MapEditorContext.ToolMode.Tile: DrawTileUI(); break;
+            case MapEditorContext.ToolMode.Edge: DrawEdgeUI(); break;
+            case MapEditorContext.ToolMode.Pillar: DrawPillarUI(); break;
+            case MapEditorContext.ToolMode.Portal: DrawPortalUI(); break;
+            case MapEditorContext.ToolMode.Spawn: DrawSpawnUI(); break;
+            case MapEditorContext.ToolMode.Erase:
+                EditorGUILayout.HelpBox("Click to erase Tile & Marker.", MessageType.Info);
+                break;
+        }
+
+        GUILayout.FlexibleSpace();
+        DrawIOSettings();
+    }
+
+    private void DrawCommonSettings()
+    {
+        GUILayout.Label("Global Settings", EditorStyles.boldLabel);
         _context.Registry = (TileRegistrySO)EditorGUILayout.ObjectField("Tile Registry", _context.Registry, typeof(TileRegistrySO), false);
+        if (_context.Registry == null) EditorGUILayout.HelpBox("Registry Missing!", MessageType.Error);
 
-        if (_context.Registry == null)
-        {
-            EditorGUILayout.HelpBox("Please assign Tile Registry!", MessageType.Error);
-        }
-
-        // Max Level 설정
-        int maxLevel = 5;
-        if (_context.TargetMapData != null)
-        {
-            Undo.RecordObject(_context.TargetMapData, "Change Max Level");
-            _context.TargetMapData.MaxLevel = EditorGUILayout.IntField("Map Max Level", _context.TargetMapData.MaxLevel);
-            maxLevel = _context.TargetMapData.MaxLevel;
-        }
-
-        // Current Level 슬라이더
-        EditorGUI.BeginChangeCheck();
+        int maxLevel = (_context.TargetMapData != null) ? _context.TargetMapData.MaxLevel : 5;
         _context.CurrentLevel = EditorGUILayout.IntSlider("Current Level (Y)", _context.CurrentLevel, 0, maxLevel);
-        if (EditorGUI.EndChangeCheck())
+    }
+
+    private void DrawTileUI() { _context.SelectedFloorType = (FloorType)EditorGUILayout.EnumPopup("Floor Type", _context.SelectedFloorType); }
+    private void DrawEdgeUI() { _context.SelectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Edge Type", _context.SelectedEdgeType); }
+    private void DrawPillarUI() { _context.SelectedPillarType = (PillarType)EditorGUILayout.EnumPopup("Pillar Type", _context.SelectedPillarType); }
+
+    private void DrawPortalUI()
+    {
+        EditorGUILayout.BeginVertical("box");
+        GUILayout.Label("Portal Settings", EditorStyles.boldLabel);
+        _context.SelectedPortalType = (PortalType)EditorGUILayout.EnumPopup("Portal Type", _context.SelectedPortalType);
+        _context.CurrentPortalID = EditorGUILayout.TextField("Link ID", _context.CurrentPortalID);
+        if (_context.SelectedPortalType == PortalType.Out)
+            _context.CurrentPortalFacing = (Direction)EditorGUILayout.EnumPopup("Exit Facing", _context.CurrentPortalFacing);
+        EditorGUILayout.Space();
+        EditorGUILayout.HelpBox("Click: Create Portal\nAlt+Click: Remove", MessageType.Info);
+        EditorGUILayout.EndVertical();
+    }
+
+    private void DrawSpawnUI()
+    {
+        EditorGUILayout.BeginVertical("box");
+        GUILayout.Label("Spawn Settings", EditorStyles.boldLabel);
+
+        _context.SelectedSpawnType = (MarkerType)EditorGUILayout.EnumPopup("Spawn Type", _context.SelectedSpawnType);
+
+        // [Fix] CS0117 오류 해결: MarkerType.Portal_In 등은 삭제되었으므로, 
+        // MarkerType이 Portal인 경우 강제로 PlayerSpawn으로 돌려놓는 안전장치 수정
+        if (_context.SelectedSpawnType == MarkerType.Portal)
         {
-            SceneView.RepaintAll();
+            _context.SelectedSpawnType = MarkerType.PlayerSpawn;
         }
+
+        _context.CurrentSpawnRoleTag = EditorGUILayout.TextField("Role Tag", _context.CurrentSpawnRoleTag);
 
         EditorGUILayout.Space();
+        EditorGUILayout.HelpBox("Click: Create Spawn\nAlt+Click: Remove", MessageType.Info);
+        EditorGUILayout.EndVertical();
+    }
 
-        // 툴 모드 선택
-        _context.CurrentToolMode = (MapEditorContext.ToolMode)EditorGUILayout.EnumPopup("Mode", _context.CurrentToolMode);
-
-        if (_context.CurrentToolMode == MapEditorContext.ToolMode.Tile)
-        {
-            _context.SelectedFloorType = (FloorType)EditorGUILayout.EnumPopup("Floor Type", _context.SelectedFloorType);
-        }
-        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
-        {
-            _context.SelectedEdgeType = (EdgeType)EditorGUILayout.EnumPopup("Edge Type", _context.SelectedEdgeType);
-        }
-        else if (_context.CurrentToolMode == MapEditorContext.ToolMode.Pillar)
-        {
-            _context.SelectedPillarType = (PillarType)EditorGUILayout.EnumPopup("Pillar Type", _context.SelectedPillarType);
-        }
-
-        EditorGUILayout.Space();
+    private void DrawIOSettings()
+    {
         GUILayout.Label("Map Data IO", EditorStyles.boldLabel);
-
-        EditorGUI.BeginChangeCheck();
         _context.TargetMapData = (MapDataSO)EditorGUILayout.ObjectField("Target Map Data", _context.TargetMapData, typeof(MapDataSO), false);
-        if (EditorGUI.EndChangeCheck())
-        {
-            Repaint();
-        }
-
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Load Data to Scene"))
-        {
-            if (_context.TargetMapData != null && _context.Registry != null)
-                _action.LoadMapFromData(_context.TargetMapData);
-            else
-                Debug.LogError("TargetMapData or Registry is missing!");
-        }
-
-        if (GUILayout.Button("Save Scene to Data"))
-        {
-            if (_context.TargetMapData != null)
-                _io.SaveMap();
-            else
-                Debug.LogError("TargetMapData is missing!");
-        }
+        if (GUILayout.Button("Load Data")) _action.LoadMapFromData(_context.TargetMapData);
+        if (GUILayout.Button("Save Data")) _io.SaveMap();
         GUILayout.EndHorizontal();
     }
 

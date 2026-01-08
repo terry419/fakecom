@@ -388,7 +388,7 @@ MonoBehaviour:
   _rangeCircleOffset: 0.8
   _verticalOffset: 0.12
   _initialPoolSize: 50
-  _zFightingOffset: 0.01
+  _zFightingOffset: 0.05
   _useRenderQueue: 1
 --- !u!1 &4524678035037519289
 GameObject:

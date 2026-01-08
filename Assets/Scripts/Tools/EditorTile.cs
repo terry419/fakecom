@@ -9,15 +9,21 @@ public class EditorTile : MonoBehaviour
 
     public SavedEdgeInfo[] Edges = new SavedEdgeInfo[4];
 
+    public PortalInfo PortalData;
+
     public void Initialize(GridCoords coords)
     {
         Coordinate = coords;
         // [Fix] Concrete -> Standard
         FloorID = FloorType.Standard;
         PillarID = PillarType.None;
+        PortalData = null;
 
-        if (Edges == null || Edges.Length != 4) Edges = new SavedEdgeInfo[4];
-        for (int i = 0; i < 4; i++) Edges[i] = SavedEdgeInfo.CreateOpen();
+        if (Edges == null || Edges.Length != 4)
+        {
+            Edges = new SavedEdgeInfo[4];
+            for (int i = 0; i < 4; i++) Edges[i] = SavedEdgeInfo.CreateOpen();
+        }
 
         SyncWithNeighboringWalls();
         UpdateName();

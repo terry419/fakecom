@@ -247,3 +247,6 @@ MonoBehaviour:
     Cover: 0
     MaxHP: 0
     CurrentHP: 0
+  PortalData:
+    Destinations: []
+    MovementCost: 1

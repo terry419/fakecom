@@ -11,8 +11,6 @@ public class Tile
     // ========================================================================
     public GridCoords Coordinate { get; private set; }
     public FloorType FloorID { get; private set; }
-
-    // [Fix] RoleTag 추가 (스폰 로직 필수)
     public string RoleTag { get; private set; }
 
     public PillarType InitialPillarID { get; private set; }
@@ -29,6 +27,9 @@ public class Tile
 
     public IReadOnlyList<ITileOccupant> Occupants => _occupants;
 
+    // [Data] 런타임 포탈 정보
+    public PortalInfo PortalData { get; private set; }
+
     // ========================================================================
     // 3. 캐싱된 상태
     // ========================================================================
@@ -39,14 +40,15 @@ public class Tile
     // ========================================================================
     // 4. 초기화 및 로드
     // ========================================================================
-
-    // [Fix] 생성자에 RoleTag 추가
     public Tile(GridCoords coords, FloorType floorID, PillarType pillarID, string roleTag = null)
     {
         Coordinate = coords;
         FloorID = floorID;
         InitialPillarID = pillarID;
         RoleTag = roleTag;
+
+        // 포탈 데이터 초기화
+        PortalData = null;
     }
 
     public void LoadFromSaveData(TileSaveData saveData)
@@ -57,10 +59,19 @@ public class Tile
         InitialPillarHP = saveData.CurrentPillarHP;
         RoleTag = saveData.RoleTag;
 
-        // [Fix] SaveData 우선 적용
         if (!string.IsNullOrEmpty(saveData.RoleTag))
         {
             RoleTag = saveData.RoleTag;
+        }
+
+        // [Load] 포탈 데이터 복제 (Deep Copy)
+        if (saveData.PortalData != null)
+        {
+            PortalData = saveData.PortalData.Clone();
+        }
+        else
+        {
+            PortalData = null;
         }
 
         if (saveData.Edges != null && saveData.Edges.Length == 4)
@@ -73,6 +84,18 @@ public class Tile
             for (int i = 0; i < 4; i++) TempSavedEdges[i] = SavedEdgeInfo.CreateOpen();
         }
         UpdateCache();
+    }
+
+    // ========================================================================
+    // 5. 헬퍼 메서드 (Helper Methods)
+    // ========================================================================
+
+    // [Fix] Pathfinder에서 호출하는 필수 메서드 추가
+    public bool HasActiveExits()
+    {
+        return PortalData != null &&
+               PortalData.Destinations != null &&
+               PortalData.Destinations.Count > 0;
     }
 
     public void SetSharedEdge(Direction dir, RuntimeEdge edge) => _edges[(int)dir] = edge;

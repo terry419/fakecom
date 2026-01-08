@@ -6,23 +6,35 @@ public class MapEditorContext : ScriptableObject
     private static MapEditorContext _instance;
     public static MapEditorContext Instance => _instance ??= CreateInstance<MapEditorContext>();
 
-    // [Wiring] Settings 삭제 -> Registry가 유일한 장부
     public TileRegistrySO Registry;
     public MapDataSO TargetMapData;
 
-    public enum ToolMode { Tile, Edge, Pillar, Erase }
+    // [Logic Check] 모드를 명확히 분리하여 로직 꼬임 방지
+    public enum ToolMode { Tile, Edge, Pillar, Portal, Spawn, Erase }
     public ToolMode CurrentToolMode = ToolMode.Tile;
 
     public int CurrentLevel = 0;
 
+    // 타일/벽/기둥 설정
     public FloorType SelectedFloorType = FloorType.Standard;
     public PillarType SelectedPillarType = PillarType.Standing;
     public EdgeType SelectedEdgeType = EdgeType.Wall;
 
+    // [New] 포탈 모드 전용 상태값
+    public PortalType SelectedPortalType = PortalType.In;
+    public string CurrentPortalID = "Gate_1";
+    public Direction CurrentPortalFacing = Direction.North; // Edge와 동일한 Direction Enum 사용
+
+    // [New] 스폰 모드 전용 상태값
+    public MarkerType SelectedSpawnType = MarkerType.PlayerSpawn;
+    public string CurrentSpawnRoleTag = "Spawn_1";
+
+    // 인터랙션 상태
     public GridCoords MouseGridCoords;
     public bool IsMouseOverGrid;
     public HighlightedEdgeInfo HighlightedEdge = new HighlightedEdgeInfo();
 
+    // --- 캐싱 시스템 (기존 로직 유지 - 성능 최적화) ---
     private Dictionary<GridCoords, EditorTile> _tileCache = new Dictionary<GridCoords, EditorTile>();
     private Dictionary<(GridCoords, Direction), EditorWall> _wallCache = new Dictionary<(GridCoords, Direction), EditorWall>();
     private bool _isCacheDirty = true;
@@ -39,18 +51,17 @@ public class MapEditorContext : ScriptableObject
         _tileCache.Clear();
         _wallCache.Clear();
 
+        // 씬 내의 타일/벽 오브젝트를 딕셔너리로 인덱싱 (O(1) 접근)
         var tiles = FindObjectsOfType<EditorTile>();
         foreach (var t in tiles)
         {
-            if (!_tileCache.ContainsKey(t.Coordinate))
-                _tileCache.Add(t.Coordinate, t);
+            if (!_tileCache.ContainsKey(t.Coordinate)) _tileCache.Add(t.Coordinate, t);
         }
 
         var walls = FindObjectsOfType<EditorWall>();
         foreach (var w in walls)
         {
-            if (!_wallCache.ContainsKey((w.Coordinate, w.Direction)))
-                _wallCache.Add((w.Coordinate, w.Direction), w);
+            if (!_wallCache.ContainsKey((w.Coordinate, w.Direction))) _wallCache.Add((w.Coordinate, w.Direction), w);
         }
 
         _isCacheDirty = false;
@@ -78,7 +89,9 @@ public class MapEditorContext : ScriptableObject
         public void Set(GridCoords t, Direction d, Vector3 p, bool v)
         {
             Tile = t;
-            Dir = d; WorldPos = p; IsValid = v;
+            Dir = d;
+            WorldPos = p;
+            IsValid = v;
         }
         public void SetInvalid() => IsValid = false;
     }

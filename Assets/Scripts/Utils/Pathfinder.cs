@@ -35,31 +35,56 @@ public static class Pathfinder
             int currentCost = _bfsCost[current];
             if (currentCost >= mobility) continue;
 
+            Tile currentTile = map.GetTile(current);
+
+            // A. 일반 인접 이동 (상하좌우)
             for (int i = 0; i < _directions.Length; i++)
             {
-                // BFS를 수행하고 Walkable을 탐색
                 if (!IsValidMove(current, _directions[i], map, out GridCoords next, ignoreWalkability: false)) continue;
 
                 int newCost = currentCost + 1;
-                if (newCost <= mobility)
+                ProcessNeighbor(next, newCost, mobility, results);
+            }
+
+            // B. [New] 포탈 이동 체크
+            // 현재 타일이 포탈이고, 유효한 출구가 있다면 그곳도 이웃으로 간주
+            if (currentTile != null && currentTile.HasActiveExits())
+            {
+                GridCoords? portalExit = GetValidPortalExit(currentTile, map);
+                if (portalExit.HasValue)
                 {
-                    if (!_bfsCost.ContainsKey(next) || newCost < _bfsCost[next])
-                    {
-                        _bfsCost[next] = newCost;
-                        results.Add(next);
-                        _bfsQueue.Enqueue(next);
-                    }
+                    // 포탈 이동 비용 적용 (기본 1, 데이터에 따라 다름)
+                    int moveCost = currentTile.PortalData.MovementCost;
+                    int newCost = currentCost + moveCost;
+                    ProcessNeighbor(portalExit.Value, newCost, mobility, results);
                 }
             }
         }
         return results;
     }
 
-    // 2. Find Path (A*) - [수정됨] 단일 함수 사용하고 GetNeighbor 재사용
+    // BFS 중복 코드 분리
+    private static void ProcessNeighbor(GridCoords next, int newCost, int mobility, HashSet<GridCoords> results)
+    {
+        if (newCost <= mobility)
+        {
+            if (!_bfsCost.ContainsKey(next) || newCost < _bfsCost[next])
+            {
+                _bfsCost[next] = newCost;
+                results.Add(next);
+                _bfsQueue.Enqueue(next);
+            }
+        }
+    }
+
+    // 2. Find Path (A*)
     public static List<GridCoords> FindPath(GridCoords start, GridCoords end, MapManager map)
     {
         if (start.Equals(end)) return new List<GridCoords>();
-        if (start.y != end.y) return null;
+
+        // [Fix] 3D 이동을 위해 Y축 제한 해제
+        // if (start.y != end.y) return null; 
+
         if (map == null) return null;
 
         _astarFrontier.Clear();
@@ -82,25 +107,32 @@ public static class Pathfinder
                 break;
             }
 
+            Tile currentTile = map.GetTile(current);
+
+            // A. 일반 인접 이동
             for (int i = 0; i < _directions.Length; i++)
             {
                 Direction dir = _directions[i];
-
-                // [수정됨] GridUtils.TryGetNeighbor -> GridUtils.GetNeighbor로 변경
-                // 인접 좌표만 얻어옴 (Walkable 체크는 IsValidMove 내부에서 map.GetTile을 통해 처리)
                 GridCoords nextCheck = GridUtils.GetNeighbor(current, dir);
                 bool isDestination = nextCheck.Equals(end);
 
-                // 목적지 타일이면 Walkable 검사 스킵 (ignoreWalkability: true)
                 if (!IsValidMove(current, dir, map, out GridCoords next, ignoreWalkability: isDestination)) continue;
 
                 int newCost = _astarCostSoFar[current] + 1;
-                if (!_astarCostSoFar.ContainsKey(next) || newCost < _astarCostSoFar[next])
+                ProcessAStarNeighbor(current, next, newCost, end);
+            }
+
+            // B. [New] 포탈 이동 (BFS와 동일 로직)
+            if (currentTile != null && currentTile.HasActiveExits())
+            {
+                GridCoords? portalExit = GetValidPortalExit(currentTile, map);
+                if (portalExit.HasValue)
                 {
-                    _astarCostSoFar[next] = newCost;
-                    int priority = newCost + GetHeuristic(next, end);
-                    _astarFrontier.Enqueue(next, priority);
-                    _astarCameFrom[next] = current;
+                    GridCoords next = portalExit.Value;
+                    int moveCost = currentTile.PortalData.MovementCost;
+                    int newCost = _astarCostSoFar[current] + moveCost;
+
+                    ProcessAStarNeighbor(current, next, newCost, end);
                 }
             }
         }
@@ -108,7 +140,48 @@ public static class Pathfinder
         return found ? RetracePath(_astarCameFrom, start, end) : null;
     }
 
-    // 3. Helper
+    private static void ProcessAStarNeighbor(GridCoords current, GridCoords next, int newCost, GridCoords end)
+    {
+        if (!_astarCostSoFar.ContainsKey(next) || newCost < _astarCostSoFar[next])
+        {
+            _astarCostSoFar[next] = newCost;
+            int priority = newCost + GetHeuristic(next, end);
+            _astarFrontier.Enqueue(next, priority);
+            _astarCameFrom[next] = current;
+        }
+    }
+
+    // 3. Helper Logic
+
+    /// <summary>
+    /// [New] 포탈의 목적지 후보들을 순회하며 실제 이동 가능한 첫 번째 좌표를 반환합니다.
+    /// </summary>
+    private static GridCoords? GetValidPortalExit(Tile tile, MapManager map)
+    {
+        if (tile.PortalData == null || tile.PortalData.Destinations == null) return null;
+
+        // [Fix] foreach 타입 추론 (PortalDestination)
+        foreach (var destEntry in tile.PortalData.Destinations)
+        {
+            // 구조체에서 좌표 추출
+            GridCoords target = destEntry.Coordinate;
+
+            // 1. 맵 범위 및 타일 존재 확인
+            if (!map.HasTile(target)) continue;
+
+            // 2. 유닛 점유 확인
+            if (map.HasUnit(target)) continue;
+
+            // 3. 타일 Walkable 확인
+            Tile destTile = map.GetTile(target);
+            if (destTile != null && destTile.IsWalkable)
+            {
+                return target; // 유효한 좌표 반환
+            }
+        }
+
+        return null;
+    }
     private static bool IsValidMove(GridCoords current, Direction dir, MapManager map, out GridCoords nextCoords, bool ignoreWalkability = false)
     {
         nextCoords = GridUtils.GetNeighbor(current, dir);
@@ -120,7 +193,7 @@ public static class Pathfinder
         Tile currentTile = map.GetTile(current);
         if (currentTile != null && currentTile.IsPathBlockedByEdge(dir)) return false;
 
-        // 2. 다음 타일 Walkable 여부 (ignoreWalkability가 true면 무시함)
+        // 2. 다음 타일 Walkable 여부
         if (!ignoreWalkability && !nextTile.IsWalkable) return false;
 
         // 3. 다음 타일의 에지 체크
@@ -132,17 +205,37 @@ public static class Pathfinder
 
     private static int GetHeuristic(GridCoords a, GridCoords b)
     {
-        return Math.Abs(a.x - b.x) + Math.Abs(a.z - b.z);
+        // [Fix] 3D 맨해튼 거리 (Y축 추가)
+        return Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y) + Math.Abs(a.z - b.z);
     }
 
     private static List<GridCoords> RetracePath(Dictionary<GridCoords, GridCoords> cameFrom, GridCoords start, GridCoords end)
     {
         var path = new List<GridCoords>();
         GridCoords current = end;
+
+        // 안전장치: 경로가 끊겨있을 경우 무한루프 방지
+        int safetyCount = 0;
+        int maxDepth = 1000;
+
         while (!current.Equals(start))
         {
             path.Add(current);
+
+            if (!cameFrom.ContainsKey(current))
+            {
+                // 경로 추적 실패 (버그 상황)
+                Debug.LogError($"Path retrace failed. No history for {current}");
+                return new List<GridCoords>();
+            }
+
             current = cameFrom[current];
+
+            if (++safetyCount > maxDepth)
+            {
+                Debug.LogError("Path retrace Infinite Loop Detected!");
+                break;
+            }
         }
         path.Reverse();
         return path;

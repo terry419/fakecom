@@ -1,4 +1,3 @@
-// 파일: Assets/Scripts/Data/Map/MapDataSO.cs
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +17,9 @@ public class MapDataSO : ScriptableObject
     [Header("2. Tile Data")]
     public List<TileSaveData> Tiles = new List<TileSaveData>();
 
+    // [New] 맵에 존재하는 유효한 ID 목록 (에디터 저장 시 자동 갱신)
+    public List<string> ValidRoleTags = new List<string>();
+
     // [Deprecated] SpawnPoints는 더 이상 사용하지 않음 (RoleTag로 대체)
     [HideInInspector]
     public List<SpawnPointData> SpawnPoints;
@@ -35,7 +37,7 @@ public class MapDataSO : ScriptableObject
             return false;
         }
 
-        // [New] RoleTag 중복 검증 필수
+        // [New] RoleTag 중복 검증 필수 (MapDataSO의 책임)
         var roleTagSet = new HashSet<string>();
         foreach (var tile in Tiles)
         {
@@ -64,7 +66,7 @@ public class MapDataSO : ScriptableObject
         {
             if (tile.RoleTag == roleTag)
             {
-                // [주석 명확화] GridCoords는 3D (x, y, z)인데, y는 높이이므로 무시하고 xz 평면 좌표만 사용
+                // GridCoords(x, z, y)에서 x, z만 추출하여 2D 좌표로 반환
                 coordinate = new Vector2Int(tile.Coords.x, tile.Coords.z);
                 return true;
             }
