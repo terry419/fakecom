@@ -1,6 +1,6 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
-using System; // Action 이벤트를 위해 추가
+using System;
 using System.Threading;
 
 public class AttackAction : BaseAction
@@ -8,7 +8,6 @@ public class AttackAction : BaseAction
     private MapManager _mapManager;
     private CombatManager _combatManager;
 
-    // [변경] PathVisualizer 제거 -> 이벤트 정의
     public event Action<Vector3, int> OnShowRange;
     public event Action OnHideRange;
 
@@ -17,7 +16,6 @@ public class AttackAction : BaseAction
         base.Initialize(unit);
         _mapManager = ServiceLocator.Get<MapManager>();
         _combatManager = ServiceLocator.Get<CombatManager>();
-        // _pathVisualizer 제거됨
     }
 
     public override string GetActionName() => "Attack";
@@ -31,26 +29,20 @@ public class AttackAction : BaseAction
     public override void OnSelect()
     {
         base.OnSelect();
-        // [변경] 이벤트 발송
         OnShowRange?.Invoke(_unit.transform.position, GetWeaponRange());
     }
 
     public override void OnExit()
     {
         base.OnExit();
-        // [변경] 이벤트 발송
         OnHideRange?.Invoke();
     }
 
     public override bool CanExecute(GridCoords targetCoords = default)
     {
         if (State == ActionState.Disabled || State == ActionState.Running) return false;
-
-        // [SSOT] Bridge Property 사용
         if (_unit.HasAttacked) return false;
-
-        if (_unit.ClassType == ClassType.Sniper && _unit.HasStartedMoving)
-            return false;
+        if (_unit.ClassType == ClassType.Sniper && _unit.HasStartedMoving) return false;
 
         if (targetCoords != default)
         {
@@ -66,9 +58,7 @@ public class AttackAction : BaseAction
         if (!string.IsNullOrEmpty(baseReason)) return baseReason;
 
         if (_unit.HasAttacked) return "Already Attacked";
-
-        if (_unit.ClassType == ClassType.Sniper && _unit.HasStartedMoving)
-            return "Cannot fire after moving";
+        if (_unit.ClassType == ClassType.Sniper && _unit.HasStartedMoving) return "Cannot fire after moving";
 
         if (targetCoords != default)
         {
@@ -87,7 +77,6 @@ public class AttackAction : BaseAction
             return ActionExecutionResult.Fail(targetError);
         }
 
-        // [변경] 공격 시작 전 범위 표시 숨기기
         OnHideRange?.Invoke();
 
         Unit targetUnit = _mapManager.GetUnit(mouseGrid);
@@ -107,15 +96,31 @@ public class AttackAction : BaseAction
 
     private string GetTargetValidationResult(GridCoords targetCoords)
     {
+        // 1. 자기 자신 공격 불가 체크
         if (targetCoords.Equals(_unit.Coordinate)) return "Cannot attack yourself";
 
+        // 2. 사거리 계산 (성능 최적화 버전)
         int range = GetWeaponRange();
-        int distance = Mathf.Abs(_unit.Coordinate.x - targetCoords.x) + Mathf.Abs(_unit.Coordinate.z - targetCoords.z);
 
-        if (distance > range) return $"Out of Range ({distance}/{range})";
+        // x, z축 차이 계산
+        float dx = _unit.Coordinate.x - targetCoords.x;
+        float dz = _unit.Coordinate.z - targetCoords.z;
 
+        // 거리의 제곱 (x^2 + z^2) - Sqrt를 사용하지 않아 연산이 빠름
+        float sqrDistance = (dx * dx) + (dz * dz);
+
+        // 사거리의 제곱과 비교
+        if (sqrDistance > (range * range))
+        {
+            // 실제 거리 로그는 에러 발생 시에만 계산 (사용자 편의용)
+            float actualDistance = Mathf.Sqrt(sqrDistance);
+            return $"Out of Range ({actualDistance:F1}/{range})";
+        }
+
+        // 3. 타일 내 유닛 존재 여부 확인
         if (!_mapManager.HasUnit(targetCoords)) return "No Valid Target";
 
+        // 4. 피아식별 체크
         Unit target = _mapManager.GetUnit(targetCoords);
         if (target != null && target.Faction == _unit.Faction)
         {

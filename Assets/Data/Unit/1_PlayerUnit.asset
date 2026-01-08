@@ -27,13 +27,12 @@ MonoBehaviour:
     m_SubObjectType: 
     m_EditorAssetChanged: 0
   MaxHP: 100
-  MaxAP: 2
   Mobility: 5
   Agility: 8
   Range: 0
   Aim: 80
   Evasion: 10
-  CritChance: 5
+  CritChance: 0
   BaseSurvivalChance: 5
   BaseNeuralSync: 100
   BaseOverclockChance: 5

@@ -73,7 +73,8 @@ public class SceneInitializer : MonoBehaviour
             typeof(CameraController),
             typeof(TurnManager),
             typeof(BattleManager),
-              
+            typeof(DamageTextManager),
+
         };
 
         foreach (var managerType in initSequence)

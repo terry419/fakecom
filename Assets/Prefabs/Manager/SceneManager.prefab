@@ -617,9 +617,9 @@ MonoBehaviour:
     m_SubObjectType: 
     m_EditorAssetChanged: 0
   _defaultPoolSize: 20
-  _maxPoolSize: 100
-  _normalColor: {r: 1, g: 1, b: 1, a: 1}
-  _critColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  _maxPoolSize: 20
+  _normalColor: {r: 1, g: 0.8835707, b: 0, a: 1}
+  _critColor: {r: 1, g: 0.039559267, b: 0, a: 1}
   _missColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   _normalScale: 1
   _critScale: 1.5
