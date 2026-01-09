@@ -23,10 +23,11 @@ public class MapEditorContext : ScriptableObject
     // [New] 포탈 모드 전용 상태값
     public PortalType SelectedPortalType = PortalType.In;
     public string CurrentPortalID = "Gate_1";
-    public Direction CurrentPortalFacing = Direction.North; // Edge와 동일한 Direction Enum 사용
+    public Direction CurrentPortalFacing = Direction.North;
 
-    // [New] 스폰 모드 전용 상태값
-    public MarkerType SelectedSpawnType = MarkerType.PlayerSpawn;
+    // [Change] 스폰 모드 전용 상태값 (MarkerType -> SpawnType)
+    // 이제 여기서 Player인지 Enemy인지 선택합니다.
+    public SpawnType SelectedSpawnType = SpawnType.Player;
     public string CurrentSpawnRoleTag = "Spawn_1";
 
     // 인터랙션 상태
@@ -34,7 +35,7 @@ public class MapEditorContext : ScriptableObject
     public bool IsMouseOverGrid;
     public HighlightedEdgeInfo HighlightedEdge = new HighlightedEdgeInfo();
 
-    // --- 캐싱 시스템 (기존 로직 유지 - 성능 최적화) ---
+    // --- 캐싱 시스템 (기존 유지) ---
     private Dictionary<GridCoords, EditorTile> _tileCache = new Dictionary<GridCoords, EditorTile>();
     private Dictionary<(GridCoords, Direction), EditorWall> _wallCache = new Dictionary<(GridCoords, Direction), EditorWall>();
     private bool _isCacheDirty = true;
@@ -51,7 +52,6 @@ public class MapEditorContext : ScriptableObject
         _tileCache.Clear();
         _wallCache.Clear();
 
-        // 씬 내의 타일/벽 오브젝트를 딕셔너리로 인덱싱 (O(1) 접근)
         var tiles = FindObjectsOfType<EditorTile>();
         foreach (var t in tiles)
         {

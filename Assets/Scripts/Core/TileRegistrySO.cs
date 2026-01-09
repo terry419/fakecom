@@ -3,8 +3,27 @@ using System.Collections.Generic;
 using System.Linq;
 
 // ==================================================================================
-// 1. 데이터 구조체 정의
+// 1. 데이터 구조체 및 Enum 정의
 // ==================================================================================
+
+// [New] 마커의 최상위 카테고리 (계층 분리)
+public enum MarkerType
+{
+    Spawn,
+    Portal
+}
+
+// [New] 스폰의 하위 타입
+public enum SpawnType
+{
+    Player,
+    Enemy
+}
+
+public enum PortalType
+{
+    In, Out, Both
+}
 
 [System.Serializable]
 public struct FloorEntry
@@ -33,17 +52,12 @@ public struct EdgeEntry
     public bool IsPassable;
 }
 
-// [New] 스폰 프리팹 구조체 (누락되었던 부분 추가)
+// [Change] MarkerType -> SpawnType으로 변경
 [System.Serializable]
 public struct SpawnEntry
 {
-    public MarkerType Type; // PlayerSpawn or EnemySpawn
+    public SpawnType Type;
     public GameObject Prefab;
-}
-
-public enum PortalType
-{
-    In, Out, Both
 }
 
 [System.Serializable]
@@ -64,8 +78,6 @@ public class TileRegistrySO : ScriptableObject
     [Header("Pillars")] public List<PillarEntry> Pillars;
     [Header("Edges")] public List<EdgeEntry> Edges;
     [Header("Portals")] public List<PortalEntry> Portals;
-
-    // [Fix] 스폰 리스트 추가
     [Header("Spawns")] public List<SpawnEntry> Spawns;
 
     [Header("Editor Visuals")]
@@ -85,10 +97,12 @@ public class TileRegistrySO : ScriptableObject
     private Dictionary<PillarType, PillarEntry> _pillarCache;
     private Dictionary<EdgeType, EdgeEntry> _edgeCache;
     private bool _isDirty = true;
+
     private void OnEnable() => _isDirty = true;
 #if UNITY_EDITOR
     private void OnValidate() => _isDirty = true;
 #endif
+
     public void RebuildCache()
     {
         _floorCache = Floors?.ToDictionary(x => x.Type) ?? new Dictionary<FloorType, FloorEntry>();
@@ -96,9 +110,11 @@ public class TileRegistrySO : ScriptableObject
         _edgeCache = Edges?.ToDictionary(x => x.Type) ?? new Dictionary<EdgeType, EdgeEntry>();
         _isDirty = false;
     }
+
     public FloorEntry GetFloor(FloorType type) { if (_isDirty || _floorCache == null) RebuildCache(); return _floorCache.GetValueOrDefault(type); }
     public PillarEntry GetPillar(PillarType type) { if (_isDirty || _pillarCache == null) RebuildCache(); return _pillarCache.GetValueOrDefault(type); }
     public EdgeEntry GetEdge(EdgeType type) { if (_isDirty || _edgeCache == null) RebuildCache(); return _edgeCache.GetValueOrDefault(type); }
+
     public PortalEntry GetPortalPrefab(PortalType type)
     {
         if (Portals == null || Portals.Count == 0) return default;
@@ -106,8 +122,8 @@ public class TileRegistrySO : ScriptableObject
         return (entry.Prefab != null) ? entry : Portals[0];
     }
 
-    // [Fix] 스폰 프리팹 조회 메서드 구현 (Action 스크립트에서 호출함)
-    public GameObject GetSpawnPrefab(MarkerType type)
+    // [Change] MarkerType -> SpawnType 인자 변경
+    public GameObject GetSpawnPrefab(SpawnType type)
     {
         if (Spawns == null || Spawns.Count == 0) return null;
         var entry = Spawns.FirstOrDefault(s => s.Type == type);

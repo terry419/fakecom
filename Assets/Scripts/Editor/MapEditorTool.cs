@@ -52,6 +52,8 @@ public class MapEditorTool : EditorWindow
 
     private void OnRequestCreateSpawn(GridCoords coords)
     {
+        // [Note] MapEditorAction이 아직 수정되지 않았으므로 여기서 CS1503 오류가 날 수 있으나,
+        // MapEditorAction.HandleCreateSpawn의 인자를 SpawnType으로 바꾸면 해결됩니다.
         _action.HandleCreateSpawn(coords, _context.SelectedSpawnType, _context.CurrentSpawnRoleTag);
     }
 
@@ -62,7 +64,6 @@ public class MapEditorTool : EditorWindow
 
         DrawCommonSettings();
         GUILayout.Space(10);
-
         _context.CurrentToolMode = (MapEditorContext.ToolMode)EditorGUILayout.EnumPopup("Editor Mode", _context.CurrentToolMode);
         GUILayout.Space(5);
 
@@ -87,7 +88,6 @@ public class MapEditorTool : EditorWindow
         GUILayout.Label("Global Settings", EditorStyles.boldLabel);
         _context.Registry = (TileRegistrySO)EditorGUILayout.ObjectField("Tile Registry", _context.Registry, typeof(TileRegistrySO), false);
         if (_context.Registry == null) EditorGUILayout.HelpBox("Registry Missing!", MessageType.Error);
-
         int maxLevel = (_context.TargetMapData != null) ? _context.TargetMapData.MaxLevel : 5;
         _context.CurrentLevel = EditorGUILayout.IntSlider("Current Level (Y)", _context.CurrentLevel, 0, maxLevel);
     }
@@ -114,14 +114,11 @@ public class MapEditorTool : EditorWindow
         EditorGUILayout.BeginVertical("box");
         GUILayout.Label("Spawn Settings", EditorStyles.boldLabel);
 
-        _context.SelectedSpawnType = (MarkerType)EditorGUILayout.EnumPopup("Spawn Type", _context.SelectedSpawnType);
+        // [Fix] MarkerType -> SpawnType으로 캐스팅 변경
+        _context.SelectedSpawnType = (SpawnType)EditorGUILayout.EnumPopup("Spawn Type", _context.SelectedSpawnType);
 
-        // [Fix] CS0117 오류 해결: MarkerType.Portal_In 등은 삭제되었으므로, 
-        // MarkerType이 Portal인 경우 강제로 PlayerSpawn으로 돌려놓는 안전장치 수정
-        if (_context.SelectedSpawnType == MarkerType.Portal)
-        {
-            _context.SelectedSpawnType = MarkerType.PlayerSpawn;
-        }
+        // [Fix] 불필요한 MarkerType.Portal 체크 로직 삭제
+        // (SpawnType Enum에는 Player와 Enemy만 존재하므로 Portal이 선택될 일이 없음)
 
         _context.CurrentSpawnRoleTag = EditorGUILayout.TextField("Role Tag", _context.CurrentSpawnRoleTag);
 

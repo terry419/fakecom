@@ -17,18 +17,6 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: 6ccb2183ff5702a478a205188dec41cf
   m_SerializeEntries:
-  - m_GUID: 4b05f9c17bbbb6a4c9175252d32c46b9
-    m_Address: Floor_Concrete.asset
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - TileData
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 872ae3b85f0597948abca826b9d791a2
-    m_Address: Pillar_Concrete.asset
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - TileData
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ed91cb3fbf8279d46bc8844ce423a49f
     m_Address: Assets/SO/Tile/TileRegistry.asset
     m_ReadOnly: 0

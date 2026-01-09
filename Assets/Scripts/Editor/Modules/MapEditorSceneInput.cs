@@ -36,7 +36,7 @@ public class MapEditorSceneInput
         if (guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint) return;
 
         // 클릭 제어권 확보 (오브젝트 선택 방지)
-        if (_context.CurrentToolMode != MapEditorContext.ToolMode.Tile) // Tile 모드가 아닐 때도 동작하도록
+        if (_context.CurrentToolMode != MapEditorContext.ToolMode.Tile)
         {
             int controlID = GUIUtility.GetControlID(FocusType.Passive);
             HandleUtility.AddDefaultControl(controlID);
@@ -52,7 +52,7 @@ public class MapEditorSceneInput
             _context.MouseGridCoords.y = _context.CurrentLevel;
             _context.IsMouseOverGrid = true;
 
-            // Edge 모드일 때만 엣지 계산
+            // Edge 하이라이트 계산
             if (_context.CurrentToolMode == MapEditorContext.ToolMode.Edge)
                 CalculateHighlightedEdge(worldPos);
             else
@@ -78,7 +78,7 @@ public class MapEditorSceneInput
         Vector3 offset = mouseWorldPos - tileCenter;
 
         float threshold = GridUtils.CELL_SIZE * 0.35f;
-        // 중앙 부근이면 엣지 선택 안 함
+        // 중심부(타일 내부)라면 엣지 선택 안 함
         if (Mathf.Abs(offset.x) < threshold && Mathf.Abs(offset.z) < threshold)
         {
             _context.HighlightedEdge.SetInvalid();
@@ -118,20 +118,14 @@ public class MapEditorSceneInput
                 OnEraseTileRequested?.Invoke(_context.MouseGridCoords);
                 break;
 
-            // [New] Portal Mode Logic
             case MapEditorContext.ToolMode.Portal:
-                if (isAlt)
-                    OnRemoveMarkerRequested?.Invoke(_context.MouseGridCoords);
-                else
-                    OnCreatePortalRequested?.Invoke(_context.MouseGridCoords);
+                if (isAlt) OnRemoveMarkerRequested?.Invoke(_context.MouseGridCoords);
+                else OnCreatePortalRequested?.Invoke(_context.MouseGridCoords);
                 break;
 
-            // [New] Spawn Mode Logic
             case MapEditorContext.ToolMode.Spawn:
-                if (isAlt)
-                    OnRemoveMarkerRequested?.Invoke(_context.MouseGridCoords);
-                else
-                    OnCreateSpawnRequested?.Invoke(_context.MouseGridCoords);
+                if (isAlt) OnRemoveMarkerRequested?.Invoke(_context.MouseGridCoords);
+                else OnCreateSpawnRequested?.Invoke(_context.MouseGridCoords);
                 break;
         }
     }
@@ -142,17 +136,17 @@ public class MapEditorSceneInput
 
         Color c = Color.cyan; // Default
 
-        // 모드별 커서 색상 변경 (직관성 강화)
         switch (_context.CurrentToolMode)
         {
             case MapEditorContext.ToolMode.Pillar: c = Color.yellow; break;
             case MapEditorContext.ToolMode.Erase: c = Color.red; break;
             case MapEditorContext.ToolMode.Portal:
                 c = (_context.SelectedPortalType == PortalType.In) ? new Color(0.6f, 0, 1f) : Color.blue;
-                if (Event.current.alt) c = Color.red; // 삭제 모드일 땐 빨강
+                if (Event.current.alt) c = Color.red;
                 break;
             case MapEditorContext.ToolMode.Spawn:
-                c = (_context.SelectedSpawnType == MarkerType.PlayerSpawn) ? Color.green : new Color(1f, 0.5f, 0f);
+                // [Fix] MarkerType.PlayerSpawn -> SpawnType.Player 로 변경
+                c = (_context.SelectedSpawnType == SpawnType.Player) ? Color.green : new Color(1f, 0.5f, 0f);
                 if (Event.current.alt) c = Color.red;
                 break;
         }

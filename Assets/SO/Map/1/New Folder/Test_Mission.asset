@@ -35,11 +35,11 @@ MonoBehaviour:
     TimeLimit: 0
   PlayerConfig:
     SpawnSlots:
-    - RoleTag: Spawn_Player
+    - RoleTag: Spawn_P
     DefaultSquad:
     - {fileID: 11400000, guid: 0964b9e991755534c845512d39e3d106, type: 2}
   EnemySpawns:
-  - RoleTag: Spot_A
+  - RoleTag: Spawn_E
     UnitData: {fileID: 11400000, guid: 9d21199e9ddbfc047a905a9a87dc54b4, type: 2}
   NeutralSpawns: []
   Rewards: []

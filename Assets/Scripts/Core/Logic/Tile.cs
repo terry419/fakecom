@@ -11,6 +11,8 @@ public class Tile
     // ========================================================================
     public GridCoords Coordinate { get; private set; }
     public FloorType FloorID { get; private set; }
+
+    // [Fix] 복잡한 함정 로직 제거하고 원래대로 복구
     public string RoleTag { get; private set; }
 
     public PillarType InitialPillarID { get; private set; }
@@ -51,29 +53,38 @@ public class Tile
         PortalData = null;
     }
 
+    // [핵심 Fix] 외부에서 강제로 RoleTag를 주입할 수 있는 안전장치 메서드
+    public void ForceSetRoleTag(string tag)
+    {
+        RoleTag = tag;
+    }
+
     public void LoadFromSaveData(TileSaveData saveData)
     {
         Coordinate = saveData.Coords;
         FloorID = saveData.FloorID;
         InitialPillarID = saveData.PillarID;
         InitialPillarHP = saveData.CurrentPillarHP;
-        RoleTag = saveData.RoleTag;
 
+        // 1. RoleTag 로드 (빈 값 방지)
         if (!string.IsNullOrEmpty(saveData.RoleTag))
         {
             RoleTag = saveData.RoleTag;
         }
 
-        // [Load] 포탈 데이터 복제 (Deep Copy)
-        if (saveData.PortalData != null)
+        // [핵심 Fix] 유령 포탈 제거 로직
+        // PortalData가 null이 아니더라도, 내부의 LinkID가 비어있으면 "가짜/기본값"입니다.
+        // 따라서 ID가 유효한 경우에만 데이터를 복제합니다.
+        if (saveData.PortalData != null && !string.IsNullOrEmpty(saveData.PortalData.LinkID))
         {
             PortalData = saveData.PortalData.Clone();
         }
         else
         {
-            PortalData = null;
+            PortalData = null; // 가짜 데이터는 null로 밀어버림
         }
 
+        // 3. 엣지 데이터 로드
         if (saveData.Edges != null && saveData.Edges.Length == 4)
         {
             TempSavedEdges = saveData.Edges;
@@ -85,12 +96,10 @@ public class Tile
         }
         UpdateCache();
     }
-
     // ========================================================================
-    // 5. 헬퍼 메서드 (Helper Methods)
+    // 5. 헬퍼 메서드 (Helper Methods) - 원본 유지
     // ========================================================================
 
-    // [Fix] Pathfinder에서 호출하는 필수 메서드 추가
     public bool HasActiveExits()
     {
         return PortalData != null &&
@@ -158,7 +167,11 @@ public class Tile
     public bool IsPathBlockedByEdge(Direction dir)
     {
         var edge = GetEdge(dir);
-        if (edge == null) return false;
+        if (edge == null)
+        {
+            // Debug.LogWarning($"Tile {Coordinate}: GetEdge({dir})가 null을 반환했습니다. 에지 연결 실패!");
+            return false;
+        }
         return edge.IsBlocking;
     }
 }

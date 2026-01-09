@@ -248,5 +248,8 @@ MonoBehaviour:
     MaxHP: 0
     CurrentHP: 0
   PortalData:
+    Type: 0
+    LinkID: 
+    ExitFacing: 0
     Destinations: []
     MovementCost: 1

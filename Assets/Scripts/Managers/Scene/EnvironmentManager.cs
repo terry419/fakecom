@@ -7,6 +7,9 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
     private MapManager _mapManager;
     private TileDataManager _tileDataManager;
 
+    // [Fix] 포탈들을 묶어서 관리할 부모 트랜스폼
+    private Transform _portalParent;
+
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
     private void OnDestroy() => ServiceLocator.Unregister<EnvironmentManager>(ManagerScope.Scene);
 
@@ -25,14 +28,19 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
 
         Debug.Log("[EnvironmentManager] Start Building Features...");
 
-        // MapManager의 모든 타일 순회 (전수 조사)
+        // [Fix] 포탈 부모 생성 (씬 정리용)
+        if (_portalParent == null)
+        {
+            var go = new GameObject("Runtime_Portals");
+            go.transform.SetParent(this.transform);
+            _portalParent = go.transform;
+        }
+
         foreach (Tile tile in _mapManager.GetAllTiles())
         {
-            // 1. 기둥(Pillar) 처리
             ProcessPillar(tile);
-
-            // 2. 벽/창문 처리 (North, East 방향만 처리하여 중복 생성 방지)
             LinkEdgesForTile(tile);
+            ProcessPortal(tile);
         }
 
         Debug.Log("[EnvironmentManager] Build Complete.");
@@ -42,67 +50,66 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
     {
         if (tile.InitialPillarID == PillarType.None) return;
 
-        // [Fix CS0019] 데이터 유무 확인 및 null 체크 수행
         var pillarData = _tileDataManager.GetPillarData(tile.InitialPillarID);
+        float currentHP = (tile.InitialPillarHP > 0) ? tile.InitialPillarHP : pillarData.MaxHP;
 
-        // 유효성 체크 (Prefab 존재 여부 확인)
-        if (pillarData.Prefab == null)
-        {
-            Debug.LogError($"[EnvManager] Pillar Data missing/invalid for ID: {tile.InitialPillarID}");
-            return;
-        }
-
-        // 특정 좌표 디버깅: (18, 6, 0) 타일 로드 확인용
-        if (tile.Coordinate.x == 18 && tile.Coordinate.z == 6)
-        {
-            Debug.Log($"<color=green>[EnvManager] Creating Pillar at {tile.Coordinate}: {tile.InitialPillarID}</color>");
-        }
-
-        var pillarInfo = new PillarInfo(tile.InitialPillarID, pillarData.MaxHP, pillarData.MaxHP);
-        tile.AddOccupant(pillarInfo);
+        PillarInfo pillar = new PillarInfo(tile.InitialPillarID, pillarData.MaxHP, currentHP);
+        tile.AddOccupant(pillar);
     }
 
-    private void LinkEdgesForTile(Tile currentTile)
+    private void LinkEdgesForTile(Tile tile)
     {
-        GridCoords pos = currentTile.Coordinate;
+        GridCoords coords = tile.Coordinate;
 
-        // [Fix] GridCoords 좌표계 (x, z, y) 해석 기준 적용
+        // North (z + 1)
+        ProcessSingleEdge(tile, Direction.North, new GridCoords(coords.x, coords.z + 1, coords.y), Direction.South);
 
-        // 1. North Check (Z + 1 방향 확인)
-        // 2번째 인자가 z이므로 여기에 pos.z + 1 대입
-        GridCoords northPos = new GridCoords(pos.x, pos.z + 1, pos.y);
-
-        if (_mapManager.HasTile(northPos))
-        {
-            ProcessEdge(currentTile, Direction.North, northPos, Direction.South);
-        }
-
-        // 2. East Check (X + 1 방향 확인)
-        // 1번째 인자가 x이므로 여기에 pos.x + 1 대입
-        GridCoords eastPos = new GridCoords(pos.x + 1, pos.z, pos.y);
-
-        if (_mapManager.HasTile(eastPos))
-        {
-            ProcessEdge(currentTile, Direction.East, eastPos, Direction.West);
-        }
+        // East (x + 1)
+        ProcessSingleEdge(tile, Direction.East, new GridCoords(coords.x + 1, coords.z, coords.y), Direction.West);
     }
 
-    private void ProcessEdge(Tile currentTile, Direction currentDir, GridCoords neighborPos, Direction neighborDir)
+    private void ProcessSingleEdge(Tile currentTile, Direction currentDir, GridCoords neighborPos, Direction neighborDir)
     {
-        // 현재 타일의 저장된 Edge 정보 가져오기
         SavedEdgeInfo info = currentTile.TempSavedEdges[(int)currentDir];
 
-        // 런타임용 Edge 객체 생성
-        RuntimeEdge edge = new RuntimeEdge(info.Type, info.Cover, info.MaxHP, info.CurrentHP);
+        var edgeDataEntry = _tileDataManager.GetEdgeData(info.Type);
+        bool isPassable = edgeDataEntry.IsPassable;
 
-        // 현재 타일에 설정
+        RuntimeEdge edge = new RuntimeEdge(info.Type, info.Cover, info.MaxHP, info.CurrentHP, isPassable);
+
         currentTile.SetSharedEdge(currentDir, edge);
 
-        // 이웃 타일에도 동일한 Edge 공유 설정 (데이터 동기화)
         Tile neighbor = _mapManager.GetTile(neighborPos);
         if (neighbor != null)
         {
             neighbor.SetSharedEdge(neighborDir, edge);
+        }
+    }
+
+    // [Fix] 포탈 생성 로직 수정
+    private void ProcessPortal(Tile tile)
+    {
+        if (tile.PortalData == null) return;
+
+        // 1. GetRegistry() 대신 GetPortalPrefab() 사용 (CS1061 해결)
+        GameObject prefab = _tileDataManager.GetPortalPrefab(tile.PortalData.Type);
+        if (prefab == null) return;
+
+        Vector3 worldPos = GridUtils.GridToWorld(tile.Coordinate);
+        GameObject portalObj = Instantiate(prefab, worldPos, Quaternion.identity);
+
+        // 2. tile.GetTransform() 대신 _portalParent 사용 (CS1061 해결)
+        portalObj.transform.SetParent(_portalParent);
+
+        // Out 포탈 회전 처리
+        if (tile.PortalData.Type == PortalType.Out)
+        {
+            GridCoords dirCoords = GridUtils.GetDirectionVector(tile.PortalData.ExitFacing);
+            Vector3 lookDir = new Vector3(dirCoords.x, 0, dirCoords.z);
+            if (lookDir != Vector3.zero)
+            {
+                portalObj.transform.rotation = Quaternion.LookRotation(lookDir);
+            }
         }
     }
 
@@ -115,21 +122,20 @@ public class EnvironmentManager : MonoBehaviour, IInitializable
         if (edge != null && edge.Type != EdgeType.Open)
         {
             edge.TakeDamage(damage);
-            // 필요 시 파괴 효과나 사운드 추가 가능
         }
     }
+
     public void DamagePillarAt(GridCoords coords, float damage)
     {
         Tile tile = _mapManager.GetTile(coords);
         if (tile == null) return;
 
-        // 타일의 점유자들 중에서 PillarInfo를 찾아서 데미지 적용
-        foreach (var occupant in tile.Occupants)
+        var occupants = tile.Occupants;
+        for (int i = 0; i < occupants.Count; i++)
         {
-            if (occupant is PillarInfo pillar)
+            if (occupants[i] is PillarInfo pillar)
             {
                 pillar.TakeDamage(damage);
-                // 기둥은 타일당 하나라고 가정하고 찾으면 즉시 종료
                 break;
             }
         }

@@ -21,25 +21,32 @@ public struct PortalDestination
 [Serializable]
 public class PortalInfo
 {
-    // [Refactor] 목적지 정보에 '방향'을 포함하기 위해 구조체 변경
-    // 기존: List<GridCoords> -> 변경: List<PortalDestination>
+    // ========================================================================
+    // 1. 에디터 저장 데이터 (Static Data from Editor)
+    // ========================================================================
+    public PortalType Type;        // In, Out, Both
+    public string LinkID;          // 연결 식별자
+    public Direction ExitFacing;   // (Out인 경우) 나갈 때 바라볼 방향
+
+    // ========================================================================
+    // 2. 런타임 계산 데이터 (Runtime Data)
+    // ========================================================================
     public List<PortalDestination> Destinations = new List<PortalDestination>();
 
     public int MovementCost = 1;
 
-    // [Refactor] Clone 메서드도 변경된 구조에 맞춰 수정
     public PortalInfo Clone()
     {
         return new PortalInfo
         {
-            // 리스트 Deep Copy
-            Destinations = (this.Destinations != null) ? new List<PortalDestination>(this.Destinations) : new List<PortalDestination>(),
-            MovementCost = this.MovementCost
+            Type = this.Type,
+            LinkID = this.LinkID,
+            ExitFacing = this.ExitFacing,
+            MovementCost = this.MovementCost,
+            Destinations = (this.Destinations != null) ? new List<PortalDestination>(this.Destinations) : new List<PortalDestination>()
         };
     }
 }
-
-// ... (SavedEdgeInfo, TileSaveData, SpawnPointData 등 나머지 구조체는 기존 유지) ...
 
 [Serializable]
 public struct SavedEdgeInfo
@@ -74,12 +81,17 @@ public struct TileSaveData
     public GridCoords Coords;
     public FloorType FloorID;
     public PillarType PillarID;
+
+    // [Fix] 주석 해제: Tile.cs에서 참조 중이므로 반드시 필요함
     public float CurrentPillarHP;
+
+    public SpawnType SpawnType;
+
     public SavedEdgeInfo[] Edges;
 
     public string RoleTag;
 
-    // 포탈 데이터 (위에서 정의한 PortalInfo 사용)
+    // 포탈 데이터
     public PortalInfo PortalData;
 
     public void InitializeEdges()
@@ -89,10 +101,9 @@ public struct TileSaveData
     }
 }
 
-[Serializable]
+[System.Serializable]
 public struct SpawnPointData
 {
-    public Vector3 Position;
-    public TeamType Team;
-    public float YRotation;
+    public GridCoords Coordinate;
+    public string RoleTag;
 }

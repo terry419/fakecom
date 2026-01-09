@@ -10,7 +10,6 @@ public class TileDataManager : MonoBehaviour, IInitializable
 
     private bool _isInitialized = false;
 
-    // [중요] Global이 아니라 Scene 스코프로 등록해야 합니다.
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
 
     private void OnDestroy()
@@ -20,29 +19,26 @@ public class TileDataManager : MonoBehaviour, IInitializable
 
     public async UniTask Initialize(InitializationContext context)
     {
-        // 1. 미션(Context)에서 넘어온 타일셋이 있으면 최우선 적용 (Override)
         if (context.Registry != null)
         {
             _registry = context.Registry;
         }
 
-        // 2. 프리팹 할당도 없고, Context도 없으면 비상용 로드
         if (_registry == null)
         {
-            // 경로가 맞는지 확인 필요
             _registry = Resources.Load<TileRegistrySO>("Data/Map/TileRegistry");
         }
 
-        // 3. 그래도 없으면 에러
         if (_registry == null)
         {
             throw new BootstrapException(
                 "[TileDataManager] CRITICAL: TileRegistrySO가 연결되지 않았습니다.\n" +
-                "Action: Project 폴더의 TileDataManager 프리팹을 열고 인스펙터에 할당하거나 MapEntry의 BiomeRef를 확인하십시오.");
+                "1. GlobalSettings에 할당되었는지\n" +
+                "2. Resources/Data/Map/TileRegistry 경로에 파일이 있는지 확인하세요.");
         }
 
         _isInitialized = true;
-        // Debug.Log($"[TileDataManager] Initialized with Registry: {_registry.name}");
+        Debug.Log($"[TileDataManager] Initialized. Registry: {_registry.name}");
         await UniTask.CompletedTask;
     }
 
@@ -75,20 +71,12 @@ public class TileDataManager : MonoBehaviour, IInitializable
     public GameObject GetFloorPrefab(FloorType type)
     {
         var entry = GetFloorData(type);
-        if (type != FloorType.None && entry.Prefab == null)
-        {
-            // Debug.LogWarning($"[TileDataManager] Missing prefab for Floor: {type}");
-        }
         return entry.Prefab;
     }
 
     public GameObject GetPillarPrefab(PillarType type)
     {
         var entry = GetPillarData(type);
-        if (type != PillarType.None && entry.Prefab == null)
-        {
-            // Debug.LogWarning($"[TileDataManager] Missing prefab for Pillar: {type}");
-        }
         return entry.Prefab;
     }
 
@@ -97,4 +85,15 @@ public class TileDataManager : MonoBehaviour, IInitializable
         var entry = GetEdgeData(type);
         return entry.Prefab;
     }
+
+    // [Fix] EnvironmentManager에서 사용할 포탈 프리팹 조회 메서드 추가
+    public GameObject GetPortalPrefab(PortalType type)
+    {
+        if (!_isInitialized || _registry == null) return null;
+        // TileRegistrySO의 GetPortalPrefab은 PortalEntry를 반환하므로 .Prefab 접근
+        return _registry.GetPortalPrefab(type).Prefab;
+    }
+
+    // [Fix] 레지스트리 직접 접근이 필요하다면 사용 (Optional)
+    public TileRegistrySO GetRegistry() => _registry;
 }

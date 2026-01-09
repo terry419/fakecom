@@ -3,24 +3,20 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-// [Fix] MarkerType에 Portal 추가 (오류 CS0117 해결)
-public enum MarkerType
-{
-    PlayerSpawn,
-    EnemySpawn,
-    Portal
-}
+// [Fix] Enum 정의 삭제 (TileRegistrySO로 이동됨)
 
 [ExecuteInEditMode]
 public class EditorMarker : MonoBehaviour
 {
     [Header("Common Settings")]
-    // [Fix] 필드 추가 (오류 CS1061 해결)
-    public MarkerType MarkerCategory;
+    public MarkerType MarkerCategory; // Spawn or Portal
     public string ID;
 
+    [Header("Spawn Settings")]
+    // [New] 스폰 전용 하위 타입
+    public SpawnType SType;
+
     [Header("Portal Settings")]
-    // [Fix] 포탈 전용 필드 추가
     public PortalType PType;
     public Direction Facing = Direction.North;
 
@@ -56,7 +52,12 @@ public class EditorMarker : MonoBehaviour
         style.fontSize = 12;
 
         string info = $"{MarkerCategory}\nID: {ID}";
-        if (MarkerCategory == MarkerType.Portal) info += $"\n({PType}) -> {Facing}";
+
+        // [New] 카테고리에 따라 세부 정보 표시 분기
+        if (MarkerCategory == MarkerType.Portal)
+            info += $"\n({PType}) -> {Facing}";
+        else if (MarkerCategory == MarkerType.Spawn)
+            info += $"\n({SType})";
 
         Handles.Label(transform.position + Vector3.up * 0.8f, info, style);
 #endif
@@ -73,7 +74,7 @@ public class EditorMarker : MonoBehaviour
         var all = FindObjectsOfType<EditorMarker>();
         foreach (var m in all)
         {
-            // 같은 ID를 가진 출구와 연결
+            // 같은 ID를 가진 출구 포탈과 연결
             if (m != this && m.MarkerCategory == MarkerType.Portal && m.PType == PortalType.Out && m.ID == this.ID)
             {
                 Gizmos.color = Color.cyan;

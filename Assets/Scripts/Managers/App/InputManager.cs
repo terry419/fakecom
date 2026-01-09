@@ -75,15 +75,6 @@ public class InputManager : MonoBehaviour, IInitializable
             }
         };
 
-        _inputActions.Player.RightClick.performed += ctx => // 이름 수정 (RightClick -> Command)
-        {
-            if (_isInputActive && !_isPointerOverUI)
-            {
-                Vector2 mousePos = _inputActions.Player.Point.ReadValue<Vector2>();
-                OnCommandInput?.Invoke(mousePos);
-            }
-        };
-
         _inputActions.Player.TurnEnd.performed += _ => OnTurnEndInvoked?.Invoke();
         _inputActions.Player.Recenter.performed += _ => OnCameraRecenter?.Invoke();
     }

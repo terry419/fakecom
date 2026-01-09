@@ -9,7 +9,7 @@ public class MapEditorAction
     // 계층 구조 관리용 부모
     private Transform _tileParent;
     private Transform _edgeParent;
-    private Transform _markerParent; // [New] 마커 부모 추가
+    private Transform _markerParent;
 
     public MapEditorAction(MapEditorContext context)
     {
@@ -23,7 +23,6 @@ public class MapEditorAction
     public void HandleCreateTile(GridCoords coords)
     {
         if (_context.Registry == null) { Debug.LogError("Context에 Registry가 없습니다!"); return; }
-        // 이미 타일이 있으면 패스
         if (_context.GetTile(coords) != null) return;
 
         UpdateParentReferences();
@@ -31,7 +30,6 @@ public class MapEditorAction
         var floorEntry = _context.Registry.GetFloor(_context.SelectedFloorType);
         if (floorEntry.Prefab == null) return;
 
-        // 타일 생성
         GameObject newObj = (GameObject)PrefabUtility.InstantiatePrefab(floorEntry.Prefab, _tileParent);
         Undo.RegisterCreatedObjectUndo(newObj, "Create Tile");
 
@@ -43,7 +41,6 @@ public class MapEditorAction
         {
             editorTile.Initialize(coords);
             editorTile.FloorID = _context.SelectedFloorType;
-            // [Important] PortalData는 이제 사용하지 않으므로 null 처리
             editorTile.PortalData = null;
         }
 
@@ -52,20 +49,16 @@ public class MapEditorAction
 
     public void HandleEraseTile(GridCoords coords)
     {
-        // 1. 타일 삭제
         var tile = _context.GetTile(coords);
         if (tile != null) SafeDestroy(tile.gameObject);
 
-        // 2. 벽 삭제
         for (int i = 0; i < 4; i++)
         {
             var wall = _context.GetWall(coords, (Direction)i);
             if (wall != null) SafeDestroy(wall.gameObject);
         }
 
-        // 3. [New] 해당 위치의 마커도 함께 삭제 (바닥이 없으면 마커도 의미 없음)
         HandleRemoveMarker(coords);
-
         _context.InvalidateCache();
     }
 
@@ -75,7 +68,6 @@ public class MapEditorAction
     public void HandleCreatePillar(GridCoords coords)
     {
         var tile = _context.GetTile(coords);
-        // 타일 없으면 자동 생성
         if (tile == null)
         {
             HandleCreateTile(coords);
@@ -92,7 +84,7 @@ public class MapEditorAction
     }
 
     // ==================================================================================
-    // 3. [New] 마커 로직 (Marker Logic - Portal & Spawn)
+    // 3. 마커 로직 (Marker Logic - Portal & Spawn)
     // ==================================================================================
 
     // 포탈 생성
@@ -100,25 +92,21 @@ public class MapEditorAction
     {
         if (_context.Registry == null) return;
 
-        // 바닥 타일 보장
         EnsureBaseTile(coords);
-        // 기존 마커 제거 (중복 방지)
         HandleRemoveMarker(coords);
         UpdateParentReferences();
 
-        // 오브젝트 생성
         GameObject markerObj = new GameObject($"Portal_{pType}_{id}");
         SetupMarkerObject(markerObj, coords);
 
-        // 마커 컴포넌트 설정
         var marker = markerObj.AddComponent<EditorMarker>();
-        marker.MarkerCategory = MarkerType.Portal;
-        marker.PType = pType;
+        // [Fix] 계층 구조 반영
+        marker.MarkerCategory = MarkerType.Portal; // 상위 카테고리
+        marker.PType = pType;                      // 하위 타입
         marker.ID = id;
         marker.Facing = facing;
 
-        // 비주얼 생성 (Registry에서 Type 기반 조회)
-        // [Key Change] 수동 생성 코드가 사라지고 프리팹 인스턴스화로 대체됨
+        // 비주얼 생성
         var entry = _context.Registry.GetPortalPrefab(pType);
         if (entry.Prefab != null)
         {
@@ -126,19 +114,16 @@ public class MapEditorAction
             visual.transform.localPosition = Vector3.zero;
             visual.transform.localRotation = Quaternion.identity;
         }
-        else
-        {
-            Debug.LogWarning($"[MapEditorAction] No prefab found for PortalType: {pType}");
-        }
 
-        // Gizmo 색상 설정
+        // Gizmo 색상
         marker.GizmoColor = (pType == PortalType.In) ? _context.Registry.PortalInColor : _context.Registry.PortalOutColor;
 
         Undo.RegisterCreatedObjectUndo(markerObj, "Create Portal");
     }
 
     // 스폰 생성
-    public void HandleCreateSpawn(GridCoords coords, MarkerType sType, string roleTag)
+    // [Fix] 인자 타입 변경 (MarkerType -> SpawnType)
+    public void HandleCreateSpawn(GridCoords coords, SpawnType sType, string roleTag)
     {
         EnsureBaseTile(coords);
         HandleRemoveMarker(coords);
@@ -148,13 +133,14 @@ public class MapEditorAction
         SetupMarkerObject(markerObj, coords);
 
         var marker = markerObj.AddComponent<EditorMarker>();
-        marker.MarkerCategory = sType;
+        // [Fix] 계층 구조 반영
+        marker.MarkerCategory = MarkerType.Spawn; // 상위 카테고리
+        marker.SType = sType;                     // 하위 타입
         marker.ID = roleTag;
 
-        // [New] 스폰 비주얼(프리팹) 생성 로직 추가
         if (_context.Registry != null)
         {
-            // TileRegistrySO에 추가된 GetSpawnPrefab 사용
+            // [Fix] GetSpawnPrefab 호출 시 SpawnType 전달
             GameObject prefab = _context.Registry.GetSpawnPrefab(sType);
             if (prefab != null)
             {
@@ -164,16 +150,14 @@ public class MapEditorAction
             }
             else
             {
-                // 프리팹 없으면 디버깅용 캡슐
-                Debug.Log($"No prefab for {sType}, using default visual.");
                 var temp = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 temp.transform.SetParent(markerObj.transform);
                 temp.transform.localPosition = Vector3.up * 1f;
                 temp.transform.localScale = Vector3.one * 0.5f;
             }
 
-            // Gizmo 색상도 설정
-            marker.GizmoColor = (sType == MarkerType.PlayerSpawn) ?
+            // [Fix] 비교 구문 수정 (MarkerType.PlayerSpawn -> SpawnType.Player)
+            marker.GizmoColor = (sType == SpawnType.Player) ?
                 _context.Registry.PlayerSpawnColor : _context.Registry.EnemySpawnColor;
         }
 
@@ -183,7 +167,6 @@ public class MapEditorAction
     // 마커 삭제 (공통)
     public void HandleRemoveMarker(GridCoords coords)
     {
-        // 씬 전체 마커 검색 (성능 최적화가 필요하다면 추후 캐싱)
         var allMarkers = Object.FindObjectsOfType<EditorMarker>();
         foreach (var m in allMarkers)
         {
@@ -194,11 +177,9 @@ public class MapEditorAction
         }
     }
 
-    // 마커 위치 설정 헬퍼
     private void SetupMarkerObject(GameObject obj, GridCoords coords)
     {
         obj.transform.SetParent(_markerParent);
-        // 바닥과 겹치지 않게 살짝 위로
         obj.transform.position = GridUtils.GridToWorld(coords) + Vector3.up * 0.5f;
     }
 
@@ -214,6 +195,7 @@ public class MapEditorAction
 
         Undo.RecordObject(tile, "Modify Edge");
         tile.Edges[(int)dir] = newEdgeInfo;
+        Debug.Log($"[Action] Tile {coords}의 Edge[{dir}]에 Type '{newEdgeInfo.Type}' 설정 완료.");
         EditorUtility.SetDirty(tile);
 
         ReplaceEdgeVisuals(coords, dir, newEdgeInfo);
@@ -250,7 +232,7 @@ public class MapEditorAction
 
         foreach (var tileData in data.Tiles)
         {
-            // 1. 타일 생성
+            // 1. 타일 생성 (기존 코드)
             var floorEntry = _context.Registry.GetFloor(tileData.FloorID);
             if (floorEntry.Prefab == null) continue;
 
@@ -265,9 +247,7 @@ public class MapEditorAction
                 editorTile.Initialize(tileData.Coords);
                 editorTile.FloorID = tileData.FloorID;
                 editorTile.PillarID = tileData.PillarID;
-
-                // [Changed] 구식 PortalData 로드 로직 제거
-                editorTile.PortalData = null;
+                editorTile.PortalData = null; // 마커 로직에서 처리하므로 일단 null
 
                 if (tileData.Edges != null && tileData.Edges.Length == 4)
                     editorTile.Edges = (SavedEdgeInfo[])tileData.Edges.Clone();
@@ -280,7 +260,7 @@ public class MapEditorAction
                 if (editorTile.PillarID != PillarType.None) RebuildPillarVisual(editorTile);
             }
 
-            // 2. 벽면 생성
+            // 2. 벽면 생성 (기존 코드)
             for (int i = 0; i < 4; i++)
             {
                 if (editorTile == null) break;
@@ -290,6 +270,28 @@ public class MapEditorAction
                     CreateWallVisual(tileData.Coords, (Direction)i, edgeInfo);
                 }
             }
+
+            // ================================================================
+            // [Fix] 3. 마커 복원 로직 (여기가 없어서 리셋되었던 것임)
+            // ================================================================
+
+            // A. 스폰 복원
+            if (!string.IsNullOrEmpty(tileData.RoleTag))
+            {
+                // 저장된 SpawnType과 RoleTag를 이용해 마커 재생성
+                HandleCreateSpawn(tileData.Coords, tileData.SpawnType, tileData.RoleTag);
+            }
+
+            // B. 포탈 복원
+            if (tileData.PortalData != null && !string.IsNullOrEmpty(tileData.PortalData.LinkID))
+            {
+                HandleCreatePortal(
+                    tileData.Coords,
+                    tileData.PortalData.Type,
+                    tileData.PortalData.LinkID,
+                    tileData.PortalData.ExitFacing
+                );
+            }
         }
 
         Undo.CollapseUndoOperations(group);
@@ -297,7 +299,7 @@ public class MapEditorAction
         Debug.Log($"[MapEditor] 맵 로드 완료: {data.name}");
     }
 
-    // --- Visual Helpers (기존 기능 유지) ---
+    // --- Visual Helpers ---
 
     private void RebuildPillarVisual(EditorTile tile)
     {
@@ -402,7 +404,6 @@ public class MapEditorAction
     {
         if (_tileParent != null) for (int i = _tileParent.childCount - 1; i >= 0; i--) SafeDestroy(_tileParent.GetChild(i).gameObject);
         if (_edgeParent != null) for (int i = _edgeParent.childCount - 1; i >= 0; i--) SafeDestroy(_edgeParent.GetChild(i).gameObject);
-        // [New] 마커도 초기화
         if (_markerParent != null) for (int i = _markerParent.childCount - 1; i >= 0; i--) SafeDestroy(_markerParent.GetChild(i).gameObject);
 
         _context.InvalidateCache();

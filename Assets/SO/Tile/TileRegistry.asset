@@ -41,17 +41,22 @@ MonoBehaviour:
     Prefab: {fileID: 7892387242418326335, guid: 390d97d512254524d8a460dd0a0e7e6e, type: 3}
     MaxHP: 25
     DefaultCover: 0
-    IsPassable: 0
+    IsPassable: 1
   - Type: 4
     Prefab: {fileID: 2830432925599487230, guid: 5d77c99198af9224a8d1394137945824, type: 3}
     MaxHP: 25
     DefaultCover: 0
-    IsPassable: 0
+    IsPassable: 1
   Portals:
   - Type: 0
-    Prefab: {fileID: 8354126558350536518, guid: 78daae2efb051f1488165d79b8a812b1, type: 3}
+    Prefab: {fileID: 4858560454193061850, guid: 78daae2efb051f1488165d79b8a812b1, type: 3}
   - Type: 1
-    Prefab: {fileID: 8354126558350536518, guid: 646ef72dee530cb439b82fb60a8a1e94, type: 3}
+    Prefab: {fileID: 1217602425750861447, guid: 646ef72dee530cb439b82fb60a8a1e94, type: 3}
+  Spawns:
+  - Type: 0
+    Prefab: {fileID: 773406982911097683, guid: fd2fe14c48b469940b5d9c1958fc4d4c, type: 3}
+  - Type: 1
+    Prefab: {fileID: 1324576353595034041, guid: af3cd1b560e05734ebe2b1dfb29bf0c7, type: 3}
   HighlightMaterial: {fileID: 2100000, guid: 6bfc2b92c847a7d44b06fc5a7655c755, type: 2}
   GridColor: {r: 1, g: 1, b: 1, a: 1}
   PillarHighlightColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
