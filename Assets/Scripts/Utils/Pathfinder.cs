@@ -122,6 +122,25 @@ public static class Pathfinder
                 ProcessAStarNeighbor(current, next, newCost, end);
             }
 
+            if (currentTile != null)
+            {
+                // [Debug Log] 포탈 발견 시 상태 확인
+                if (currentTile.PortalData != null)
+                {
+                    int destCount = currentTile.PortalData.Destinations?.Count ?? 0;
+                    if (destCount == 0)
+                    {
+                        // 목적지가 없어서 이동 불가능한 상황
+                        Debug.LogWarning($"[Pathfinder] Portal Found at {current}, but Destination List is EMPTY! (LinkID: {currentTile.PortalData.LinkID})");
+                    }
+                    else
+                    {
+                        // 정상적으로 목적지가 있는 상황
+                        Debug.Log($"[Pathfinder] Portal Found at {current}. Destinations: {destCount}");
+                    }
+                }
+            }
+
             // B. [New] 포탈 이동 (BFS와 동일 로직)
             if (currentTile != null && currentTile.HasActiveExits())
             {

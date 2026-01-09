@@ -26,7 +26,7 @@ public class MapEditorIO
 
     public void SaveMap()
     {
-        // 1. 타겟 데이터 생성 또는 확보
+        // 1. 타겟 데이터 생성
         if (_context.TargetMapData == null)
         {
             string path = EditorUtility.SaveFilePanelInProject("Create New Map Data", "NewMapData", "asset", "Save Map Data SO");
@@ -41,21 +41,15 @@ public class MapEditorIO
 
         _context.RefreshCache();
         Undo.RecordObject(_context.TargetMapData, "Save Map Data");
-
         _context.TargetMapData.Tiles.Clear();
 
-        // 2. 맵에 존재하는 모든 요소 수집
+        // 2. 맵 요소 수집
         var allMarkers = Object.FindObjectsOfType<EditorMarker>();
         EditorTile[] allTiles = Object.FindObjectsOfType<EditorTile>();
 
-        if (allTiles.Length == 0)
-        {
-            Debug.LogWarning("[MapEditorIO] 저장할 타일이 없습니다.");
-            return;
-        }
+        if (allTiles.Length == 0) return;
 
-        // 3. [핵심] 맵의 경계(Grid Size) 자동 계산
-        // 이 부분이 있어야 MapManager가 타일 배열을 올바른 크기로 생성합니다.
+        // 3. 맵 경계 계산
         int minX = int.MaxValue, maxX = int.MinValue;
         int minZ = int.MaxValue, maxZ = int.MinValue;
         int minY = int.MaxValue, maxY = int.MinValue;
@@ -64,15 +58,12 @@ public class MapEditorIO
         {
             if (t.Coordinate.x < minX) minX = t.Coordinate.x;
             if (t.Coordinate.x > maxX) maxX = t.Coordinate.x;
-
             if (t.Coordinate.z < minZ) minZ = t.Coordinate.z;
             if (t.Coordinate.z > maxZ) maxZ = t.Coordinate.z;
-
             if (t.Coordinate.y < minY) minY = t.Coordinate.y;
             if (t.Coordinate.y > maxY) maxY = t.Coordinate.y;
         }
 
-        // 계산된 크기 적용
         _context.TargetMapData.GridSize = new Vector2Int(maxX - minX + 1, maxZ - minZ + 1);
         _context.TargetMapData.BasePosition = new Vector2Int(minX, minZ);
         _context.TargetMapData.MinLevel = minY;
@@ -87,13 +78,9 @@ public class MapEditorIO
             data.Coords = editorTile.Coordinate;
             data.FloorID = editorTile.FloorID;
             data.PillarID = editorTile.PillarID;
-
-            // [Fix] CS1061 오류 수정
-            // EditorTile에는 현재 체력 정보가 없으므로 0으로 저장합니다.
-            // (런타임 로드 시 0이면 자동으로 MaxHP로 초기화됩니다)
             data.CurrentPillarHP = 0f;
 
-            // 마커 정보 매칭 (Spawn, Portal)
+            // 마커 매칭
             EditorMarker marker = allMarkers.FirstOrDefault(m =>
                 IsCoordinateMatch(m.transform.position, editorTile.Coordinate));
 
@@ -112,6 +99,32 @@ public class MapEditorIO
                         LinkID = marker.ID,
                         ExitFacing = marker.Facing
                     };
+
+                    // =================================================================================
+                    // [핵심 Fix] 포탈 연결 로직 (Link Processing)
+                    // 같은 ID를 가진 다른 포탈(Out/Both)을 찾아서 목적지로 등록합니다.
+                    // =================================================================================
+                    if (marker.PType == PortalType.In || marker.PType == PortalType.Both)
+                    {
+                        // 1. 나(marker)와 ID가 같고, 내가 아닌 다른 마커들 찾기
+                        var targets = allMarkers.Where(m =>
+                            m.MarkerCategory == MarkerType.Portal &&
+                            m.ID == marker.ID &&
+                            m != marker).ToList();
+
+                        foreach (var target in targets)
+                        {
+                            // 2. 목적지가 될 수 있는 타입인지 확인 (Out or Both)
+                            if (target.PType == PortalType.Out || target.PType == PortalType.Both)
+                            {
+                                GridCoords targetCoords = GridUtils.WorldToGrid(target.transform.position);
+
+                                // 3. Destinations 리스트에 추가
+                                data.PortalData.Destinations.Add(new PortalDestination(targetCoords, target.Facing));
+                                Debug.Log($"[Link] Portal Linked: {data.Coords} -> {targetCoords} (ID: {marker.ID})");
+                            }
+                        }
+                    }
                 }
             }
             else
@@ -120,7 +133,6 @@ public class MapEditorIO
                 data.PortalData = null;
             }
 
-            // 엣지 정보 저장
             data.InitializeEdges();
             if (editorTile.Edges != null)
             {

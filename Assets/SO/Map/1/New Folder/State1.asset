@@ -19,7 +19,7 @@ MonoBehaviour:
   Tiles:
   - Coords:
       x: 4
-      z: 15
+      z: 16
       y: 0
     FloorID: 2
     PillarID: 0
@@ -42,7 +42,103 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    RoleTag: 
+    RoleTag: Spawn_P
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: Spawn_P
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: Spawn_P
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: Spawn_P
     PortalData:
       Type: 0
       LinkID: 
@@ -51,1132 +147,12 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 5
-      z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 21
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 21
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 21
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -2
-      z: 21
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -3
-      z: 21
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -3
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -3
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -3
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -3
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -2
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -2
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -2
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -2
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 20
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 19
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 1
-      LinkID: Gate_1
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 18
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 1
-      LinkID: Gate_1
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 17
-      y: 1
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 1
-      LinkID: Gate_1
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 20
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
       z: 15
       y: 0
     FloorID: 2
     PillarID: 0
     CurrentPillarHP: 0
-    SpawnType: 0
+    SpawnType: 1
     Edges:
     - Type: 0
       Cover: 0
@@ -1194,7 +170,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    RoleTag: 
+    RoleTag: Spawn_E
     PortalData:
       Type: 0
       LinkID: 
@@ -1202,12 +178,140 @@ MonoBehaviour:
       Destinations: []
       MovementCost: 1
   - Coords:
-      x: 0
+      x: 5
       z: 15
       y: 0
     FloorID: 2
     PillarID: 0
     CurrentPillarHP: 0
+    SpawnType: 1
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: Spawn_E
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 5
+      z: 15
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 1
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: Spawn_E
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 5
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 2
+      Cover: 1
+      MaxHP: 30
+      CurrentHP: 30
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 4
+      Cover: 1
+      MaxHP: 100
+      CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 3
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
     SpawnType: 0
     Edges:
     - Type: 0
@@ -1229,205 +333,75 @@ MonoBehaviour:
     RoleTag: 
     PortalData:
       Type: 0
-      LinkID: 
+      LinkID: Gate_1
       ExitFacing: 0
-      Destinations: []
+      Destinations:
+      - Coordinate:
+          x: 2
+          z: 17
+          y: 1
+        Facing: 0
+      - Coordinate:
+          x: 2
+          z: 18
+          y: 1
+        Facing: 0
+      - Coordinate:
+          x: 1
+          z: 17
+          y: 1
+        Facing: 0
       MovementCost: 1
   - Coords:
-      x: 0
+      x: 3
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: Gate_1
+      ExitFacing: 0
+      Destinations:
+      - Coordinate:
+          x: 2
+          z: 17
+          y: 1
+        Facing: 0
+      - Coordinate:
+          x: 2
+          z: 18
+          y: 1
+        Facing: 0
+      - Coordinate:
+          x: 1
+          z: 17
+          y: 1
+        Facing: 0
+      MovementCost: 1
+  - Coords:
+      x: 3
       z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: -1
-      z: 17
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 17
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 0
-      z: 20
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 20
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 20
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1459,39 +433,7 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 3
-      z: 20
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 4
-      z: 20
+      z: 15
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1523,7 +465,7 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 5
-      z: 20
+      z: 18
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1538,42 +480,10 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 5
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
+    - Type: 1
+      Cover: 2
+      MaxHP: 100
+      CurrentHP: 100
     - Type: 0
       Cover: 0
       MaxHP: 0
@@ -1587,134 +497,6 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 4
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 3
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 19
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
       z: 18
       y: 0
     FloorID: 2
@@ -1746,72 +528,8 @@ MonoBehaviour:
       Destinations: []
       MovementCost: 1
   - Coords:
-      x: 1
-      z: 17
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 1
-      z: 15
+      x: 3
+      z: 18
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1843,39 +561,7 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 2
-      z: 15
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 2
-      z: 16
+      z: 18
       y: 0
     FloorID: 2
     PillarID: 0
@@ -1939,166 +625,6 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 2
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 3
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 4
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 5
-      z: 18
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 1
-      Cover: 2
-      MaxHP: 100
-      CurrentHP: 100
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 3
-      z: 15
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: 
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 3
       z: 16
       y: 0
     FloorID: 2
@@ -2130,7 +656,103 @@ MonoBehaviour:
       Destinations: []
       MovementCost: 1
   - Coords:
-      x: 3
+      x: 2
+      z: 15
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 15
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
       z: 17
       y: 0
     FloorID: 2
@@ -2157,14 +779,782 @@ MonoBehaviour:
     RoleTag: 
     PortalData:
       Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 18
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 3
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 5
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 5
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 4
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 3
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 17
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 15
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 15
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 16
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 18
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 18
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 19
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 20
+      y: 0
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 1
       LinkID: Gate_1
       ExitFacing: 0
       Destinations: []
       MovementCost: 1
   - Coords:
-      x: 4
-      z: 17
-      y: 0
+      x: 2
+      z: 18
+      y: 1
     FloorID: 2
     PillarID: 0
     CurrentPillarHP: 0
@@ -2178,10 +1568,874 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    - Type: 4
-      Cover: 1
-      MaxHP: 100
-      CurrentHP: 100
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 1
+      LinkID: Gate_1
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 1
+      LinkID: Gate_1
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 1
+      LinkID: Gate_1
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 2
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -2
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -2
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -2
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -2
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -3
+      z: 17
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -3
+      z: 18
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -3
+      z: 20
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -3
+      z: 19
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -2
+      z: 21
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: -1
+      z: 21
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 0
+      z: 21
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    RoleTag: 
+    PortalData:
+      Type: 0
+      LinkID: 
+      ExitFacing: 0
+      Destinations: []
+      MovementCost: 1
+  - Coords:
+      x: 1
+      z: 21
+      y: 1
+    FloorID: 2
+    PillarID: 0
+    CurrentPillarHP: 0
+    SpawnType: 0
+    Edges:
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
     - Type: 0
       Cover: 0
       MaxHP: 0
@@ -2195,7 +2449,7 @@ MonoBehaviour:
       MovementCost: 1
   - Coords:
       x: 5
-      z: 17
+      z: 16
       y: 0
     FloorID: 2
     PillarID: 0
@@ -2214,10 +2468,10 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    - Type: 2
-      Cover: 1
-      MaxHP: 30
-      CurrentHP: 30
+    - Type: 0
+      Cover: 0
+      MaxHP: 0
+      CurrentHP: 0
     RoleTag: 
     PortalData:
       Type: 0
@@ -2226,104 +2480,8 @@ MonoBehaviour:
       Destinations: []
       MovementCost: 1
   - Coords:
-      x: 5
-      z: 15
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 1
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: Spawn_E
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 5
-      z: 15
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 1
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: Spawn_E
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 5
-      z: 15
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 1
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: Spawn_E
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
       x: 4
-      z: 16
+      z: 15
       y: 0
     FloorID: 2
     PillarID: 0
@@ -2346,71 +2504,7 @@ MonoBehaviour:
       Cover: 0
       MaxHP: 0
       CurrentHP: 0
-    RoleTag: Spawn_P
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 4
-      z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: Spawn_P
-    PortalData:
-      Type: 0
-      LinkID: 
-      ExitFacing: 0
-      Destinations: []
-      MovementCost: 1
-  - Coords:
-      x: 4
-      z: 16
-      y: 0
-    FloorID: 2
-    PillarID: 0
-    CurrentPillarHP: 0
-    SpawnType: 0
-    Edges:
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    - Type: 0
-      Cover: 0
-      MaxHP: 0
-      CurrentHP: 0
-    RoleTag: Spawn_P
+    RoleTag: 
     PortalData:
       Type: 0
       LinkID: 
