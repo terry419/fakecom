@@ -6,11 +6,13 @@ using YCOM.Utils;
 
 public class BootManager : MonoBehaviour
 {
+    // [New] Race Condition 방지용 정적 이벤트/프로퍼티
     public static event Action<bool> OnBootComplete;
+    public static bool IsBootComplete { get; private set; } = false;
+
     private StringBuilder _bootLog = new StringBuilder();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    // [Mod] 탐험 씬 테스트를 위해 자동 전투 진입을 끕니다.
     private const bool AUTO_START_SESSION = false;
 #else
     private const bool AUTO_START_SESSION = false;
@@ -22,9 +24,13 @@ public class BootManager : MonoBehaviour
     {
         _bootLog.Clear();
         _bootLog.AppendLine("[Boot Sequence Log]");
+        bool isSuccess = false; // 성공 여부 추적
 
         try
         {
+            // 초기화 시작 전 플래그 리셋
+            IsBootComplete = false;
+
             // 1. Global Systems
             _bootLog.AppendLine("1. Global Systems");
             await AppBootstrapper.EnsureGlobalSystems();
@@ -35,7 +41,7 @@ public class BootManager : MonoBehaviour
             _bootLog.AppendLine("   ✓ Initialized");
 
             // ----------------------------------------------------------------
-            // 1.5. Session Strategy
+            // 1.5. Session Strategy (기존 로직 유지)
             // ----------------------------------------------------------------
             _bootLog.AppendLine("\n1.5. Session");
 
@@ -47,13 +53,12 @@ public class BootManager : MonoBehaviour
                     if (!ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
                         throw new BootstrapException("CatalogManager not found.");
 
-                    // [Fix] int(1) -> MissionDifficulty.Normal (Enum)
+                    // [Fix] int(1) -> MissionDifficulty.Normal (Enum) 대응 필요 시 수정
                     if (!catalogMgr.TryGetRandomMissionByDifficulty(1, out MissionDataSO selectedMission))
                         throw new BootstrapException("No mission found for Difficulty 1.");
 
                     await gameManager.StartSessionAsync(selectedMission, false);
 
-                    // [Fix] MissionSettings -> Definition
                     _bootLog.AppendLine($"   ✓ Auto-started (Mission: {selectedMission.Definition.MissionName})");
                 }
                 catch (Exception ex)
@@ -71,7 +76,7 @@ public class BootManager : MonoBehaviour
 #endif
 
             // ----------------------------------------------------------------
-            // 2. Scene Systems
+            // 2. Scene Systems (기존 로직 유지 - 맵 로딩 포함)
             // ----------------------------------------------------------------
             var sceneInitializer = FindObjectOfType<SceneInitializer>();
             if (sceneInitializer != null)
@@ -90,8 +95,8 @@ public class BootManager : MonoBehaviour
                     {
                         try
                         {
-                            // [Fix] MissionSettings -> Definition
                             _bootLog.Append($"   - Loading Map ({currentMission.Definition.MissionName})...");
+                            // [Restore] 맵 데이터 비동기 로드 복구
                             loadedMapData = await MapDataLoader.LoadMapDataAsync(currentMission);
                             _bootLog.AppendLine(" OK");
                         }
@@ -103,7 +108,6 @@ public class BootManager : MonoBehaviour
                     }
                 }
 
-                // [Fix] MapCatalogManager -> MapCatalogSO
                 MapCatalogSO catalogSO = null;
                 if (ServiceLocator.TryGet(out MapCatalogManager catalogMgr))
                 {
@@ -135,7 +139,12 @@ public class BootManager : MonoBehaviour
             _bootLog.AppendLine("\n<color=green>✓ ALL SYSTEMS READY</color>");
             Debug.Log(_bootLog.ToString());
 
+            // [New] 부팅 완료 처리 (BattleManager 등에서 대기 가능하도록)
+            IsBootComplete = true;
             OnBootComplete?.Invoke(true);
+            isSuccess = true;
+
+            // 씬 전환 로직
             string currentSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
             if (currentSceneName == "BootScene" || currentSceneName == "Boot")
             {
@@ -146,14 +155,16 @@ public class BootManager : MonoBehaviour
             {
                 Debug.Log($"[BootManager] Boot Complete. Detected Test Mode in '{currentSceneName}'. Staying in current scene.");
             }
-
-            return true;
         }
         catch (Exception ex)
         {
             Debug.LogError($"<color=red>[BOOT FAILED]</color>\n{_bootLog}\n\nError: {ex.Message}\n{ex.StackTrace}");
+            IsBootComplete = false;
             OnBootComplete?.Invoke(false);
-            return false;
+            isSuccess = false;
         }
+
+        // [Fix CS0162] 모든 경로에서 도달 가능한 리턴
+        return isSuccess;
     }
 }

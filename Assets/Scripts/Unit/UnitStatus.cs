@@ -25,6 +25,30 @@ public class UnitStatus : MonoBehaviour
     public UnitCondition Condition { get => condition; set => condition = value; }
     [SerializeField] private UnitCondition condition = UnitCondition.Normal;
 
+    private void Start()
+    {
+        // TurnManager 찾아서 나를 등록해줘!
+        if (ServiceLocator.TryGet<TurnManager>(out var turnManager))
+        {
+            turnManager.RegisterUnit(this);
+        }
+        else
+        {
+            // 만약 못 찾으면 0.5초 뒤 재시도하는 코루틴 등을 쓸 수도 있지만,
+            // 보통은 TurnManager가 먼저 초기화되므로 바로 될 것입니다.
+            Debug.LogWarning($"[UnitStatus] Failed to register {name} to TurnManager.");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // 죽거나 파괴될 때 등록 해제
+        if (ServiceLocator.TryGet<TurnManager>(out var turnManager))
+        {
+            turnManager.UnregisterUnit(this);
+        }
+    }
+
     public float CurrentTS
     {
         get => TurnSystem != null ? TurnSystem.CurrentTS : 0f;
@@ -133,6 +157,7 @@ public class UnitStatus : MonoBehaviour
     public void OnTurnStart() => TurnSystem?.OnTurnStart();
     public float CalculateNextTurnPenalty() => TurnSystem != null ? TurnSystem.CalculateNextTurnPenalty() : 0f;
     public void AddDamagePenalty(float penalty) => TurnSystem?.AddDamagePenalty(penalty);
+    public void AddTurnPenalty(float penalty) => TurnSystem?.AddDamagePenalty(penalty);
     public bool CanPerformAction(int requiredMobility) => TurnSystem != null && TurnSystem.CanPerformAction(requiredMobility);
     public void ConsumeMobility(int amount) => TurnSystem?.ConsumeMobility(amount);
 

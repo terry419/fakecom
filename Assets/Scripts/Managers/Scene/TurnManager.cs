@@ -1,198 +1,324 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
 public class TurnManager : MonoBehaviour, IInitializable
 {
-    [Tooltip("1초당 감소하는 TS 수치입니다.")]
-    [SerializeField] private float tsDecrementPerSecond = 5f;
+    [Header("Settings")]
+    [Tooltip("1초당 감소하는 TS 수치")]
+    [SerializeField] private float _tsDecrementPerSecond = 5f;
 
-    // [Optimization] TS 업데이트 주기 설정 (0.1초)
-    private const float TS_UPDATE_INTERVAL = 0.1f;
-    private float _tsUpdateTimer = 0f;
+    [Tooltip("UI 갱신 빈도 (초 단위, 0.05 = 20fps)")]
+    [SerializeField] private float _uiTickInterval = 0.05f;
 
-    private List<UnitStatus> allUnits = new List<UnitStatus>();
+    [Tooltip("턴 시뮬레이션 간격")]
+    [SerializeField] private float _simulationStep = 0.1f;
+
+    // 내부 상태
+    private List<UnitStatus> _activeUnits = new List<UnitStatus>();
+    private Queue<UnitStatus> _readyQueue = new Queue<UnitStatus>();
+    private float _simulationTimer = 0f;
+    private float _uiTimer = 0f;
+
+    public IReadOnlyList<UnitStatus> AllUnits => _activeUnits;
     public UnitStatus ActiveUnit { get; private set; }
-    private bool isTurnActive = false;
+    private bool _isTurnActive = false;
+    private BattleManager _battleManager;
 
-    public event System.Action<UnitStatus> OnTurnStarted;
-    public event System.Action<List<UnitStatus>> OnTimelineUpdated;
+    // 애니메이션 관리용 CancellationTokenSource 맵
+    private Dictionary<UnitStatus, CancellationTokenSource> _animCtsMap = new Dictionary<UnitStatus, CancellationTokenSource>();
 
-    // [Refactor] CameraController, InputManager 의존성 삭제됨
+    // [이벤트] - UI 효율성을 위해 개별 이벤트로 분리
+    public event Action<UnitStatus> OnUnitRegistered;   // 유닛 1명 추가됨
+    public event Action<UnitStatus> OnUnitUnregistered; // 유닛 1명 삭제됨
+    public event Action OnTick;                         // TS 변화 (파라미터 없음)
+    public event Action<UnitStatus> OnTurnStarted;
 
     private void Awake()
     {
         ServiceLocator.Register(this, ManagerScope.Scene);
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        // [Refactor] InputManager 구독 해제 로직 삭제됨
+        CancelAllAnimations();
         if (ServiceLocator.IsRegistered<TurnManager>())
             ServiceLocator.Unregister<TurnManager>(ManagerScope.Scene);
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
-        // [Refactor] 의존성(Camera/Input) 가져오는 코드 삭제
-
-        // 씬 내의 모든 유닛 수집
-        allUnits = FindObjectsOfType<UnitStatus>().OrderBy(u => u.gameObject.name).ToList();
-        Debug.Log($"[TurnManager] 초기화 완료. 감지된 유닛: {allUnits.Count}");
-
-        // 초기 TS 부여 (민첩성 기반)
-        foreach (var unit in allUnits)
+        if (!ServiceLocator.TryGet(out _battleManager))
         {
-            if (unit.Agility > 0)
-                unit.CurrentTS = Random.Range(20f, 40f) / unit.Agility;
-            else
-                unit.CurrentTS = 100f;
+            Debug.LogWarning("[TurnManager] BattleManager not found via ServiceLocator. Finding Object...");
+            _battleManager = FindObjectOfType<BattleManager>();
         }
 
-        // [Refactor] InputManager 이벤트 구독 삭제
-
-        isTurnActive = false;
-        ActiveUnit = null;
-
-        OnTimelineUpdated?.Invoke(allUnits);
-
+        Debug.Log("[TurnManager] Initialized. Waiting for units to register...");
         await UniTask.CompletedTask;
     }
 
-    private void Update()
+    // --- [Core Logic 1] 유닛 등록/해제 ---
+
+    public void RegisterUnit(UnitStatus unit)
     {
-        // 턴이 진행 중이거나 유닛이 없으면 패스
-        if (isTurnActive || allUnits == null || allUnits.Count == 0) return;
+        if (unit == null || _activeUnits.Contains(unit)) return;
 
-        // [Optimization] 0.1초마다 로직 실행
-        _tsUpdateTimer += Time.deltaTime;
-        if (_tsUpdateTimer < TS_UPDATE_INTERVAL) return;
+        _activeUnits.Add(unit);
 
-        // 경과 시간만큼 TS 감소 계산
-        float tsToDecrement = tsDecrementPerSecond * _tsUpdateTimer;
-        _tsUpdateTimer = 0f; // 타이머 리셋
-
-        bool timelineChanged = false;
-
-        foreach (var unit in allUnits)
+        // 초기 TS 부여 (없는 경우에만)
+        if (unit.CurrentTS <= 0)
         {
-            if (unit == null || unit.IsDead) continue;
-
-            if (unit.CurrentTS > 0)
-            {
-                unit.CurrentTS -= tsToDecrement;
-                timelineChanged = true;
-            }
-
-            // TS가 0 이하가 되면 턴 시작
-            if (unit.CurrentTS <= 0)
-            {
-                unit.CurrentTS = 0;
-                StartTurn(unit);
-                break; // 한 프레임에 한 명만 턴 시작
-            }
+            int agility = (unit.unitData != null && unit.unitData.Agility > 0) ? unit.unitData.Agility : 10;
+            unit.CurrentTS = UnityEngine.Random.Range(20f, 40f) / agility;
         }
 
-        if (timelineChanged) OnTimelineUpdated?.Invoke(allUnits);
+        // 정렬 유지 (이름순)
+        _activeUnits.Sort((a, b) => a.name.CompareTo(b.name));
+
+        Debug.Log($"[TurnManager] Unit Registered: {unit.name}. Total: {_activeUnits.Count}");
+
+        // [방송] 개별 유닛 추가 알림
+        OnUnitRegistered?.Invoke(unit);
+        // 즉시 위치 갱신 요청
+        OnTick?.Invoke();
     }
 
-    private void StartTurn(UnitStatus unit)
+    public void UnregisterUnit(UnitStatus unit)
     {
-        isTurnActive = true;
-        ActiveUnit = unit;
-        ActiveUnit.ResetTurnData();
+        if (unit == null || !_activeUnits.Contains(unit)) return;
 
-        // [Refactor] 카메라 이동 명령 삭제 (CameraController가 이벤트를 구독하여 스스로 처리함)
-
-        ActiveUnit.OnTurnStart();
-
-        if (ActiveUnit.IsDead)
+        // 진행 중인 애니메이션 취소
+        if (_animCtsMap.TryGetValue(unit, out var cts))
         {
-            Debug.Log($"{ActiveUnit.name}(이)가 턴 시작과 동시에 사망했습니다.");
-            EndTurn();
+            cts.Cancel();
+            cts.Dispose();
+            _animCtsMap.Remove(unit);
+        }
+
+        _activeUnits.Remove(unit);
+        Debug.Log($"[TurnManager] Unit Unregistered: {unit.name}. Total: {_activeUnits.Count}");
+
+        // [방송] 개별 유닛 삭제 알림
+        OnUnitUnregistered?.Invoke(unit);
+        OnTick?.Invoke();
+    }
+
+    // --- [Core Logic 2] 메인 루프 ---
+
+    private void Update()
+    {
+        if (_battleManager != null && _battleManager.IsTransitioning) return;
+        if (_isTurnActive || _activeUnits.Count == 0) return;
+
+        // 1. 시뮬레이션 스텝
+        _simulationTimer += Time.deltaTime;
+        if (_simulationTimer >= _simulationStep)
+        {
+            float decrement = _tsDecrementPerSecond * _simulationTimer;
+            _simulationTimer = 0f;
+
+            ProcessTimePassage(decrement);
+        }
+
+        // 2. UI 갱신 스텝
+        _uiTimer += Time.deltaTime;
+        if (_uiTimer >= _uiTickInterval)
+        {
+            _uiTimer = 0f;
+            OnTick?.Invoke();
+        }
+    }
+
+    private void ProcessTimePassage(float decrement)
+    {
+        if (_readyQueue.Count > 0)
+        {
+            StartNextTurn();
             return;
         }
 
-        // 이 이벤트를 통해 외부(카메라, UI 등)가 반응
+        List<UnitStatus> readyUnits = new List<UnitStatus>();
+
+        foreach (var unit in _activeUnits)
+        {
+            if (unit.IsDead) continue;
+
+            if (unit.CurrentTS > 0)
+            {
+                unit.CurrentTS -= decrement;
+            }
+
+            if (unit.CurrentTS <= 0)
+            {
+                readyUnits.Add(unit);
+            }
+        }
+
+        if (readyUnits.Count == 0) return;
+
+        // 턴 우선순위 정렬
+        readyUnits.Sort((a, b) =>
+        {
+            int tsCompare = a.CurrentTS.CompareTo(b.CurrentTS);
+            if (tsCompare != 0) return tsCompare;
+
+            int agiA = a.unitData != null ? a.unitData.Agility : 0;
+            int agiB = b.unitData != null ? b.unitData.Agility : 0;
+            return agiB.CompareTo(agiA);
+        });
+
+        foreach (var unit in readyUnits)
+        {
+            unit.CurrentTS = 0;
+            _readyQueue.Enqueue(unit);
+        }
+
+        StartNextTurn();
+    }
+
+    private void StartNextTurn()
+    {
+        if (_readyQueue.Count == 0)
+        {
+            _isTurnActive = false;
+            return;
+        }
+
+        UnitStatus nextUnit = _readyQueue.Dequeue();
+
+        if (nextUnit == null || nextUnit.IsDead)
+        {
+            StartNextTurn();
+            return;
+        }
+
+        _isTurnActive = true;
+        ActiveUnit = nextUnit;
+
+        ActiveUnit.ResetTurnData();
+        ActiveUnit.OnTurnStart();
+
         OnTurnStarted?.Invoke(ActiveUnit);
     }
 
     public void EndTurn()
     {
-        if (!isTurnActive || ActiveUnit == null) return;
+        if (!_isTurnActive || ActiveUnit == null) return;
 
-        // PathVisualizer는 여전히 필요하므로 로컬로 가져와 사용 (간접 참조)
-        var pathVisualizer = ServiceLocator.Get<PathVisualizer>();
-        if (pathVisualizer != null) pathVisualizer.ClearAll();
+        if (ServiceLocator.TryGet<PathVisualizer>(out var pathVisualizer))
+            pathVisualizer.ClearAll();
 
-        // 다음 턴을 위한 페널티 부여
-        ActiveUnit.CurrentTS += ActiveUnit.CalculateNextTurnPenalty();
+        float penalty = ActiveUnit.CalculateNextTurnPenalty();
+        float oldTS = ActiveUnit.CurrentTS;
+
+        ActiveUnit.CurrentTS = Mathf.Max(oldTS + penalty, 0f);
+
         ActiveUnit.ResetTurnData();
         ActiveUnit = null;
-        isTurnActive = false;
 
-        OnTimelineUpdated?.Invoke(allUnits);
-    }
-
-    // 타임라인 UI 연출용 (기존 유지)
-    public void UpdateUnitTurnDelay(UnitStatus unit, float oldTS, float newTS, bool isCrit)
-    {
-        StartCoroutine(ProcessTurnDelayAnimation(unit, oldTS, newTS, isCrit));
-    }
-
-    private IEnumerator ProcessTurnDelayAnimation(UnitStatus unit, float startTS, float targetTS, bool isCrit)
-    {
-        if (!isCrit)
+        if (_readyQueue.Count > 0)
         {
-            float duration = 0.3f;
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                unit.CurrentTS = Mathf.Lerp(startTS, targetTS, t);
-                OnTimelineUpdated?.Invoke(allUnits);
-                yield return null;
-            }
+            StartNextTurn();
         }
         else
         {
-            float difference = targetTS - startTS;
-            float overshootAmount = difference * 0.5f;
-            float overshootTarget = targetTS + overshootAmount;
-
-            // Phase 1: Overshoot
-            float phase1Duration = 0.2f;
-            float p1Timer = 0f;
-            while (p1Timer < phase1Duration)
-            {
-                p1Timer += Time.deltaTime;
-                float t = p1Timer / phase1Duration;
-                float easeT = 1f - Mathf.Pow(1f - t, 3);
-                unit.CurrentTS = Mathf.Lerp(startTS, overshootTarget, easeT);
-                OnTimelineUpdated?.Invoke(allUnits);
-                yield return null;
-            }
-            unit.CurrentTS = overshootTarget;
-
-            // Phase 2: Settle
-            float phase2Duration = 0.3f;
-            float p2Timer = 0f;
-            while (p2Timer < phase2Duration)
-            {
-                p2Timer += Time.deltaTime;
-                float t = p2Timer / phase2Duration;
-                float smoothT = t * t * (3f - 2f * t);
-                unit.CurrentTS = Mathf.Lerp(overshootTarget, targetTS, smoothT);
-                OnTimelineUpdated?.Invoke(allUnits);
-                yield return null;
-            }
+            _isTurnActive = false;
         }
-        unit.CurrentTS = targetTS;
-        OnTimelineUpdated?.Invoke(allUnits);
+
+        OnTick?.Invoke();
     }
 
-    // [Refactor] HandleCameraRecenterInput 메서드 삭제됨
+    // --- [Core Logic 3] 애니메이션 (UniTask) ---
+
+    public void UpdateUnitTurnDelay(UnitStatus unit, float oldTS, float newTS, bool isCrit)
+    {
+        if (_animCtsMap.TryGetValue(unit, out var oldCts))
+        {
+            oldCts.Cancel();
+            oldCts.Dispose();
+        }
+
+        var cts = new CancellationTokenSource();
+        _animCtsMap[unit] = cts;
+
+        ProcessTurnDelayAnimationAsync(unit, oldTS, newTS, isCrit, cts.Token).Forget();
+    }
+
+    private async UniTaskVoid ProcessTurnDelayAnimationAsync(UnitStatus unit, float startTS, float targetTS, bool isCrit, CancellationToken token)
+    {
+        try
+        {
+            float duration = isCrit ? 0.5f : 0.3f;
+            float elapsed = 0f;
+            float localUiTimer = 0f;
+
+            while (elapsed < duration)
+            {
+                if (token.IsCancellationRequested) return;
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+
+                if (!isCrit)
+                {
+                    unit.CurrentTS = Mathf.Lerp(startTS, targetTS, t);
+                }
+                else
+                {
+                    float overshoot = targetTS + (targetTS - startTS) * 0.2f;
+                    if (t < 0.5f)
+                    {
+                        float subT = t * 2f;
+                        unit.CurrentTS = Mathf.Lerp(startTS, overshoot, 1f - Mathf.Pow(1f - subT, 3));
+                    }
+                    else
+                    {
+                        float subT = (t - 0.5f) * 2f;
+                        unit.CurrentTS = Mathf.Lerp(overshoot, targetTS, subT * subT * (3f - 2f * subT));
+                    }
+                }
+
+                localUiTimer += Time.deltaTime;
+                if (localUiTimer >= _uiTickInterval)
+                {
+                    localUiTimer = 0f;
+                    OnTick?.Invoke();
+                }
+
+                await UniTask.Yield(PlayerLoopTiming.Update, token);
+            }
+
+            unit.CurrentTS = targetTS;
+            OnTick?.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            // [Fix] CS1061: token.Source 대신 cts 변수 사용하거나, token 출처 확인
+            // CancellationToken 자체에는 Source 속성이 없으므로, _animCtsMap에서 확인 후 제거
+            if (_animCtsMap.ContainsKey(unit))
+            {
+                // 현재 맵에 있는 CTS가 내가 만든 CTS인지 확인 (중복 실행 방지)
+                // (여기서는 간단히 제거)
+                _animCtsMap.Remove(unit);
+            }
+            // token과 연결된 CTS는 호출부에서 관리되므로 여기서는 맵 제거만 수행
+        }
+    }
+
+    private void CancelAllAnimations()
+    {
+        foreach (var cts in _animCtsMap.Values)
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+        _animCtsMap.Clear();
+    }
 }

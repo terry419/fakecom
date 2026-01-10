@@ -43,6 +43,8 @@ public class CameraController : MonoBehaviour, IInitializable
 
     private bool _isInitialized = false;
 
+    private Vector3 _savedPosition;
+
     private void Awake()
     {
         InitializeTransforms();
@@ -280,5 +282,15 @@ public class CameraController : MonoBehaviour, IInitializable
         {
             RecenterCamera(_turnManager.ActiveUnit.transform.position);
         }
+    }
+    public void SavePosition()
+    {
+        _savedPosition = targetPosition;
+    }
+
+    // [추가] 아까 저장해둔 위치로 복귀
+    public void RestorePosition()
+    {
+        targetPosition = _savedPosition;
     }
 }

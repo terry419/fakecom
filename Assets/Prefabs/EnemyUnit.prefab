@@ -17,10 +17,10 @@ GameObject:
   - component: {fileID: 2190872833047985383}
   - component: {fileID: 7884046704667591939}
   - component: {fileID: 5132256666255157361}
-  - component: {fileID: -2645334769933296883}
   - component: {fileID: 2691812338882529401}
   - component: {fileID: -8916674119659760954}
   - component: {fileID: -8433699415518994494}
+  - component: {fileID: 2645228334161710055}
   m_Layer: 0
   m_Name: EnemyUnit
   m_TagString: Untagged
@@ -188,18 +188,6 @@ MonoBehaviour:
   hasAttacked: 0
   usedMoveCost: 0
   <LastFinalPenalty>k__BackingField: 0
---- !u!114 &-2645334769933296883
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2382100463405782337}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8545e0fca77a62b4c8dd42d7983fe8a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &2691812338882529401
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -214,6 +202,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   rotateSpeed: 15
+  jumpThresholdCells: 1.5
+  portalWaitTime: 0.4
+  pivotOffsetY: 0
 --- !u!114 &-8916674119659760954
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -237,5 +228,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 140a1cc0ef3945a46a2d4a550ceddd2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &2645228334161710055
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2382100463405782337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12c86a55c6f4e264d96c10b2e28dad97, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 

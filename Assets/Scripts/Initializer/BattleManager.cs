@@ -16,7 +16,9 @@ public class BattleManager : MonoBehaviour, IInitializable
     private CancellationTokenSource _destroyCts;
     private CancellationTokenSource _stateCts;
 
+    // 상태 전환 플래그 (Race Condition 방지)
     private bool _isTransitioning = false;
+    public bool IsTransitioning => _isTransitioning;
 
     // (임시) Mock UI
     private class UIManagerMock : IUIManager
@@ -39,137 +41,169 @@ public class BattleManager : MonoBehaviour, IInitializable
 
     private void OnDestroy()
     {
-        // 1. 매니저 파괴 토큰 취소
-        if (_destroyCts != null)
+        // [Fix 2] 정적 이벤트 해제 (이미 올바름)
+        BootManager.OnBootComplete -= OnSystemBootFinished;
+
+        // [Fix 8] Exit 호출 시 안전한 정리 (Cancel 후 Forget)
+        if (_currentLogicState != null)
         {
-            _destroyCts.Cancel();
-            _destroyCts.Dispose();
+            _currentLogicState.OnRequestTransition -= HandleTransitionRequest;
+
+            // Exit이 토큰 취소를 감지하고 빨리 끝나도록 유도
+            if (_stateCts != null) _stateCts.Cancel();
+
+            // 동기 컨텍스트이므로 Forget 사용하되, 위에서 Cancel 했으므로 안전성 확보
+            _currentLogicState.Exit(CancellationToken.None).Forget();
+            _currentLogicState = null;
         }
 
-        // 2. 현재 상태 토큰 취소
+        // 토큰 정리 (순서: Cancel -> Dispose)
         if (_stateCts != null)
         {
             _stateCts.Cancel();
             _stateCts.Dispose();
         }
 
-        // 3. 마지막 상태 종료 시도
-        _currentLogicState?.Exit(CancellationToken.None).Forget();
+        if (_destroyCts != null)
+        {
+            _destroyCts.Cancel();
+            _destroyCts.Dispose();
+        }
 
         ServiceLocator.Unregister<BattleManager>(ManagerScope.Scene);
-        BootManager.OnBootComplete -= OnSystemBootFinished;
     }
 
     public async UniTask Initialize(InitializationContext context)
     {
         try
         {
-            if (!ServiceLocator.TryGet(out MapManager mapManager))
-                throw new Exception("MapManager가 등록되지 않았습니다!");
+            Debug.Log("[BattleManager] Initialize Start...");
 
-            if (!ServiceLocator.TryGet(out TurnManager turnManager))
-                throw new Exception("TurnManager가 등록되지 않았습니다!");
+            if (!ServiceLocator.TryGet<MapManager>(out var mapManager))
+                throw new InvalidOperationException("[BattleManager] MapManager not found");
 
-            _uiManagerMock = new UIManagerMock();
+            if (!ServiceLocator.TryGet<TurnManager>(out var turnManager))
+                throw new InvalidOperationException("[BattleManager] TurnManager not found");
 
-            var battleContext = new BattleContext(mapManager, turnManager, _uiManagerMock);
+            IUIManager uiManager = null;
+            if (ServiceLocator.TryGet<IUIManager>(out var realUI))
+                uiManager = realUI;
+            else
+                uiManager = _uiManagerMock = new UIManagerMock();
+
+            // Context 생성 및 유효성 검사
+            var battleContext = new BattleContext
+            {
+                BattleManager = this,
+                Map = mapManager,
+                Turn = turnManager,
+                UI = uiManager
+            };
+
+            // [Fix 3] Validate 호출
+            battleContext.Validate();
+
             _stateFactory = new BattleStateFactory(battleContext);
 
+            // [Fix 1] 정적 이벤트 구독 및 즉시 상태 확인
             BootManager.OnBootComplete += OnSystemBootFinished;
+
+            if (BootManager.IsBootComplete)
+            {
+                Debug.Log("[BattleManager] BootManager already complete. Starting immediately.");
+                OnSystemBootFinished(true);
+            }
+            else
+            {
+                Debug.Log("[BattleManager] Waiting for BootManager...");
+            }
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[BattleManager] 초기화 실패: {ex.Message}");
-            CurrentStateID = BattleState.Error;
-            _stateCts = new CancellationTokenSource();
-            _currentLogicState = new ErrorState(null);
-            _currentLogicState.Enter(new ErrorPayload(ex), _stateCts.Token).Forget();
+            Debug.LogError($"[BattleManager] Initialize failed: {ex.Message}");
+            await HandleCriticalError(ex);
         }
-        await UniTask.CompletedTask;
     }
 
     private void OnSystemBootFinished(bool isSuccess)
     {
         if (CurrentStateID == BattleState.Error) return;
 
-        if (!isSuccess || _stateFactory == null)
+        if (!isSuccess)
         {
-            HandleTransitionRequest(BattleState.Error, new ErrorPayload(new Exception("Boot failed or StateFactory not ready.")));
+            HandleTransitionRequest(BattleState.Error,
+                new ErrorPayload(new InvalidOperationException("[BattleManager] System boot failed")));
             return;
         }
 
-        Debug.Log("[BattleManager] 시스템 부팅 완료. Setup 상태 진입 요청.");
-        _uiManagerMock.AutoTriggerStartConfirmation();
+        Debug.Log("[BattleManager] System boot complete. Requesting Setup state.");
         HandleTransitionRequest(BattleState.Setup, null);
     }
 
-    public void HandleTransitionRequest(BattleState nextStateID, StatePayload payload)
-    {
-        TransitionAsync(nextStateID, payload).Forget();
-    }
-
-    // [중요 수정] 안전한 비동기 전환 로직
-    private async UniTaskVoid TransitionAsync(BattleState nextStateID, StatePayload payload)
+    public void HandleTransitionRequest(BattleState nextState, StatePayload payload)
     {
         if (_isTransitioning)
         {
-            Debug.LogWarning($"[BattleManager] 전환 중 중복 요청 무시됨: {nextStateID}");
+            Debug.LogWarning($"[BattleManager] 전환 중 무시됨: {CurrentStateID} -> {nextState}");
             return;
         }
-        _isTransitioning = true;
 
-        // 1. 토큰 교체 (Rotation)
-        var oldCts = _stateCts;
-        _stateCts = new CancellationTokenSource();
-        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyCts.Token, _stateCts.Token);
+        ChangeState(nextState, payload).Forget();
+    }
+
+    private async UniTask ChangeState(BattleState nextStateID, StatePayload payload = null)
+    {
+        _isTransitioning = true;
+        var oldID = CurrentStateID;
 
         try
         {
-            // 2. 이전 상태 취소 (Dispose는 아직 하지 않음!)
-            if (oldCts != null)
-            {
-                oldCts.Cancel();
-            }
-
+            // 1. 이전 상태 종료
             if (_currentLogicState != null)
             {
                 _currentLogicState.OnRequestTransition -= HandleTransitionRequest;
-                // Exit 실행 (취소된 oldCts의 영향을 받지 않도록 None 전달)
                 await _currentLogicState.Exit(CancellationToken.None);
+                _currentLogicState = null;
             }
 
-            // 3. [핵심] Exit이 완전히 끝난 후 안전하게 폐기
-            if (oldCts != null)
+            // 2. 토큰 갱신
+            if (_stateCts != null)
             {
-                oldCts.Dispose();
+                _stateCts.Cancel();
+                _stateCts.Dispose();
+            }
+            _stateCts = new CancellationTokenSource();
+
+            // 3. 다음 상태 진입
+            // [Fix 6] using 블록 내부에서는 Enter만 수행 (LinkedToken 유효성 보장)
+            using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyCts.Token, _stateCts.Token))
+            {
+                _currentLogicState = _stateFactory.GetOrCreate(nextStateID);
+                CurrentStateID = _currentLogicState.StateID;
+
+                _currentLogicState.OnRequestTransition += HandleTransitionRequest;
+
+                await _currentLogicState.Enter(payload, linkedCts.Token);
             }
 
-            // 4. 다음 상태 생성 및 진입
-            var oldID = CurrentStateID;
-            _currentLogicState = _stateFactory.GetOrCreate(nextStateID);
-            CurrentStateID = _currentLogicState.StateID;
-
-            OnStateChanged?.Invoke(oldID, CurrentStateID);
-
-            _currentLogicState.OnRequestTransition += HandleTransitionRequest;
-            await _currentLogicState.Enter(payload, linkedCts.Token);
+            // [Fix 5] Enter 완료 후, using 블록 밖에서 이벤트 호출 (Listener 예외 격리)
+            try
+            {
+                OnStateChanged?.Invoke(oldID, CurrentStateID);
+            }
+            catch (Exception listenerEx)
+            {
+                Debug.LogError($"[BattleManager] OnStateChanged listener error: {listenerEx.Message}");
+            }
         }
         catch (OperationCanceledException)
         {
-            Debug.Log("[BattleManager] 상태 전환 중 취소됨.");
+            Debug.Log($"[BattleManager] State change cancelled: {nextStateID}");
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[BattleManager] 상태 전환 중 오류: {ex.Message}");
-            _isTransitioning = false;
-
-            CurrentStateID = BattleState.Error;
-            _currentLogicState = _stateFactory.GetOrCreate(BattleState.Error);
-
-            if (_stateCts != null) _stateCts.Dispose();
-            _stateCts = new CancellationTokenSource();
-
-            _currentLogicState.Enter(new ErrorPayload(ex), _stateCts.Token).Forget();
+            Debug.LogError($"[BattleManager] State change error: {ex.Message}");
+            await HandleCriticalError(ex);
         }
         finally
         {
@@ -180,14 +214,52 @@ public class BattleManager : MonoBehaviour, IInitializable
     private void Update()
     {
         if (_isTransitioning || _currentLogicState == null) return;
+
         try
         {
             _currentLogicState.Update();
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[BattleManager] Update Error: {ex.Message}");
+            Debug.LogError($"[BattleManager] Update Critical Error: {ex.Message}");
+            // [Fix 7] 에러 상태 전환 요청 (finally에서 _isTransitioning 해제되므로 다음 프레임 처리가능)
             HandleTransitionRequest(BattleState.Error, new ErrorPayload(ex));
+        }
+    }
+
+    private async UniTask HandleCriticalError(Exception ex)
+    {
+        try
+        {
+            _currentLogicState = null;
+            CurrentStateID = BattleState.Error;
+
+            if (_stateCts != null)
+            {
+                _stateCts.Cancel();
+                _stateCts.Dispose();
+            }
+            _stateCts = new CancellationTokenSource();
+
+            // [Fix 4] StateFactory Null 체크
+            if (_stateFactory == null)
+            {
+                Debug.LogError("[BattleManager] StateFactory is null. Cannot enter ErrorState.");
+                return;
+            }
+
+            _currentLogicState = _stateFactory.GetOrCreate(BattleState.Error);
+            _currentLogicState.OnRequestTransition += HandleTransitionRequest;
+
+            await _currentLogicState.Enter(new ErrorPayload(ex), _stateCts.Token);
+        }
+        catch (Exception innerEx)
+        {
+            Debug.LogError($"[BattleManager] Error state entry failed: {innerEx.Message}");
+        }
+        finally
+        {
+            _isTransitioning = false;
         }
     }
 }

@@ -3,7 +3,6 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// [Refactored] PlayerController에게 턴 제어권 위임 및 입력 활성화 보장
 public class PlayerTurnState : BattleStateBase
 {
     public override BattleState StateID => BattleState.PlayerTurn;
@@ -16,61 +15,71 @@ public class PlayerTurnState : BattleStateBase
 
     public override async UniTask Enter(StatePayload payload, CancellationToken cancellationToken)
     {
-        Debug.Log($"<color=magenta>[TRACER] 1. PlayerTurnState 진입 성공! (ActiveUnit: {_context.Turn.ActiveUnit?.name})</color>");
-
         // 1. 데이터 검증
         var activeUnitStatus = _context.Turn.ActiveUnit;
-        if (activeUnitStatus == null)
+        if (activeUnitStatus == null || !activeUnitStatus.TryGetComponent<Unit>(out var unitComponent))
         {
-            Debug.LogError("[PlayerTurnState] ActiveUnit is null. Reverting to Waiting.");
-            RequestTransition(BattleState.TurnWaiting, null);
-            return;
-        }
-
-        if (!activeUnitStatus.TryGetComponent<Unit>(out var unitComponent))
-        {
-            Debug.LogError($"[PlayerTurnState] '{activeUnitStatus.name}' has no Unit component!");
-            RequestTransition(BattleState.TurnWaiting, null);
+            Debug.LogError("[PlayerTurnState] Invalid ActiveUnit. Reverting to Waiting.");
+            // [Safety] 즉시 요청하면 BattleManager가 바쁠 수 있으므로 다음 프레임에 요청
+            ChangeStateToWaitingAsync().Forget();
             return;
         }
 
         Debug.Log($"[PlayerTurnState] Start Turn: {activeUnitStatus.name}");
 
-        // 2. 매니저 참조
+        // Deadlock 방지: Fire-and-Forget
+        RunTurnLogic(unitComponent, cancellationToken).Forget();
+
+        await UniTask.CompletedTask;
+    }
+
+    private async UniTaskVoid ChangeStateToWaitingAsync()
+    {
+        await UniTask.NextFrame();
+        RequestTransition(BattleState.TurnWaiting);
+    }
+
+    private async UniTaskVoid RunTurnLogic(Unit unit, CancellationToken token)
+    {
         var playerController = ServiceLocator.Get<PlayerController>();
         var inputManager = ServiceLocator.Get<InputManager>();
 
         if (playerController == null || inputManager == null)
         {
-            Debug.LogError("[PlayerTurnState] Missing Managers.");
+            Debug.LogError("[PlayerTurnState] Critical: Missing PlayerController or InputManager.");
             RequestTransition(BattleState.TurnWaiting, null);
             return;
         }
 
-        // 3. 이벤트 연결 (UI 턴 종료 버튼 -> PlayerController 종료)
-        // 로컬 함수나 델리게이트를 사용하여 구독 해제를 보장합니다.
-        Action onTurnEndAction = () => playerController.EndTurn();
-        inputManager.OnTurnEndInvoked += onTurnEndAction;
+        Action onTurnEndAction = () =>
+        {
+            Debug.Log("[PlayerTurnState] Turn End Requested via UI.");
+            playerController.EndTurn();
+        };
+
+        // 성공적인 흐름 제어를 위한 플래그
+        bool turnCompletedSuccessfully = false;
 
         try
         {
-            // 4. Unit 빙의 (Possess)
-            bool isPossessSuccessful = await playerController.Possess(unitComponent);
+            // 1. 빙의 (Possess)
+            bool isPossessSuccessful = await playerController.Possess(unit);
             if (!isPossessSuccessful)
             {
-                Debug.LogError("[PlayerTurnState] Failed to Possess unit.");
+                Debug.LogError("[PlayerTurnState] Possess failed.");
+                // 여기서 EndTurn을 부르면 안됨 (시작도 안했으므로)
                 RequestTransition(BattleState.TurnWaiting, null);
                 return;
             }
 
-            // 5. [Fix] PlayerController의 턴 로직 실행 (입력 활성화 포함)
-            // OnTurnStart 내부에서 _inputHandler.SetActive(true)가 호출됩니다.
-            // 플레이어가 턴을 종료할 때까지 여기서 대기합니다.
+            // 2. 이벤트 구독
+            inputManager.OnTurnEndInvoked += onTurnEndAction;
+
+            // 3. 턴 로직 실행 (유저 입력 대기)
             await playerController.OnTurnStart();
 
-            // 6. 턴 로직이 끝나면 상태 전환 요청
-            Debug.Log("[PlayerTurnState] Controller logic finished. Requesting transition.");
-            RequestTransition(BattleState.TurnWaiting);
+            // 4. 로직 정상 종료 확인
+            turnCompletedSuccessfully = true;
         }
         catch (OperationCanceledException)
         {
@@ -83,32 +92,40 @@ public class PlayerTurnState : BattleStateBase
         }
         finally
         {
-            // 7. 이벤트 구독 해제
+            // 5. 정리 (Cleanup)
             if (inputManager != null)
-            {
                 inputManager.OnTurnEndInvoked -= onTurnEndAction;
+
+            // [Core Fix]
+            // 상태 전환 요청 전에 *반드시* 턴을 물리적으로 종료시켜야 합니다.
+            // 그래야 TurnWaitingState가 'ActiveUnit'을 null로 인식합니다.
+            if (_context.Turn != null)
+            {
+                _context.Turn.EndTurn();
             }
+        }
+
+        // [Core Fix]
+        // EndTurn()이 완전히 끝난 후에 전환 요청을 보냅니다.
+        // (finally 블록 이후에 실행됨)
+        if (turnCompletedSuccessfully)
+        {
+            Debug.Log("[PlayerTurnState] Controller logic finished. Requesting transition.");
+            RequestTransition(BattleState.TurnWaiting);
         }
     }
 
     public override async UniTask Exit(CancellationToken cancellationToken)
     {
-        var playerController = ServiceLocator.Get<PlayerController>();
-
-        // 1. 빙의 해제 (Unpossess)
-        if (playerController != null)
+        if (ServiceLocator.TryGet<PlayerController>(out var playerController))
         {
-            await playerController.Unpossess();
+            if (playerController.PossessedUnit != null)
+            {
+                await playerController.Unpossess();
+            }
         }
 
-        // 2. TurnManager에 턴 종료 통지 (AP 리셋, 턴 카운트 증가 등 처리)
-        if (_context.Turn != null)
-        {
-            _context.Turn.EndTurn();
-        }
-
-        Debug.Log("[PlayerTurnState] Turn Ended & Cleaned up.");
+        Debug.Log("[PlayerTurnState] Exit Complete.");
+        await UniTask.CompletedTask;
     }
-
-    public override void Update() { }
 }

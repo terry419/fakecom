@@ -10,6 +10,7 @@ public abstract class UnitDataSO : ScriptableObject
     public ClassType Role;
 
     [Header("2. Visual")]
+    public Sprite Icon;
     public AssetReferenceGameObject ModelPrefab;
     public AssetReferenceGameObject HitVFX;
 

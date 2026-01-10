@@ -1,18 +1,19 @@
 using System;
 
-// 모든 매니저 의존성을 담는 컨테이너 클래스
+// [Refactor] 객체 이니셜라이저 패턴 및 유효성 검사 지원
 public class BattleContext
 {
-    public readonly MapManager Map;
-    public readonly TurnManager Turn;
-    public readonly IUIManager UI;
-    // public readonly UnitManager Unit;
+    public BattleManager BattleManager { get; set; }
+    public MapManager Map { get; set; }
+    public TurnManager Turn { get; set; }
+    public IUIManager UI { get; set; }
 
-    public BattleContext(MapManager map, TurnManager turn, IUIManager ui)
+    // [Fix 3] 필수 의존성 검증 메서드
+    public void Validate()
     {
-        // Fail-Fast: 필수 의존성이 null이면 즉시 에러를 발생시킵니다.
-        Map = map ?? throw new ArgumentNullException(nameof(map));
-        Turn = turn ?? throw new ArgumentNullException(nameof(turn));
-        UI = ui ?? throw new ArgumentNullException(nameof(ui));
+        if (BattleManager == null) throw new InvalidOperationException("[BattleContext] BattleManager is null");
+        if (Map == null) throw new InvalidOperationException("[BattleContext] MapManager is null");
+        if (Turn == null) throw new InvalidOperationException("[BattleContext] TurnManager is null");
+        if (UI == null) throw new InvalidOperationException("[BattleContext] IUIManager is null");
     }
 }

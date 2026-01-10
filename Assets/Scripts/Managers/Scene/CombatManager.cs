@@ -145,7 +145,7 @@ public class CombatManager : MonoBehaviour, IInitializable
 
     private void ApplyAttackCost(UnitStatus attackerStatus)
     {
-        if (attackerStatus != null) attackerStatus.CurrentTS += _baseAttackCost;
+        attackerStatus.AddTurnPenalty(_baseAttackCost);
     }
 
     // ========================================================================
