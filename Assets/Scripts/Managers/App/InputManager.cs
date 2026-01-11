@@ -6,9 +6,6 @@ using System;
 
 public class InputManager : MonoBehaviour, IInitializable
 {
-    // [수정 1] static Instance 및 중복 파괴 로직 제거 (ServiceLocator가 유일성 보장)
-    // public static InputManager Instance { get; private set; } 
-
     // ========================================================================
     // 1. 이벤트 정의
     // ========================================================================
@@ -27,7 +24,8 @@ public class InputManager : MonoBehaviour, IInitializable
 
     private void Awake()
     {
-        // [수정 2] 싱글톤 로직 삭제 -> 바로 등록
+        // ServiceLocator 등록 (Scene Scope or Global Scope)
+        // 여기서는 Global로 등록되어 있으나, 씬 전환 시 파괴 정책에 따라 Scene으로 변경 고려 가능
         ServiceLocator.Register(this, ManagerScope.Global);
         _inputActions = new PlayerInputActions();
     }
@@ -60,9 +58,6 @@ public class InputManager : MonoBehaviour, IInitializable
         Debug.Log("[InputManager] Initialized.");
         return UniTask.CompletedTask;
     }
-
-    // ... (이하 나머지 코드는 기존과 동일하게 유지) ...
-    // SetupInputBindings, DisposeActions, Update, HandleNumberKeys 등등
 
     private void SetupInputBindings()
     {
@@ -138,7 +133,10 @@ public class InputManager : MonoBehaviour, IInitializable
 
     public bool IsCameraRotatePressed()
     {
-        return _inputActions != null && _inputActions.Player.RightClick.IsPressed(); // 이름 수정
+        // [Check] PlayerInputActions 에셋에 'RightClick' 액션이 정의되어 있는지 확인하십시오.
+        // 만약 없다면 'Command' 등 우클릭에 해당하는 액션으로 변경해야 합니다.
+        // 예: return _inputActions != null && _inputActions.Player.Command.IsPressed();
+        return _inputActions != null && _inputActions.Player.RightClick.IsPressed();
     }
 
     public Vector2 GetMouseDelta()

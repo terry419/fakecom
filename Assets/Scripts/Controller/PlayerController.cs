@@ -2,7 +2,6 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using System;
 
-// [Update] IUnitController 인터페이스 구현 추가
 public class PlayerController : MonoBehaviour, IInitializable
 {
     public Unit PossessedUnit { get; private set; }
@@ -12,20 +11,19 @@ public class PlayerController : MonoBehaviour, IInitializable
     private InputManager _inputManager;
 
     private BaseAction _selectedAction;
-    private UniTaskCompletionSource _turnCompletionSource; // 비동기 턴 대기용 소스
+    private UniTaskCompletionSource _turnCompletionSource;
     private bool _isMyTurn = false;
 
     public async UniTask Initialize(InitializationContext context)
     {
         ServiceLocator.Register(this, ManagerScope.Scene);
-
         var mapManager = ServiceLocator.Get<MapManager>();
         _inputManager = ServiceLocator.Get<InputManager>();
 
         if (_inputManager == null)
         {
             Debug.LogError("[PlayerController] InputManager not found");
-            return; // UniTask.CompletedTask 자동 처리
+            return;
         }
 
         _inputHandler = gameObject.GetComponent<PlayerInputHandler>();
@@ -45,100 +43,73 @@ public class PlayerController : MonoBehaviour, IInitializable
         await UniTask.CompletedTask;
     }
 
-    // [New] 비동기 빙의 (IUnitController 구현)
     public async UniTask<bool> Possess(Unit unit)
     {
-        if (unit == null)
-        {
-            Debug.LogError("[PlayerController] Cannot possess null unit.");
-            return false;
-        }
-
+        if (unit == null) return false;
         PossessedUnit = unit;
         _isMyTurn = true;
 
-        // [Option] 카메라 포커싱 (비동기 대기)
-        if (_cameraController != null)
-        {
-            // 실제 CameraController 구현에 따라 await 방식 적용
-            // await _cameraController.FocusUnit(unit);
-            await UniTask.Yield(); // 임시 대기
-        }
+        if (_cameraController != null) await UniTask.Yield();
 
         Debug.Log($"[PlayerController] Possessed {unit.name}");
         return true;
     }
 
-    // [New] 비동기 빙의 해제 (IUnitController 구현)
     public async UniTask Unpossess()
     {
         if (PossessedUnit == null) return;
-
-        Debug.Log($"[PlayerController] Unpossessing {PossessedUnit.name}");
-
-        CleanupTurn(); // 입력 비활성화 등 정리
+        CleanupTurn();
         PossessedUnit = null;
         _isMyTurn = false;
-
         await UniTask.CompletedTask;
     }
 
-    // [New] 턴 시작 로직 (비동기 대기 지원)
     public async UniTask OnTurnStart()
     {
         if (PossessedUnit == null) return;
 
         _isMyTurn = true;
-        // 턴 종료를 기다리기 위한 TCS 생성
         _turnCompletionSource = new UniTaskCompletionSource();
 
         if (_inputHandler != null)
         {
             _inputHandler.OnCancelRequested += OnCancelRequested;
-            // 입력 활성화
             _inputHandler.SetActive(true);
         }
 
-        // 기본 액션 선택
         _selectedAction?.OnSelect();
         if (_selectedAction == null) SetAction(PossessedUnit.GetDefaultAction());
 
         Debug.Log("[PlayerController] Turn Started. Waiting for input...");
-
-        // [Wait] EndTurn()이 호출될 때까지 여기서 대기합니다.
         await _turnCompletionSource.Task;
 
         CleanupTurn();
     }
 
-    // [New] 턴 종료 신호 (외부 혹은 내부 로직에서 호출)
-    public void OnTurnEnd() => EndTurn(); // 인터페이스 구현용
+    public void OnTurnEnd() => EndTurn();
 
     public void EndTurn()
     {
         if (!_isMyTurn) return;
         Debug.Log("[PlayerController] EndTurn called.");
-        _turnCompletionSource?.TrySetResult(); // 대기 중인 OnTurnStart를 해제
+        _turnCompletionSource?.TrySetResult();
     }
 
     private void CleanupTurn()
     {
         _isMyTurn = false;
-
         if (_inputHandler != null)
         {
             _inputHandler.SetActive(false);
             _inputHandler.OnCancelRequested -= OnCancelRequested;
         }
-
         _selectedAction?.OnExit();
         _selectedAction = null;
     }
 
-    // --- 기존 로직 (Action Handling) 유지 ---
-
     public void SetAction(BaseAction newAction)
     {
+        // [Optimization] 같은 액션이면 초기화 로직을 건너뜀
         if (_selectedAction == newAction) return;
 
         if (_selectedAction != null && _selectedAction.State == ActionState.Running)
@@ -163,7 +134,6 @@ public class PlayerController : MonoBehaviour, IInitializable
         if (_selectedAction != null && _selectedAction.State == ActionState.Running) return;
 
         BaseAction targetAction = null;
-
         switch (keyIndex)
         {
             case 1:
@@ -211,70 +181,55 @@ public class PlayerController : MonoBehaviour, IInitializable
         ExecuteAction(target).Forget();
     }
 
-    // [Restore] 클래스별 분기 로직 및 Action 결과 처리 복구
+    // [Step 3 Complete] 로직 이동 완료. Action의 결과를 받아 처리만 수행
     private async UniTaskVoid ExecuteAction(GridCoords target)
     {
         if (!_isMyTurn || _selectedAction == null) return;
 
+        // Action 실행 및 결과 대기
         var result = await _selectedAction.ExecuteAsync(target);
 
         if (result.Success)
         {
-            // 공격 완료 후 처리
-            if (_selectedAction is AttackAction)
-            {
-                PossessedUnit.MarkAsAttacked();
-
-                // Scout: Hit & Run (이동 모드 복귀)
-                if (PossessedUnit.ClassType == ClassType.Scout)
-                {
-                    Debug.Log("[Controller] Scout Attack Complete. Moving to Move State.");
-                    SetAction(PossessedUnit.GetDefaultAction());
-                }
-                // Assault, Sniper: 턴 종료
-                else
-                {
-                    Debug.Log($"[Controller] {PossessedUnit.ClassType} Attack Complete. Turn End.");
-                    EndTurn();
-                }
-            }
-            // 이동 완료 후 처리
-            else
-            {
-                if (PossessedUnit.CurrentMobility > 0)
-                {
-                    // 재이동 가능 시각화 갱신
-                    if (_selectedAction == PossessedUnit.GetDefaultAction())
-                    {
-                        _selectedAction.OnExit();
-                        _selectedAction.OnSelect();
-                    }
-                    else
-                    {
-                        SetAction(PossessedUnit.GetDefaultAction());
-                    }
-                }
-                else
-                {
-                    // 이동력 소진. 공격 기회가 없으면 종료, 있으면 대기.
-                    if (!PossessedUnit.HasAttacked)
-                    {
-                        Debug.Log("[Controller] Mobility exhausted. Waiting for action.");
-                    }
-                    else
-                    {
-                        EndTurn();
-                    }
-                }
-            }
+            // 결과(Consequence)에 따른 후속 처리 위임
+            HandleConsequence(result.Consequence);
         }
         else if (result.Cancelled)
         {
-            // 취소됨
+            // 취소됨 (로그는 BaseAction에서 처리됨)
         }
         else
         {
             Debug.LogWarning($"[Controller] Action Failed: {result.ErrorMessage}");
+        }
+    }
+
+    private void HandleConsequence(ActionConsequence consequence)
+    {
+        switch (consequence)
+        {
+            case ActionConsequence.EndTurn:
+                // 턴 종료
+                EndTurn();
+                break;
+
+            case ActionConsequence.SwitchToDefaultAction:
+                // Default Action(Move)으로 복귀
+                SetAction(PossessedUnit.GetDefaultAction());
+
+                // [Defensive Coding] SetAction의 Early Return으로 인해 
+                // 동일 액션(Move -> Move) 전환 시 시각화(파란 타일 등)가 갱신되지 않는 문제를 방지
+                _selectedAction?.OnSelect();
+                break;
+
+            case ActionConsequence.WaitForInput:
+                // 추가 조치 없음 (대기)
+                break;
+
+            case ActionConsequence.None:
+            default:
+                // 아무 조치 없음
+                break;
         }
     }
 
@@ -291,7 +246,6 @@ public class PlayerController : MonoBehaviour, IInitializable
         {
             _inputManager.OnAbilityHotkeyPressed -= OnHotkeyPressed;
         }
-
         _turnCompletionSource?.TrySetResult();
     }
 }

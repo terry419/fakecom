@@ -67,16 +67,17 @@ public class SceneInitializer : MonoBehaviour
             typeof(MapManager),
             typeof(TilemapGenerator),
             typeof(EnvironmentManager),
-            typeof(UnitManager),
-            typeof(PathVisualizer),    // [추가] Unit 생성 후, 타일 시각화 도구 초기화
-            typeof(PlayerController),
-            typeof(CameraController),
+
+            typeof(PlayerController),  // [변경] UnitManager보다 먼저 배치 (Index 4)
+            typeof(CameraController),  // (카메라도 플레이어를 따라가니 앞에 두는게 안전)
+    
+            typeof(UnitManager),       // [변경] 이제 PlayerController가 확실히 있는 상태에서 실행됨
+    
+            typeof(PathVisualizer),
             typeof(TurnManager),
             typeof(BattleManager),
             typeof(DamageTextManager),
-
         };
-
         foreach (var managerType in initSequence)
         {
             var managerObj = FindObjectOfType(managerType) as MonoBehaviour;

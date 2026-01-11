@@ -40,15 +40,35 @@ public class TurnWaitingState : BattleStateBase
     }
 
     // 상태 전환을 안전하게 처리하는 비동기 메서드
-    private async UniTaskVoid ChangeStateAsync(UnitStatus unit)
+    private async UniTaskVoid ChangeStateAsync(UnitStatus unitStatus)
     {
         // BattleManager가 현재 상태 처리를 끝낼 틈을 줍니다.
         await UniTask.NextFrame();
 
-        Debug.Log($"<color=magenta>[TRACER] 턴 유닛 감지: {unit.name}. PlayerTurn으로 전환 요청.</color>");
+        if (unitStatus == null || !unitStatus.TryGetComponent<Unit>(out var unit))
+        {
+            Debug.LogError("[TurnWaitingState] 유효하지 않은 유닛입니다. 턴을 스킵합니다.");
+            _context.Turn.EndTurn();
+            return;
+        }
 
-        // [TODO] 아군/적군 판별 로직 (현재는 PlayerTurn 고정)
-        RequestTransition(BattleState.PlayerTurn, null);
+        Debug.Log($"<color=magenta>[TRACER] 턴 유닛 감지: {unit.name} ({unit.Faction}). 상태 전환 요청.</color>");
+
+        // [핵심] 팩션에 따른 상태 분기
+        if (unit.Faction == Faction.Player)
+        {
+            RequestTransition(BattleState.PlayerTurn, null);
+        }
+        else if (unit.Faction == Faction.Enemy)
+        {
+            RequestTransition(BattleState.EnemyTurn, null); // EnemyTurnState로 전환
+        }
+        else
+        {
+            // 중립 유닛 등 기타 처리 (필요 시 구현)
+            Debug.LogWarning($"[TurnWaitingState] 알 수 없는 팩션: {unit.Faction}. 턴을 넘깁니다.");
+            _context.Turn.EndTurn();
+        }
     }
 
     public override UniTask Exit(CancellationToken cancellationToken)

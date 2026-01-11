@@ -6,7 +6,7 @@ using System.Collections.Generic;
 [RequireComponent(typeof(UnitMovementSystem))]
 public class Unit : MonoBehaviour, ITileOccupant
 {
-    // ... (기존 필드 동일) ...
+    // ... (기존 필드와 동일) ...
     public Faction Faction { get; private set; }
     public GridCoords Coordinate { get; private set; }
     public GridCoords Coords => Coordinate;
@@ -35,7 +35,6 @@ public class Unit : MonoBehaviour, ITileOccupant
     private MoveAction _moveAction;
     private AttackAction _attackAction;
 
-    // [추가] Visualizer 참조
     private UnitActionVisualizer _actionVisualizer;
 
     public IReadOnlyList<BaseAction> GetActions() => _actions.AsReadOnly();
@@ -79,31 +78,44 @@ public class Unit : MonoBehaviour, ITileOccupant
 
         if (MovementSystem != null) MovementSystem.Initialize(this);
 
-        // 1. Action 생성 (이 시점에 AddComponent 됨)
+        // 1. Action 생성
         _actions.Clear();
         _moveAction = GetOrAddAction<MoveAction>();
         _attackAction = GetOrAddAction<AttackAction>();
 
-        // 2. [핵심 수정] Visualizer를 가져오거나 추가한 뒤, 생성된 Action을 주입(Initialize)
+        // 2. Visualizer 연결
         _actionVisualizer = GetComponent<UnitActionVisualizer>();
         if (_actionVisualizer == null)
         {
             _actionVisualizer = gameObject.AddComponent<UnitActionVisualizer>();
         }
-
-        // 생성된 Action들을 Visualizer에 연결
         _actionVisualizer.Initialize(_moveAction, _attackAction);
+
         _damageFeedback = GetComponent<UnitDamageFeedback>();
         if (_damageFeedback == null)
         {
             _damageFeedback = gameObject.AddComponent<UnitDamageFeedback>();
         }
-        // HealthSystem은 Status를 통해 접근하거나 GetComponent로 가져옴
         _damageFeedback.Initialize(Status.HealthSystem);
+
         OnUnitInitialized?.Invoke(this);
+
+        // ---------------------------------------------------------
+        // [Step 4 Fix] 로컬 컨트롤러(AI) 자동 감지 및 연결 로직
+        // Player는 UnitManager가 넣어주지만, Enemy는 스스로 찾아야 함
+        // ---------------------------------------------------------
+        if (_controller == null)
+        {
+            var localController = GetComponent<IUnitController>();
+            if (localController != null)
+            {
+                // AI 컨트롤러는 비동기 대기 없이 즉시 소유권 등록
+                localController.Possess(this).Forget();
+            }
+        }
     }
 
-    // ... (이하 기존 메서드들 유지: GetOrAddAction, SpawnOnMap, MovePathAsync 등) ...
+    // ... (이하 기존 메서드 동일) ...
     private T GetOrAddAction<T>() where T : BaseAction
     {
         T action = GetComponent<T>();
@@ -133,9 +145,9 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     public void SetController(IUnitController controller)
     {
-        if (_controller != null) _controller.Unpossess();
+        if (_controller != null && _controller != controller) _controller.Unpossess();
         _controller = controller;
-        if (_controller != null) _controller.Possess(this);
+        // Possess는 컨트롤러 측에서 호출하는 것이 안전함 (순환 호출 방지)
     }
 
     public async UniTask OnTurnStart()

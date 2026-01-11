@@ -23,7 +23,6 @@ public class MoveAction : BaseAction
 
     public override string GetActionName() => "Move";
 
-    // ... (CanExecute, GetBlockReason 생략, 기존과 동일) ...
     public override bool CanExecute(GridCoords targetCoords = default)
     {
         if (State == ActionState.Disabled || State == ActionState.Running) return false;
@@ -35,23 +34,14 @@ public class MoveAction : BaseAction
         }
         return true;
     }
-    public override string GetBlockReason(GridCoords targetCoords = default) => base.GetBlockReason(targetCoords);
 
+    public override string GetBlockReason(GridCoords targetCoords = default) => base.GetBlockReason(targetCoords);
 
     private void RefreshMoveVisuals()
     {
-        Debug.Log("[MoveAction-Debug] RefreshMoveVisuals Called.");
-
         _planner.CalculateReachableArea(_unit);
-
-        // [LOG 2] 이벤트 구독자 확인
-        if (OnShowReachable == null)
+        if (OnShowReachable != null)
         {
-            Debug.LogError("[MoveAction-Debug] OnShowReachable Event has NO SUBSCRIBERS! (Visualizer missing?)");
-        }
-        else
-        {
-            Debug.Log($"[MoveAction-Debug] Invoking OnShowReachable. Subscriber Count: {OnShowReachable.GetInvocationList().Length}");
             OnShowReachable.Invoke(_planner.CachedReachableTiles, _unit.Coordinate);
         }
     }
@@ -59,8 +49,7 @@ public class MoveAction : BaseAction
     public override void OnSelect()
     {
         base.OnSelect();
-        Debug.Log($"[MoveAction-Debug] OnSelect Called. State: {State}");
-
+        // 활성화 시 이동 가능 범위 시각화
         if (State == ActionState.Active)
         {
             RefreshMoveVisuals();
@@ -94,7 +83,25 @@ public class MoveAction : BaseAction
         if (result.ValidPath.Count == 0 || !result.ValidPath.Last().Equals(mouseGrid)) return ActionExecutionResult.Fail("Unreachable");
 
         OnClearVisuals?.Invoke();
+
+        // 실제 이동 처리
         await _unit.MovePathAsync(result.ValidPath.ToList(), _mapManager);
-        return ActionExecutionResult.Ok();
+
+        // [Logic Moved] 이동 후 상태 판단 로직
+
+        // 1. 행동력이 남음 -> 계속 이동 가능 (재선택 효과)
+        if (_unit.CurrentMobility > 0)
+        {
+            return ActionExecutionResult.Ok(ActionConsequence.SwitchToDefaultAction);
+        }
+
+        // 2. 이동력 소진 & 공격도 완료함 -> 턴 종료
+        if (_unit.HasAttacked)
+        {
+            return ActionExecutionResult.Ok(ActionConsequence.EndTurn);
+        }
+
+        // 3. 이동력만 소진 -> 대기 (공격 등 다른 액션 가능)
+        return ActionExecutionResult.Ok(ActionConsequence.None);
     }
 }

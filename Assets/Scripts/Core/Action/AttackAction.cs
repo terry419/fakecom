@@ -91,36 +91,36 @@ public class AttackAction : BaseAction
             return ActionExecutionResult.Fail("System Error");
         }
 
-        return ActionExecutionResult.Ok();
+        // [Logic Moved] 클래스별 규칙을 여기서 처리 (Controller에서 제거됨)
+        ActionConsequence consequence = ActionConsequence.EndTurn; // 기본: 공격 후 턴 종료
+
+        // 예외: Scout는 공격 후 이동 가능 (Hit & Run)
+        if (_unit.ClassType == ClassType.Scout)
+        {
+            Debug.Log("[AttackAction] Scout Bonus: Switch to Default Action (Hit & Run)");
+            consequence = ActionConsequence.SwitchToDefaultAction;
+        }
+
+        return ActionExecutionResult.Ok(consequence);
     }
 
     private string GetTargetValidationResult(GridCoords targetCoords)
     {
-        // 1. 자기 자신 공격 불가 체크
         if (targetCoords.Equals(_unit.Coordinate)) return "Cannot attack yourself";
 
-        // 2. 사거리 계산 (성능 최적화 버전)
         int range = GetWeaponRange();
-
-        // x, z축 차이 계산
         float dx = _unit.Coordinate.x - targetCoords.x;
         float dz = _unit.Coordinate.z - targetCoords.z;
-
-        // 거리의 제곱 (x^2 + z^2) - Sqrt를 사용하지 않아 연산이 빠름
         float sqrDistance = (dx * dx) + (dz * dz);
 
-        // 사거리의 제곱과 비교
         if (sqrDistance > (range * range))
         {
-            // 실제 거리 로그는 에러 발생 시에만 계산 (사용자 편의용)
             float actualDistance = Mathf.Sqrt(sqrDistance);
             return $"Out of Range ({actualDistance:F1}/{range})";
         }
 
-        // 3. 타일 내 유닛 존재 여부 확인
         if (!_mapManager.HasUnit(targetCoords)) return "No Valid Target";
 
-        // 4. 피아식별 체크
         Unit target = _mapManager.GetUnit(targetCoords);
         if (target != null && target.Faction == _unit.Faction)
         {

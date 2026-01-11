@@ -2,50 +2,45 @@ using UnityEngine;
 using Cysharp.Threading.Tasks;
 
 [RequireComponent(typeof(UnitStatus))]
-public class EnemyUnitController : MonoBehaviour, IUnitController
+public class EnemyUnitController : BaseUnitController
 {
-    public TeamType Team => TeamType.Enemy;
+    public override TeamType Team => TeamType.Enemy;
 
-    private Unit _unit;
-    private UnitStatus _status;
-
-    private void Awake()
+    public override async UniTask OnTurnStart()
     {
-        _status = GetComponent<UnitStatus>();
-    }
+        if (!ValidateStatus())
+        {
+            // 유닛이 죽었거나 문제 있으면 즉시 턴 넘김
+            EndTurnSafe();
+            return;
+        }
 
-    public async UniTask<bool> Possess(Unit unit)
-    {
-        _unit = unit;
-        _status = unit.Status;
-        await UniTask.CompletedTask; // 경고 제거용
-        return true;
-    }
+        Debug.Log($"{ColoredLogTag} {_possessedUnit.name} (AI) Thinking...");
 
-    public async UniTask Unpossess()
-    {
-        _unit = null;
-        await UniTask.CompletedTask; // 경고 제거용
-    }
-
-    public async UniTask OnTurnStart()
-    {
-        Debug.Log($"<color=red>[EnemyUnit] {_status.name} AI 연산 중...</color>");
+        // AI 로직 실행
         await ThinkingProcess();
     }
 
     private async UniTask ThinkingProcess()
     {
-        await UniTask.Delay(1000); // 1초 생각
+        // [임시] 1초간 고민하는 척 (추후 여기에 Move/Attack 로직 추가)
+        await UniTask.Delay(1000);
 
+        Debug.Log($"{ColoredLogTag} {_possessedUnit.name} (AI) Turn Finished.");
+
+        // 턴 종료
+        EndTurnSafe();
+    }
+
+    private void EndTurnSafe()
+    {
         if (ServiceLocator.TryGet<TurnManager>(out var tm))
         {
             tm.EndTurn();
         }
-    }
-
-    public void OnTurnEnd()
-    {
-        Debug.Log($"[EnemyUnit] {_status.name} 턴 종료.");
+        else
+        {
+            Debug.LogError($"{ColoredLogTag} Critical Error: TurnManager not found!");
+        }
     }
 }

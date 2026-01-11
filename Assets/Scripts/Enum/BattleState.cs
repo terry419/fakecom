@@ -10,7 +10,8 @@ public enum BattleState
     // 턴 기반 전투 흐름
     TurnWaiting,    // 다음 행동 유닛을 계산하는 대기 상태
     PlayerTurn,     // 플레이어가 유닛을 조작할 수 있는 상태
-    UnitTurn,       // 특정 유닛(플레이어 또는 적)의 행동이 진행되는 상태
+    EnemyTurn,      // 적 AI가 행동하는 상태
+    UnitTurn,       // (사용 안 함 가능성 높음, 레거시)
 
     // 시네마틱 및 전투 결과
     Cinematic,      // 컷씬 등 연출이 진행되는 상태

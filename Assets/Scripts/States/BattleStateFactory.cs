@@ -40,13 +40,12 @@ public class BattleStateFactory
             case BattleState.TurnWaiting:
                 return new TurnWaitingState(_context);
 
-            // [복구 완료] 이제 PlayerTurn 요청이 오면 정상적으로 상태를 생성합니다.
             case BattleState.PlayerTurn:
                 return new PlayerTurnState(_context);
 
-            // (참고) 적 턴(EnemyTurnState) 스크립트도 만드셨다면 아래 주석을 푸세요.
-            // case BattleState.EnemyTurn:
-            //    return new EnemyTurnState(_context);
+            // [Step 4 Fix] 주석 해제! 적 턴 상태 생성
+            case BattleState.EnemyTurn:
+                return new EnemyTurnState(_context);
 
             case BattleState.BattleEnd:
                 return new BattleEndState(_context);

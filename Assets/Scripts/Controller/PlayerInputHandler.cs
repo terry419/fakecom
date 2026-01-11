@@ -7,8 +7,6 @@ public class PlayerInputHandler : MonoBehaviour
     // 이벤트만 발송 (SRP 준수)
     public event Action<GridCoords> OnHoverChanged;
     public event Action<GridCoords> OnMoveRequested;
-
-    // [Fix] 컴파일 오류 해결: 취소 요청 이벤트 추가
     public event Action OnCancelRequested;
 
     private InputManager _inputManager;
@@ -24,15 +22,21 @@ public class PlayerInputHandler : MonoBehaviour
     {
         _inputManager = inputMgr;
         _mapManager = mapMgr;
+
+        // [Optimization] Camera.main은 내부적으로 FindObjectWithTag를 사용하므로
+        // Initialize 시점에 한 번만 캐싱하여 성능 부하를 줄입니다.
         _mainCamera = Camera.main;
+        if (_mainCamera == null)
+        {
+            Debug.LogError("[PlayerInputHandler] MainCamera not found! Input raycasting will fail.");
+        }
+
         _isInitialized = true;
         Debug.Log("[DEBUG] PlayerInputHandler Initialized.");
     }
 
     public void SetActive(bool active)
     {
-        // Debug.Log($"[InputHandler] SetActive: {active}"); // 로그 너무 많으면 주석 처리
-
         if (!_isInitialized) return;
         if (_isActive == active) return;
 
@@ -57,11 +61,10 @@ public class PlayerInputHandler : MonoBehaviour
     {
         if (!_isActive || !_isInitialized) return;
 
-        // [Fix] ESC 키 입력 감지 -> 취소 이벤트 발송
-        // (Input System 사용 시)
+        // [Input] ESC 취소 요청
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
-            Debug.Log("[InputHandler] Cancel Requested (ESC)");
+            // Debug.Log("[InputHandler] Cancel Requested (ESC)");
             OnCancelRequested?.Invoke();
         }
 
@@ -70,13 +73,11 @@ public class PlayerInputHandler : MonoBehaviour
 
     private void HandleHover()
     {
-        // [수정 핵심] LayerMask 없이 좌표를 가져오는 로직 사용
         if (TryGetGridFromMouse(out GridCoords currentCoords))
         {
             if (!currentCoords.Equals(_lastHoveredCoords))
             {
                 _lastHoveredCoords = currentCoords;
-                // Debug.Log($"[InputHandler] Hover Changed: {currentCoords}");
                 OnHoverChanged?.Invoke(currentCoords);
             }
         }
@@ -99,32 +100,29 @@ public class PlayerInputHandler : MonoBehaviour
     private bool TryGetGridFromMouse(out GridCoords coords)
     {
         coords = default;
+
+        // [Safety] 초기화 안 된 상태 방지 (혹은 런타임에 카메라가 바뀐 경우)
         if (_mainCamera == null) _mainCamera = Camera.main;
-        if (_mapManager == null) return false;
+        if (_mainCamera == null || _mapManager == null) return false;
 
         // InputSystem 마우스 위치
         Vector2 mousePos = Mouse.current.position.ReadValue();
         Ray ray = _mainCamera.ScreenPointToRay(mousePos);
 
-        // 1차 시도: 그냥 쏜다 (LayerMask 따위 신경 안 씀. 뭐든 걸리면 OK)
+        // 1차 시도: Raycast (LayerMask 무관)
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
         {
             coords = GridUtils.WorldToGrid(hit.point);
-            // 맞은 곳에 타일 데이터가 있는지 확인 (이게 진짜 검증)
             if (_mapManager.HasTile(coords)) return true;
         }
 
-        // 2차 시도 (안전장치): Collider가 없거나 레이어가 꼬였을 때
-        // 강제로 바닥 높이(Y=0 혹은 현재 레벨)에 평면을 깔아서 교차점을 계산
-        float planeHeight = 0f;
-
-        Plane virtualFloor = new Plane(Vector3.up, new Vector3(0, planeHeight, 0));
+        // 2차 시도: 가상 평면 (Collider 누락 대비)
+        // Y=0 (또는 맵의 기준 높이) 평면과의 교차점 계산
+        Plane virtualFloor = new Plane(Vector3.up, Vector3.zero);
         if (virtualFloor.Raycast(ray, out float distance))
         {
             Vector3 point = ray.GetPoint(distance);
             coords = GridUtils.WorldToGrid(point);
-
-            // 데이터상으로 타일이 존재하면 유효한 클릭으로 인정
             if (_mapManager.HasTile(coords)) return true;
         }
 
@@ -136,7 +134,6 @@ public class PlayerInputHandler : MonoBehaviour
         if (_inputManager != null)
             _inputManager.OnCommandInput -= HandleClick;
 
-        // 이벤트 구독자 정리 (안전을 위해)
         OnCancelRequested = null;
         OnHoverChanged = null;
         OnMoveRequested = null;
