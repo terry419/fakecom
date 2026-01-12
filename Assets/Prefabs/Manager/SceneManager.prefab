@@ -50,7 +50,7 @@ MonoBehaviour:
   _shortRangeDistance: 4
   _shortRangeBonus: 0.1
   _projectilePrefab: {fileID: 178935609608614010, guid: 3c27cbcb562710544a3f8966866bd74f, type: 3}
-  _projectileSpeed: 3
+  _projectileSpeed: 5
   _shootHeightOffset: 0
   _targetCenterOffset: 0
   _maxPoolSize: 20
@@ -434,7 +434,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48395f7b1ebf7fd448a6f06561b864a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  tsDecrementPerSecond: 5
+  _tsDecrementPerSecond: 7.5
+  _uiTickInterval: 0.1
+  _simulationStep: 0.1
 --- !u!1 &4647220188888504884
 GameObject:
   m_ObjectHideFlags: 0

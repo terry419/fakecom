@@ -16,6 +16,7 @@ MonoBehaviour:
   UnitName: 1_PlayerUnit
   UnitTeam: 0
   Role: 3
+  Icon: {fileID: 0}
   ModelPrefab:
     m_AssetGUID: fafe13c03091abd4d8a99c5de9503184
     m_SubObjectName: 
@@ -32,7 +33,7 @@ MonoBehaviour:
   Range: 0
   Aim: 80
   Evasion: 10
-  CritChance: 0
+  CritChance: 100
   BaseSurvivalChance: 5
   BaseNeuralSync: 100
   BaseOverclockChance: 5

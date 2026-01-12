@@ -1,65 +1,113 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using System;
+using System.Threading;
 
 public class Projectile : MonoBehaviour
 {
-    [Header("Visual Settings")]
-    [Tooltip("총알의 꼬리 효과 (LineRenderer 기반)")]
+    [Header("Visual References")]
     [SerializeField] private TrailRenderer _trail;
-    [Tooltip("목표 도달 시 터질 이펙트")]
     [SerializeField] private ParticleSystem _hitVFX;
+    [SerializeField] private GameObject _meshObject;
 
-    private void Awake()
+    [Header("Settings")]
+    [Tooltip("피격 이펙트 재생 시간(초) - 이 시간만큼 대기 후 투사체가 반환됩니다.")]
+    [SerializeField] private float _vfxDuration = 1.0f; // [Fix 1] 하드코딩/프로퍼티 접근 대신 명시적 설정
+
+    private bool _isActive = false;
+    private CancellationTokenSource _cts;
+
+    private void OnEnable()
     {
-        // TrailRenderer가 있다면 자동으로 설정
-        if (_trail == null) _trail = GetComponent<TrailRenderer>();
+        _cts = new CancellationTokenSource();
+        // [Fix 2] OnEnable에서 _isActive = true 제거 (LaunchAsync 시작 시 활성화)
+        if (_trail != null) _trail.Clear();
+        if (_meshObject != null) _meshObject.SetActive(true);
     }
 
-    /// <summary>
-    /// 시작점에서 목표 지점까지 직선으로 등속 이동합니다.
-    /// </summary>
-    public async UniTask LaunchAsync(Vector3 startPos, Vector3 targetPos, float speed)
+    private void OnDisable()
     {
-        // 1. 초기 위치 설정
-        transform.position = startPos;
+        CancelTask();
+    }
 
-        // 2. 방향 설정 (루프 진입 전 1회만 계산 - 직선탄 최적화)
-        Vector3 direction = (targetPos - startPos).normalized;
+    private void OnDestroy()
+    {
+        CancelTask();
+    }
+
+    private void CancelTask()
+    {
+        _isActive = false;
+        if (_cts != null)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = null;
+        }
+    }
+
+    public async UniTask LaunchAsync(Vector3 start, Vector3 end, float speed, Action onHitCallback = null)
+    {
+        _isActive = true; // [Fix 2] 발사 시점에 활성화
+
+        transform.position = start;
+
+        // 목표 방향 회전
+        Vector3 direction = (end - start).normalized;
         if (direction != Vector3.zero)
         {
             transform.rotation = Quaternion.LookRotation(direction);
         }
 
-        gameObject.SetActive(true);
+        float distance = Vector3.Distance(start, end);
+        float duration = (speed > 0) ? distance / speed : 0f;
+        float elapsed = 0f;
 
-        // 잔상(Trail) 초기화
-        if (_trail != null) _trail.Clear();
+        var token = _cts.Token;
 
-        // 3. 이동 루프 (회전 연산 제거됨)
-        // 목표 지점과의 거리가 매우 가까워질 때까지 이동
-        while (this != null && Vector3.SqrMagnitude(transform.position - targetPos) > 0.0025f) // 0.05 * 0.05
+        try
         {
-            // MoveTowards: 현재 위치에서 목표 위치로 직선 이동
-            transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
+            while (elapsed < duration)
+            {
+                if (token.IsCancellationRequested || !_isActive) return;
 
-            await UniTask.NextFrame();
-        }
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
 
-        // 4. 도착 처리
-        if (this != null)
-        {
-            transform.position = targetPos;
+                transform.position = Vector3.Lerp(start, end, t);
 
-            // 피격 이펙트 재생
+                await UniTask.Yield(PlayerLoopTiming.Update, token);
+            }
+
+            transform.position = end;
+
+            // 타격 시점 콜백
+            onHitCallback?.Invoke();
+
+            // [Fix 3] VFX 및 메쉬 처리
             if (_hitVFX != null)
             {
                 _hitVFX.Play();
-            }
+                // 이펙트 시작 직후 메쉬 숨김
+                if (_meshObject != null) _meshObject.SetActive(false);
 
-            // 이펙트가 보일 수 있도록 잠시 대기 후 비활성화 (선택 사항)
-            // 여기서는 0.5초 뒤에 끕니다.
-            await UniTask.Delay(500);
-            gameObject.SetActive(false);
+                // [Fix 1] 설정된 시간만큼 대기
+                await UniTask.Delay(Mathf.CeilToInt(_vfxDuration * 1000), cancellationToken: token);
+            }
         }
+        catch (OperationCanceledException)
+        {
+            // 작업 취소됨
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[Projectile] Error: {ex.Message}");
+        }
+    }
+
+    public void Deactivate()
+    {
+        _isActive = false;
+        gameObject.SetActive(false);
     }
 }

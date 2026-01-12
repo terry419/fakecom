@@ -25,11 +25,20 @@ public class WeaponDataSO : ItemDataSO
     [Tooltip("치명타 발생 시 데미지 배율 (기본 1.5)")]
     public float CritBonus = 1.5f;
 
+    [Tooltip("명중 시 대상의 TS(Time Score) 페널티 (저지력). 높을수록 적의 턴이 늦게 옴.")]
+    public float HitImpactPenalty = 10f;
+
+    // [New] 기본 탄약 데이터 추가 (필수)
+    // 인벤토리 시스템이 없거나, 적 유닛일 경우 이 탄약을 기본으로 사용함.
+    [Header("2.1 Default Ammo")]
+    [Tooltip("장착된 탄약이 없을 때 사용할 기본 탄약 (AttackTier 참조용)")]
+    public AmmoDataSO DefaultAmmo;
+
     [Header("3. Tactical Logic")]
     [Tooltip("행동 제약 유형 (이동-사격 관계)")]
     public WeaponConstraint ConstraintType;
 
-    [Tooltip("True: 사격 시 턴 강제 종료 / False: 권총 등 (AP 남으면 행동 가능)")]
+    [Tooltip("True: 사격 시 턴 강제 종료 / False: 사격 후에도 추가 행동(이동 등) 가능 여부")]
     public bool EndsTurn = true;
 
     [Header("4. Durability")]
@@ -48,6 +57,10 @@ public class WeaponDataSO : ItemDataSO
     [Tooltip("QTE 미니게임 로직 모듈")]
     public AssetReferenceGameObject ActionModule;
 
+    [Tooltip("발사될 투사체 프리팹 (Projectile 컴포넌트 포함)")]
+    public AssetReferenceGameObject ProjectilePrefab;
+
+    [Header("Visuals (VFX Only)")]
     public AssetReferenceGameObject MuzzleVFX;
     public AssetReferenceGameObject TracerVFX;
     public AssetReferenceGameObject ImpactVFX;
@@ -56,5 +69,4 @@ public class WeaponDataSO : ItemDataSO
     {
         MaxStack = 1; // 장비는 스택 불가
     }
-
 }
