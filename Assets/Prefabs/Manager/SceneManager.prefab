@@ -44,11 +44,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 67d470cb033793e4ba832411edd97107, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _critMultiplier: 1.5
+  _combatSettings: {fileID: 11400000, guid: c1d5184c9037285458a32e39bcc1ce65, type: 2}
   _baseAttackCost: 20
-  _hitImpactPenalty: 10
-  _shortRangeDistance: 4
-  _shortRangeBonus: 0.1
   _projectilePrefab: {fileID: 178935609608614010, guid: 3c27cbcb562710544a3f8966866bd74f, type: 3}
   _projectileSpeed: 5
   _shootHeightOffset: 0

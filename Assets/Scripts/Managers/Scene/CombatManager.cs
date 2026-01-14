@@ -1,4 +1,3 @@
-// 경로: Assets/Scripts/Managers/Scene/CombatManager.cs
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
@@ -7,31 +6,26 @@ public enum AttackResult { Miss, Hit, Critical }
 
 public class CombatManager : MonoBehaviour, IInitializable
 {
-    // ... (기존 밸런스/사거리 변수 유지) ...
-    [Header("Combat Balance")]
-    [SerializeField] private float _critMultiplier = 1.5f;
-    [SerializeField] private float _baseAttackCost = 20f;
-    [SerializeField] private float _hitImpactPenalty = 10f;
+    // ... (기존 변수들 유지) ...
+    [Header("Settings Reference")]
+    [SerializeField] private GlobalCombatSettingsSO _combatSettings;
 
-    [Header("Range Settings")]
-    [SerializeField] private float _shortRangeDistance = 4.0f;
-    [SerializeField] private float _shortRangeBonus = 0.15f;
+    [Header("Combat Balance")]
+    [Tooltip("공격 행동 수행 시 TS(Time Score) 패널티")]
+    [SerializeField] private float _baseAttackCost = 20f;
 
     [Header("Visual Settings")]
     [SerializeField] private Projectile _projectilePrefab;
     [SerializeField] private float _projectileSpeed = 25f;
-
-    // [Fix] GDD 사양(1.5f)에 맞추고, 필요 시 조정 가능하도록 변수화
-    [Tooltip("총알 발사 높이 (유닛 바닥 기준)")]
     [SerializeField] private float _shootHeightOffset = 1.5f;
-    [Tooltip("총알 목표 높이 (타겟 바닥 기준)")]
     [SerializeField] private float _targetCenterOffset = 1.5f;
 
-    // ... (기존 풀링 변수 및 로직 유지) ...
-    [Header("Pooling Settings")]
+    [Header("Pooling")]
     [SerializeField] private int _maxPoolSize = 20;
     private Queue<Projectile> _projectilePool = new Queue<Projectile>();
     private Transform _poolRoot;
+
+    private MapManager _mapManager;
 
     private void Awake()
     {
@@ -46,116 +40,224 @@ public class CombatManager : MonoBehaviour, IInitializable
             ServiceLocator.Unregister<CombatManager>(ManagerScope.Scene);
     }
 
-    public UniTask Initialize(InitializationContext context) => UniTask.CompletedTask;
+    public UniTask Initialize(InitializationContext context)
+    {
+        _mapManager = ServiceLocator.Get<MapManager>();
+
+        if (_combatSettings == null)
+        {
+            _combatSettings = Resources.Load<GlobalCombatSettingsSO>("Settings/GlobalCombatSettings");
+            if (_combatSettings == null)
+            {
+                _combatSettings = ScriptableObject.CreateInstance<GlobalCombatSettingsSO>();
+            }
+        }
+        return UniTask.CompletedTask;
+    }
+
+    // ========================================================================
+    // 3. 전투 예측 (Prediction) [Fix: Multi-Direction Cover Check]
+    // ========================================================================
+    public CombatFormula.HitChanceContext GetCombatPrediction(Unit attacker, Unit target)
+    {
+        if (attacker == null || target == null) return default;
+        if (_mapManager == null) _mapManager = ServiceLocator.Get<MapManager>();
+        if (_mapManager == null) return default;
+
+        try
+        {
+            var attackerData = attacker.Data;
+            var targetData = target.Data;
+            var weapon = attackerData?.MainWeapon;
+
+            Vector3 attackerPos = attacker.transform.position;
+            Vector3 targetPos = target.transform.position;
+
+            float distance = Vector3.Distance(attackerPos, targetPos);
+            int attackerLayer = attacker.Coordinate.y;
+            int targetLayer = target.Coordinate.y;
+
+            // -----------------------------------------------------------
+            // [Fix] 엄폐 로직 개선: 단일 방향이 아닌 4방향 중 '최적의 엄폐' 선택
+            // -----------------------------------------------------------
+            Tile targetTile = _mapManager.GetTile(target.Coordinate);
+            bool isTargetIndoor = false;
+
+            float bestFinalCoverRating = 0f;
+            float debugAngleFactor = 0f;
+
+            if (targetTile != null)
+            {
+                // 4방향을 모두 돌면서, 공격을 가장 잘 막아주는 벽을 찾음
+                for (int i = 0; i < 4; i++)
+                {
+                    Direction dir = (Direction)i;
+                    RuntimeEdge edge = targetTile.GetEdge(dir);
+
+                    // 벽이 없거나 엄폐물이 아니면 패스
+                    if (edge == null || edge.Cover == CoverType.None) continue;
+
+                    // 벽의 정면 벡터 (타일 중심 -> 바깥)
+                    GridCoords dirOffset = GridUtils.GetDirectionVector(dir);
+                    Vector3 coverNormal = new Vector3(dirOffset.x, 0, dirOffset.z).normalized;
+
+                    // 이 벽 기준으로 엄폐율 계산
+                    float rating = CombatFormula.CalculateCoverRating(
+                        edge.Cover,
+                        coverNormal,
+                        attackerPos,
+                        targetPos,
+                        attackerLayer,
+                        targetLayer,
+                        isTargetIndoor,
+                        _combatSettings
+                    );
+
+                    // 가장 높은 방어력을 선택 (Best Cover)
+                    if (rating > bestFinalCoverRating)
+                    {
+                        bestFinalCoverRating = rating;
+
+                        // 디버그용 AngleFactor 역산 (로그 표시용)
+                        Vector3 attackDir = (attackerPos - targetPos).normalized;
+                        debugAngleFactor = Mathf.Max(0f, Vector3.Dot(coverNormal, attackDir));
+                    }
+                }
+            }
+
+            // [Info] 높이 패널티 정보
+            float heightFactorInfo = 1.0f;
+            if (attackerLayer > targetLayer)
+            {
+                float deltaH = attackerLayer - targetLayer;
+                heightFactorInfo = Mathf.Max(_combatSettings.MinHeightFactor,
+                                             1.0f - (deltaH * _combatSettings.HeightReductionFactor));
+            }
+
+            // 5. 명중률 계산
+            float baseAim = (attackerData != null) ? attackerData.Aim / 100f : 0.5f;
+            float targetEvasion = (targetData != null) ? targetData.Evasion / 100f : 0f;
+
+            float rangeBonus = 0f;
+            if (weapon != null && weapon.AccuracyCurveData != null)
+            {
+                float efficiency = weapon.AccuracyCurveData.Evaluate(distance / GridUtils.CELL_SIZE);
+                rangeBonus = (efficiency - 1.0f);
+            }
+
+            return CombatFormula.CalculateHitChance(
+                baseAim,
+                rangeBonus,
+                targetEvasion,
+                bestFinalCoverRating, // [Fix] 계산된 최적 엄폐율 적용
+                debugAngleFactor,
+                heightFactorInfo
+            );
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[CombatManager] Prediction Error: {ex.Message}");
+            return default;
+        }
+    }
 
     public async UniTask<AttackResult> ExecuteAttack(Unit attacker, Unit target)
     {
-        // 1. 검증
-        if (!ValidateAttack(attacker, target)) return AttackResult.Miss;
+        if (attacker == null || target == null) return AttackResult.Miss;
 
-        var attackerStatus = attacker.GetComponent<UnitStatus>();
-        var targetStatus = target.GetComponent<UnitStatus>();
-        var targetHealth = target.GetComponent<UnitHealthSystem>();
-
-        // 2. 계산
-        float hitChance = CalculateHitChance(attacker, target);
-        bool isHit = UnityEngine.Random.value <= hitChance;
-        bool isCrit = false;
-        int finalDamage = 0;
-
-        if (isHit) (finalDamage, isCrit) = CalculateDamage(attacker, target, attackerStatus, targetStatus);
-
-        // 3. 연출
-        var animator = attacker.GetComponentInChildren<Animator>();
-        if (animator != null) animator.SetTrigger("Attack");
-
-        await HandleProjectileSequence(attacker, target, isHit);
-
-        // 4. 적용
-        if (isHit)
+        try
         {
-            var turnManager = ServiceLocator.Get<TurnManager>();
-            bool isTargetTurn = turnManager != null && turnManager.ActiveUnit == targetStatus;
+            var prediction = GetCombatPrediction(attacker, target);
 
-            targetHealth.TakeDamage(finalDamage, isTargetTurn, isCrit, _hitImpactPenalty, false);
-            ShowFeedback(target.transform.position, finalDamage, isCrit, false);
-            Debug.Log($"[Combat] HIT! Target:{target.name} Dmg:{finalDamage}");
+            if (prediction.FinalHitChance <= 0f)
+                Debug.Log($"[Combat] HitChance is 0%. Attack will likely miss.");
+
+            // [Log Fix] 유닛 이름 대신 좌표도 같이 표시하여 혼동 방지
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[Combat] Pred: {attacker.name}({attacker.Coordinate}) -> {target.name}({target.Coordinate}) | " +
+                      $"HitChance={prediction.FinalHitChance * 100:F1}% " +
+                      $"(Aim:{prediction.BaseAim * 100:F0}% + Range:{prediction.RangeBonus * 100:F1}% " +
+                      $"- Eva:{prediction.TargetEvasion * 100:F0}% - Cover:{prediction.FinalCoverRating * 100:F1}%)");
+#endif
+
+            bool isHit = UnityEngine.Random.value <= prediction.FinalHitChance;
+            bool isCrit = false;
+            int finalDamage = 0;
+
+            if (isHit)
+            {
+                int attackTier = (attacker.CurrentAmmo != null) ? attacker.CurrentAmmo.AttackTier : 1;
+                float defenseTier = (target.CurrentArmor != null) ? target.CurrentArmor.DefenseTier : 0f;
+
+                float efficiency = CombatFormula.CalculateEfficiency(attackTier, defenseTier, _combatSettings);
+
+                int minDmg = 1, maxDmg = 2;
+                float critRate = 0.1f;
+                float critBonus = 1.5f;
+
+                if (attacker.Data != null && attacker.Data.MainWeapon != null)
+                {
+                    var w = attacker.Data.MainWeapon;
+                    minDmg = w.Damage.Min;
+                    maxDmg = w.Damage.Max;
+                    critRate = attacker.Data.CritChance / 100f;
+                    critBonus = w.CritBonus;
+                }
+
+                int baseDmg = UnityEngine.Random.Range(minDmg, maxDmg + 1);
+                float rangeMod = 1.0f + prediction.RangeBonus;
+
+                isCrit = UnityEngine.Random.value <= critRate;
+                float critMult = isCrit ? critBonus : 1.0f;
+
+                float rawDamage = baseDmg * rangeMod * efficiency * critMult;
+                finalDamage = Mathf.Max(1, Mathf.RoundToInt(rawDamage));
+            }
+
+            var animator = attacker.GetComponentInChildren<Animator>();
+            if (animator != null) animator.SetTrigger("Attack");
+
+            await HandleProjectileSequence(attacker, target, isHit);
+
+            if (isHit)
+            {
+                var targetHealth = target.GetComponent<UnitHealthSystem>();
+                var turnManager = ServiceLocator.Get<TurnManager>();
+                bool isTargetTurn = turnManager != null && turnManager.ActiveUnit == target.Status;
+
+                float impactPenalty = (attacker.Data?.MainWeapon != null) ? attacker.Data.MainWeapon.HitImpactPenalty : 10f;
+
+                if (targetHealth != null)
+                    targetHealth.TakeDamage(finalDamage, isTargetTurn, isCrit, impactPenalty, false);
+
+                ShowFeedback(target.transform.position, finalDamage, isCrit, false);
+                Debug.Log($"[Combat] HIT! Dmg: {finalDamage}");
+            }
+            else
+            {
+                ShowFeedback(target.transform.position, 0, false, true);
+                Debug.Log($"[Combat] MISS!");
+            }
+
+            if (attacker.Status != null)
+                attacker.Status.AddTurnPenalty(_baseAttackCost);
+
+            attacker.MarkAsAttacked();
+
+            return isHit ? (isCrit ? AttackResult.Critical : AttackResult.Hit) : AttackResult.Miss;
         }
-        else
+        catch (System.Exception ex)
         {
-            ShowFeedback(target.transform.position, 0, false, true);
-            Debug.Log($"[Combat] MISS! Target:{target.name}");
+            Debug.LogError($"[CombatManager] ExecuteAttack Failed: {ex.Message}");
+            return AttackResult.Miss;
         }
-
-        ApplyAttackCost(attackerStatus);
-        attacker.MarkAsAttacked();
-
-        return isHit ? (isCrit ? AttackResult.Critical : AttackResult.Hit) : AttackResult.Miss;
     }
 
-    // ... (ValidateAttack, CalculateDamage, CalculateHitChance, ApplyAttackCost 등 기존 검증/계산 로직 동일) ...
-    private bool ValidateAttack(Unit attacker, Unit target)
-    {
-        if (attacker == null || target == null || attacker == target) return false;
-        var attackerStatus = attacker.GetComponent<UnitStatus>();
-        var targetHealth = target.GetComponent<UnitHealthSystem>();
-        if (attackerStatus == null || targetHealth == null) return false;
-
-        if (attacker.HasAttacked) return false;
-        if (attackerStatus.Condition == UnitCondition.Incapacitated || attackerStatus.Condition == UnitCondition.Fleeing) return false;
-        if (targetHealth.IsDead) return false;
-        if (attacker.Faction == target.Faction && attackerStatus.Condition != UnitCondition.FriendlyFire) return false;
-
-        float dist = Vector3.Distance(attacker.transform.position, target.transform.position);
-        float range = (attacker.Data != null && attacker.Data.MainWeapon != null) ? attacker.Data.MainWeapon.Range : 1.5f;
-
-        float cellSize = 1.0f;
-        try { cellSize = GridUtils.CELL_SIZE; } catch { }
-
-        if (dist > (range * cellSize) + 0.5f) return false;
-        return true;
-    }
-
-    private (int damage, bool isCrit) CalculateDamage(Unit attacker, Unit target, UnitStatus aStatus, UnitStatus tStatus)
-    {
-        int minDmg = 1, maxDmg = 2; float critRate = 0.1f; float armor = 0f;
-        if (aStatus.unitData != null)
-        {
-            var weapon = aStatus.unitData.MainWeapon;
-            if (weapon != null) { minDmg = weapon.Damage.Min; maxDmg = weapon.Damage.Max; }
-            critRate = aStatus.unitData.CritChance;
-        }
-        if (tStatus.unitData != null && tStatus.unitData.BodyArmor != null) armor = tStatus.unitData.BodyArmor.DefenseTier;
-
-        int rawDmg = UnityEngine.Random.Range(minDmg, maxDmg + 1);
-        bool isCrit = UnityEngine.Random.value <= critRate;
-        float multiplier = isCrit ? _critMultiplier : 1.0f;
-        int finalDmg = Mathf.Max(1, Mathf.RoundToInt((rawDmg * multiplier) - armor));
-        return (finalDmg, isCrit);
-    }
-
-    private float CalculateHitChance(Unit attacker, Unit target)
-    {
-        if (attacker.Data == null || target.Data == null) return 0.5f;
-        float acc = attacker.Data.Aim; float eva = target.Data.Evasion;
-        float dist = Vector3.Distance(attacker.transform.position, target.transform.position);
-        float rangeBonus = (dist <= _shortRangeDistance) ? _shortRangeBonus : 0f;
-        return Mathf.Clamp01((acc + rangeBonus) - eva);
-    }
-
-    private void ApplyAttackCost(UnitStatus attackerStatus)
-    {
-        attackerStatus.AddTurnPenalty(_baseAttackCost);
-    }
-
-    // ========================================================================
-    // [Fix] 투사체 높이 보정 (_shootHeightOffset 사용)
-    // ========================================================================
+    // ... (HandleProjectileSequence, GetProjectile, ReturnProjectile, ShowFeedback 동일) ...
     private async UniTask HandleProjectileSequence(Unit attacker, Unit target, bool isHit)
     {
         if (_projectilePrefab == null) { await UniTask.Delay(300); return; }
 
-        // [Fix] 기존 1.5f 하드코딩 -> Inspector 변수 사용
         Vector3 startPos = attacker.transform.position + (Vector3.up * _shootHeightOffset) + (attacker.transform.forward * 0.5f);
         Vector3 targetPos = target.transform.position + (Vector3.up * _targetCenterOffset);
 
@@ -173,7 +275,6 @@ public class CombatManager : MonoBehaviour, IInitializable
         }
     }
 
-    // ... (GetProjectile, ReturnProjectile, ShowFeedback 기존 동일) ...
     private Projectile GetProjectile()
     {
         if (_projectilePool.Count > 0)

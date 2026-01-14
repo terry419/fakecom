@@ -16,15 +16,12 @@ public class PlayerController : MonoBehaviour, IInitializable
 
     public async UniTask Initialize(InitializationContext context)
     {
+        // ... (초기화 로직 동일) ...
         ServiceLocator.Register(this, ManagerScope.Scene);
         var mapManager = ServiceLocator.Get<MapManager>();
         _inputManager = ServiceLocator.Get<InputManager>();
 
-        if (_inputManager == null)
-        {
-            Debug.LogError("[PlayerController] InputManager not found");
-            return;
-        }
+        if (_inputManager == null) { Debug.LogError("[PlayerController] InputManager not found"); return; }
 
         _inputHandler = gameObject.GetComponent<PlayerInputHandler>();
         if (_inputHandler == null) _inputHandler = gameObject.AddComponent<PlayerInputHandler>();
@@ -35,10 +32,7 @@ public class PlayerController : MonoBehaviour, IInitializable
         _inputHandler.OnHoverChanged += OnHoverChanged;
         _inputHandler.OnMoveRequested += OnMoveRequested;
 
-        if (_inputManager != null)
-        {
-            _inputManager.OnAbilityHotkeyPressed += OnHotkeyPressed;
-        }
+        if (_inputManager != null) _inputManager.OnAbilityHotkeyPressed += OnHotkeyPressed;
 
         await UniTask.CompletedTask;
     }
@@ -109,8 +103,9 @@ public class PlayerController : MonoBehaviour, IInitializable
 
     public void SetAction(BaseAction newAction)
     {
-        // [Optimization] 같은 액션이면 초기화 로직을 건너뜀
-        if (_selectedAction == newAction) return;
+        // [Fix] 연속 이동 버그 수정
+        // 같은 액션이라도 상태 초기화(OnExit -> OnSelect)를 위해 강제로 갱신합니다.
+        // if (_selectedAction == newAction) return;  <-- 이 라인 삭제!
 
         if (_selectedAction != null && _selectedAction.State == ActionState.Running)
         {

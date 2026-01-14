@@ -2,8 +2,12 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 
-// 이동 후 사격 제약 (Standard: 가능, Heavy: 이동 후 불가, Light: 사격 후 이동 가능)
-public enum WeaponConstraint { Standard, Heavy, Light }
+public enum ConstraintType
+{
+    Standard, // 이동 -> 사격 가능 (턴 종료)
+    Heavy,    // 이동 -> 사격 불가 (이동 시 사격 비활성)
+    Light     // 이동 -> 사격 가능 (턴 유지, 사격 -> 이동 가능)
+}
 
 [CreateAssetMenu(fileName = "NewWeapon", menuName = "Data/Item/Weapon")]
 public class WeaponDataSO : ItemDataSO
@@ -35,11 +39,9 @@ public class WeaponDataSO : ItemDataSO
     public AmmoDataSO DefaultAmmo;
 
     [Header("3. Tactical Logic")]
-    [Tooltip("행동 제약 유형 (이동-사격 관계)")]
-    public WeaponConstraint ConstraintType;
 
-    [Tooltip("True: 사격 시 턴 강제 종료 / False: 사격 후에도 추가 행동(이동 등) 가능 여부")]
-    public bool EndsTurn = true;
+    [Tooltip("행동 제약 유형 (Standard: 일반 / Heavy: 이동후사격불가 / Light: 사격후이동가능)")]
+    public ConstraintType Constraint = ConstraintType.Standard;
 
     [Header("4. Durability")]
     [Tooltip("최대 내구도 (0이 되면 파손/수리 필요)")]

@@ -40,6 +40,22 @@ public class Tile
     public event Action<Tile> OnWalkableStatusChanged;
 
     // ========================================================================
+    // [신규 기능] 데이터 개방 (GDD 5.3 엄폐 판정용)
+    // ========================================================================
+
+    /// <summary>
+    /// 특정 방향에 있는 벽(엄폐물) 객체를 반환합니다.
+    /// CombatManager가 엄폐 타입(CoverType)을 확인하기 위해 호출합니다.
+    /// </summary>
+    /// <param name="dir">확인할 방향 (North/East/South/West)</param>
+    /// <returns>해당 방향의 RuntimeEdge 객체 (없을 경우 null 또는 빈 객체 반환 가능성 있음)</returns>
+    public RuntimeEdge GetEdge(Direction dir)
+    {
+        // Enum(0~3)을 인덱스로 사용하여 내부 배열에 접근
+        return _edges[(int)dir];
+    }
+
+    // ========================================================================
     // 4. 초기화 및 로드
     // ========================================================================
     public Tile(GridCoords coords, FloorType floorID, PillarType pillarID, string roleTag = null)
@@ -108,7 +124,6 @@ public class Tile
     }
 
     public void SetSharedEdge(Direction dir, RuntimeEdge edge) => _edges[(int)dir] = edge;
-    public RuntimeEdge GetEdge(Direction dir) => _edges[(int)dir];
 
     public void AddOccupant(ITileOccupant occupant)
     {

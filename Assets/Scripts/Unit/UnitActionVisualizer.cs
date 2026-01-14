@@ -1,41 +1,42 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+/// <summary>
+/// Unit(Logic)의 이벤트를 PathVisualizer(View) 명령으로 변환하는 어댑터
+/// </summary>
 public class UnitActionVisualizer : MonoBehaviour
 {
     private PathVisualizer _pathVisualizer;
     private MoveAction _moveAction;
     private AttackAction _attackAction;
 
-    // 초기화 여부 플래그 (중요)
     private bool _isInitialized = false;
 
-    private void Awake()
-    {
-        // 여기서는 아무것도 찾지 않습니다.
-        _pathVisualizer = ServiceLocator.Get<PathVisualizer>();
-    }
+    // [Fix] Awake 제거. ServiceLocator가 준비되지 않았을 수 있음.
 
-    // [핵심] Unit.cs가 액션 생성을 끝내고 호출해줄 메서드
     public void Initialize(MoveAction moveAction, AttackAction attackAction)
     {
+        // 1. 필요한 서비스(PathVisualizer)를 안전하게 확보
+        // 만약 여기서도 없다면 ServiceLocator 문제임.
+        if (ServiceLocator.TryGet(out _pathVisualizer))
+        {
+            Debug.Log($"[Visualizer] Connected to PathVisualizer.");
+        }
+        else
+        {
+            Debug.LogWarning($"[Visualizer] PathVisualizer not found in Scene Scope!");
+        }
+
         _moveAction = moveAction;
         _attackAction = attackAction;
         _isInitialized = true;
 
-        // 초기화 즉시 구독 시작
         SubscribeEvents();
-
-        Debug.Log($"[Visualizer] Initialized via Injection. MoveAction Linked: {_moveAction != null}");
     }
 
     private void OnEnable()
     {
-        // 초기화가 된 상태에서만 활성화 시 구독
-        if (_isInitialized)
-        {
-            SubscribeEvents();
-        }
+        if (_isInitialized) SubscribeEvents();
     }
 
     private void OnDisable()
@@ -45,8 +46,7 @@ public class UnitActionVisualizer : MonoBehaviour
 
     private void SubscribeEvents()
     {
-        // 중복 구독 방지
-        UnsubscribeEvents();
+        UnsubscribeEvents(); // 중복 방지
 
         if (_moveAction != null)
         {
@@ -78,21 +78,29 @@ public class UnitActionVisualizer : MonoBehaviour
         }
     }
 
-    // --- Event Handlers (동일) ---
+    // --- Event Adapters ---
 
     private void HandleShowReachable(HashSet<GridCoords> tiles, GridCoords center)
     {
-        if (_pathVisualizer) _pathVisualizer.ShowReachable(tiles, center);
+        _pathVisualizer?.ShowReachable(tiles, center);
     }
 
     private void HandleShowPath(List<GridCoords> validPath, List<GridCoords> invalidPath)
     {
-        if (validPath == null && invalidPath == null) _pathVisualizer?.ClearPath();
-        else _pathVisualizer?.ShowHybridPath(validPath, invalidPath);
+        if (validPath == null && invalidPath == null)
+            _pathVisualizer?.ClearPath();
+        else
+            _pathVisualizer?.ShowHybridPath(validPath, invalidPath);
     }
 
     private void HandleClearVisuals() => _pathVisualizer?.ClearAll();
 
-    private void HandleShowRange(Vector3 center, int range) => _pathVisualizer?.ShowRangeCircle(center, range);
+    private void HandleShowRange(Vector3 center, int range)
+    {
+        // [변환] Grid 거리(int) -> World 거리(float)
+        float worldRadius = range * GridUtils.CELL_SIZE;
+        _pathVisualizer?.ShowRangeCircle(center, worldRadius);
+    }
+
     private void HandleHideRange() => _pathVisualizer?.HideRangeCircle();
 }

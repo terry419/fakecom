@@ -6,7 +6,7 @@ using System.Collections.Generic;
 [RequireComponent(typeof(UnitMovementSystem))]
 public class Unit : MonoBehaviour, ITileOccupant
 {
-    // ... (±âÁ¸ ÇÊµå¿Í µ¿ÀÏ) ...
+    // ... (ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ ï¿½ï¿½ï¿½ï¿½) ...
     public Faction Faction { get; private set; }
     public GridCoords Coordinate { get; private set; }
     public GridCoords Coords => Coordinate;
@@ -35,120 +35,176 @@ public class Unit : MonoBehaviour, ITileOccupant
     private MoveAction _moveAction;
     private AttackAction _attackAction;
 
-    private UnitActionVisualizer _actionVisualizer;
-
-    public IReadOnlyList<BaseAction> GetActions() => _actions.AsReadOnly();
-    public MoveAction GetMoveAction() => _moveAction;
-    public AttackAction GetAttackAction() => _attackAction;
-    public BaseAction GetDefaultAction() => _moveAction;
-
-    public OccupantType Type => OccupantType.Unit;
-    public bool IsBlockingMovement => true;
-    public bool IsCover => false;
-
-#pragma warning disable 67
-    public event Action<bool> OnBlockingChanged;
-    public event Action<bool> OnCoverChanged;
-#pragma warning restore 67
+    private UnitActionVisualizer _visualizer;
+    private UnitDamageFeedback _damageFeedback;
 
     public event Action<Unit> OnUnitInitialized;
-    private UnitDamageFeedback _damageFeedback;
+    public event Action<bool> OnBlockingChanged;
+    public event Action<bool> OnCoverChanged;
+
+    // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¼ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    private AmmoDataSO _overrideAmmo;
+    public AmmoDataSO CurrentAmmo
+    {
+        get
+        {
+            if (_overrideAmmo != null) return _overrideAmmo;
+            if (Data != null && Data.MainWeapon != null) return Data.MainWeapon.DefaultAmmo;
+            return null;
+        }
+        set => _overrideAmmo = value;
+    }
+
+    private ArmorDataSO _overrideArmor;
+    public ArmorDataSO CurrentArmor
+    {
+        get
+        {
+            if (_overrideArmor != null) return _overrideArmor;
+            if (Data != null) return Data.BodyArmor;
+            return null;
+        }
+        set => _overrideArmor = value;
+    }
+
+    public void EquipAmmo(AmmoDataSO newAmmo) => _overrideAmmo = newAmmo;
+    public void ResetToDefaultAmmo() => _overrideAmmo = null;
+    public void EquipArmor(ArmorDataSO newArmor) => _overrideArmor = newArmor;
+    public void ResetToDefaultArmor() => _overrideArmor = null;
 
     private void Awake()
     {
         _status = GetComponent<UnitStatus>();
         _movementSystem = GetComponent<UnitMovementSystem>();
+        _visualizer = GetComponentInChildren<UnitActionVisualizer>();
+        _damageFeedback = GetComponent<UnitDamageFeedback>();
     }
 
-    public void Initialize(UnitDataSO data, Faction faction)
+    // ï¿½Ê±ï¿½È­ ï¿½Ş¼ï¿½ï¿½ï¿½
+    public void Initialize(GridCoords coords, UnitDataSO data)
     {
+        Initialize(coords, data, Faction.Enemy);
+    }
+
+    public void Initialize(GridCoords coords, UnitDataSO data, Faction faction)
+    {
+        Coordinate = coords;
         Data = data;
         Faction = faction;
-        gameObject.name = Data != null ? $"{Data.UnitName}" : "Unit";
 
-        if (Data != null) ClassType = Data.Role;
+        gameObject.name = $"{Data.UnitName}_{Coordinate} ({Faction})";
 
-        var renderer = GetComponentInChildren<Renderer>();
-        if (renderer != null)
+        SpawnOnMap();
+        OnUnitInitialized?.Invoke(this);
+    }
+
+    public void SpawnOnMap()
+    {
+        if (ServiceLocator.TryGet<MapManager>(out var mapManager))
         {
-            if (faction == Faction.Player) renderer.material.color = Color.blue;
-            else if (faction == Faction.Enemy) renderer.material.color = Color.red;
-            else renderer.material.color = Color.green;
+            mapManager.RegisterUnit(Coordinate, this);
         }
 
-        if (MovementSystem != null) MovementSystem.Initialize(this);
+        transform.position = GridUtils.GridToWorld(Coordinate);
+        AlignToGround();
 
-        // 1. Action »ı¼º
-        _actions.Clear();
+        if (MovementSystem != null)
+        {
+            // [Fix] Error CS1503: cannot convert 'GridCoords' to 'Unit'
+            // MovementSystem.Initializeï¿½ï¿½ Unitï¿½ï¿½ ï¿½Å°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ä±¸ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ô´Ï´ï¿½.
+            MovementSystem.Initialize(this);
+        }
+
         _moveAction = GetOrAddAction<MoveAction>();
         _attackAction = GetOrAddAction<AttackAction>();
 
-        // 2. Visualizer ¿¬°á
-        _actionVisualizer = GetComponent<UnitActionVisualizer>();
-        if (_actionVisualizer == null)
+        if (_visualizer != null)
         {
-            _actionVisualizer = gameObject.AddComponent<UnitActionVisualizer>();
+            _visualizer.Initialize(_moveAction, _attackAction);
         }
-        _actionVisualizer.Initialize(_moveAction, _attackAction);
 
-        _damageFeedback = GetComponent<UnitDamageFeedback>();
-        if (_damageFeedback == null)
+        if (_damageFeedback != null && Status != null)
         {
-            _damageFeedback = gameObject.AddComponent<UnitDamageFeedback>();
+            _damageFeedback.Initialize(Status.HealthSystem);
         }
-        _damageFeedback.Initialize(Status.HealthSystem);
 
-        OnUnitInitialized?.Invoke(this);
-
-        // ---------------------------------------------------------
-        // [Step 4 Fix] ·ÎÄÃ ÄÁÆ®·Ñ·¯(AI) ÀÚµ¿ °¨Áö ¹× ¿¬°á ·ÎÁ÷
-        // Player´Â UnitManager°¡ ³Ö¾îÁÖÁö¸¸, Enemy´Â ½º½º·Î Ã£¾Æ¾ß ÇÔ
-        // ---------------------------------------------------------
-        if (_controller == null)
+        // 6. [ë³µêµ¬] AI ì»¨íŠ¸ë¡¤ëŸ¬ ìë™ ê°ì§€ ë° ì—°ê²°
+        var autoController = GetComponent<IUnitController>();
+        if (autoController != null && _controller == null)
         {
-            var localController = GetComponent<IUnitController>();
-            if (localController != null)
-            {
-                // AI ÄÁÆ®·Ñ·¯´Â ºñµ¿±â ´ë±â ¾øÀÌ Áï½Ã ¼ÒÀ¯±Ç µî·Ï
-                localController.Possess(this).Forget();
-            }
+            // Possess()ë¥¼ í˜¸ì¶œí•˜ë©´, BaseUnitController ë‚´ë¶€ì—ì„œ
+            // unit.SetController(this)ë¥¼ í˜¸ì¶œí•˜ì—¬ ì–‘ë°©í–¥ ì—°ê²°ì´ ì™„ë£Œë©ë‹ˆë‹¤.
+            autoController.Possess(this).Forget();
         }
     }
+    private void AlignToGround()
+    {
+        // 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¤ï¿½ï¿½ ï¿½İ¶ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ ï¿½Ù¿ï¿½å¸¦ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        var renderers = GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
 
-    // ... (ÀÌÇÏ ±âÁ¸ ¸Ş¼­µå µ¿ÀÏ) ...
-    private T GetOrAddAction<T>() where T : BaseAction
+        // ï¿½ï¿½Ã¼ ï¿½Ù¿ï¿½ï¿½ ï¿½ï¿½ï¿½
+        Bounds combinedBounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            combinedBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        // 2. ï¿½ï¿½ï¿½ï¿½ ï¿½ß¹Ù´ï¿½ ï¿½ï¿½ï¿½ï¿½ (World Y)
+        float feetY = combinedBounds.min.y;
+
+        // 3. ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½ï¿½ (Pivot ï¿½ï¿½Ä¡)
+        // GridToWorldï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        float targetY = transform.position.y;
+
+        // 4. ï¿½ï¿½ï¿½Ì¸ï¿½Å­ ï¿½ï¿½ï¿½ï¿½
+        float diff = targetY - feetY;
+        transform.position += new Vector3(0, diff, 0);
+    }
+
+    public T GetOrAddAction<T>() where T : BaseAction
     {
         T action = GetComponent<T>();
-        if (action == null) action = gameObject.AddComponent<T>();
-        action.Initialize(this);
-        if (!_actions.Contains(action)) _actions.Add(action);
+        if (action == null)
+        {
+            action = gameObject.AddComponent<T>();
+        }
+
+        if (!_actions.Contains(action))
+        {
+            _actions.Add(action);
+            action.Initialize(this);
+        }
         return action;
     }
 
-    public void SpawnOnMap(GridCoords coords)
+    public T GetDefaultAction<T>() where T : BaseAction
     {
-        if (!ServiceLocator.TryGet(out MapManager mapManager))
-            throw new InvalidOperationException($"[{nameof(Unit)}] MapManager not found.");
-
-        Coordinate = coords;
-
-        Vector3 worldPos = GridUtils.GridToWorld(coords);
-        float y = worldPos.y;
-        if (TryGetComponent<Collider>(out var col)) y += col.bounds.extents.y;
-        transform.position = new Vector3(worldPos.x, y, worldPos.z);
-
-        if (Data != null) gameObject.name = $"{Data.UnitName}_{Coordinate} ({Faction})";
+        return GetOrAddAction<T>();
     }
 
-    public void OnAddedToTile(Tile tile) => Coordinate = tile.Coordinate;
-    public void OnRemovedFromTile(Tile tile) { }
-
-    public void SetController(IUnitController controller)
+    // [Fix] Error CS0411 in PlayerController: ï¿½ï¿½ï¿½×¸ï¿½ ï¿½ß·ï¿½ ï¿½Ò°ï¿½ ï¿½Ø°ï¿½
+    // MoveActionï¿½ï¿½ ï¿½âº»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Îµï¿½ ï¿½ß°ï¿½
+    public BaseAction GetDefaultAction()
     {
-        if (_controller != null && _controller != controller) _controller.Unpossess();
-        _controller = controller;
-        // Possess´Â ÄÁÆ®·Ñ·¯ Ãø¿¡¼­ È£ÃâÇÏ´Â °ÍÀÌ ¾ÈÀüÇÔ (¼øÈ¯ È£Ãâ ¹æÁö)
+        return GetOrAddAction<MoveAction>();
     }
+
+    public AttackAction GetAttackAction()
+    {
+        return _attackAction != null ? _attackAction : GetOrAddAction<AttackAction>();
+    }
+
+    public void SetController(IUnitController newController)
+    {
+        if (_controller != null && _controller != newController)
+        {
+            _controller.Unpossess();
+        }
+        _controller = newController;
+    }
+
+    public void AssignController(IUnitController newController) => SetController(newController);
 
     public async UniTask OnTurnStart()
     {
@@ -184,6 +240,16 @@ public class Unit : MonoBehaviour, ITileOccupant
 
     private void OnDestroy()
     {
+        if (ServiceLocator.TryGet<MapManager>(out var mapManager))
+        {
+            mapManager.UnregisterUnit(this);
+        }
+
+        if (ServiceLocator.TryGet<UnitManager>(out var unitManager))
+        {
+            unitManager.UnregisterUnit(this);
+        }
+
         if (_actions != null)
         {
             foreach (var action in _actions)
@@ -196,11 +262,14 @@ public class Unit : MonoBehaviour, ITileOccupant
             }
             _actions.Clear();
         }
-
-        if (ServiceLocator.TryGet(out MapManager mapManager) && ServiceLocator.TryGet(out UnitManager unitManager))
-        {
-            mapManager.UnregisterUnit(this);
-            unitManager.UnregisterUnit(this);
-        }
     }
+
+    public OccupantType Type => OccupantType.Unit;
+    public bool IsBlockingMovement => !IsDead;
+    public bool IsCover => true;
+
+    public void OnAddedToTile(Tile tile) { }
+    public void OnRemovedFromTile(Tile tile) { }
+
+    private bool IsDead => Status != null && Status.IsDead;
 }

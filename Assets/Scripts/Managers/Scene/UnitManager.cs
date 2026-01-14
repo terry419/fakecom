@@ -11,13 +11,32 @@ public class UnitManager : MonoBehaviour, IInitializable
     private PlayerController _cachedPlayerController;
 
     private List<Unit> _activeUnits = new List<Unit>();
+
+    // [Fix] 리소스 해제를 위해 핸들 관리가 필요하지만, 
+    // 여기서는 간편하게 GameObject 자체를 Release 하기 위해 캐시 유지
     private Dictionary<string, GameObject> _prefabCache = new Dictionary<string, GameObject>();
 
     private MissionDataSO _currentMission;
     public bool IsInitialized { get; private set; } = false;
 
     private void Awake() => ServiceLocator.Register(this, ManagerScope.Scene);
-    private void OnDestroy() => ServiceLocator.Unregister<UnitManager>(ManagerScope.Scene);
+
+    private void OnDestroy()
+    {
+        // 1. 서비스 등록 해제
+        ServiceLocator.Unregister<UnitManager>(ManagerScope.Scene);
+
+        // 2. [Fix] Addressable 리소스 해제 (메모리 누수 방지)
+        foreach (var prefab in _prefabCache.Values)
+        {
+            if (prefab != null)
+            {
+                Addressables.Release(prefab);
+            }
+        }
+        _prefabCache.Clear();
+        _activeUnits.Clear();
+    }
 
     public async UniTask Initialize(InitializationContext context)
     {
@@ -27,7 +46,6 @@ public class UnitManager : MonoBehaviour, IInitializable
 
         if (_currentMission != null)
         {
-            // [Check] 여기서 await을 했으므로 경고가 사라집니다.
             await SpawnMissionUnitsAsync();
         }
         else
@@ -54,7 +72,6 @@ public class UnitManager : MonoBehaviour, IInitializable
                 string tag = slots[i].RoleTag;
                 if (TryGetAvailableTile(tag, usedTiles, out Tile tile))
                 {
-                    // [Check] await 추가됨
                     await SpawnUnitAsync(squad[i], tile.Coordinate, Faction.Player);
                 }
                 else
@@ -83,7 +100,6 @@ public class UnitManager : MonoBehaviour, IInitializable
 
             if (TryGetAvailableTile(tag, usedTiles, out Tile tile))
             {
-                // [Check] await 추가됨
                 await SpawnUnitAsync(data, tile.Coordinate, faction);
             }
             else
@@ -129,10 +145,16 @@ public class UnitManager : MonoBehaviour, IInitializable
 
         try
         {
-            unit.Initialize(data, faction);
+            // [Refactor] 책임 분리: Unit.Initialize가 Map 등록까지 전담
+            // 1. 초기화 호출 (내부에서 SpawnOnMap -> MapManager.RegisterUnit 수행)
+            unit.Initialize(coords, data, faction);
+
+            // 2. 관리 목록에만 추가
             _activeUnits.Add(unit);
-            _mapManager.RegisterUnit(coords, unit);
-            unit.SpawnOnMap(coords);
+
+            // [삭제됨] 중복 등록 방지
+            // _mapManager.RegisterUnit(coords, unit);
+            // unit.SpawnOnMap();
         }
         catch (Exception ex)
         {
@@ -141,6 +163,7 @@ public class UnitManager : MonoBehaviour, IInitializable
             throw;
         }
 
+        // 플레이어 유닛 자동 빙의 (Possess)
         if (faction == Faction.Player)
         {
             if (_cachedPlayerController == null) _cachedPlayerController = FindObjectOfType<PlayerController>();
