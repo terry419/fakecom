@@ -235,6 +235,45 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "QTE",
+            "id": "be96fe6b-bedc-4565-bb2f-8473ee595298",
+            "actions": [
+                {
+                    "name": "Interact",
+                    "type": "Button",
+                    "id": "742f9cb3-a5a5-4d69-92c5-3bcca82460d9",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "Press(behavior=2)",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "106fcdd6-33a0-48e8-a925-3c98dd0cad79",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b48cf797-af45-4976-a2fc-8ab9b8d34311",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": []
